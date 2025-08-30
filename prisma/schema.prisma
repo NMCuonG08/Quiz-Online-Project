@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String    @id @default(uuid()) @db.Uuid
+  email      String    @unique
+  username   String?   @unique
+  full_name  String?
+  password   String
+  avatar     String?
+  bio        String?   @db.Text
+  isAdmin    Boolean   @default(false)
+  deletedAt  DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  // relations
+  roles          UserRole[]
+  @@map("users")
+}
+
+model Image {
+  id        String   @id @default(uuid()) @db.Uuid
+  url       String   @default("https://res.cloudinary.com/dj9r2qksh/image/upload/v1748052303/coffee-6467644_1280_hhpgwj.jpg")
+  publicId  String
+  alt_text  String?  @db.VarChar(255)
+  caption   String?  @db.VarChar(500)
+  size      Int? // file size in bytes
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  // relations
+
+  @@map("images")
+}
+
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  users           UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model AppPermission {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique // e.g. "user.read"
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId     String   @db.Uuid
+  roleId     String   @db.Uuid
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role          @relation(fields: [roleId], references: [id])
+  permission AppPermission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
