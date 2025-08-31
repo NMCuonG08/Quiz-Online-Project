@@ -37,14 +37,26 @@ interface DivProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof divVariants> {
   asChild?: boolean;
+  containerClassName?: string;
 }
 
 const Div = React.forwardRef<HTMLDivElement, DivProps>(
-  ({ className, variant, size, rounded, asChild = false, ...props }, ref) => {
+  (
+    {
+      className,
+      containerClassName,
+      variant,
+      size,
+      rounded,
+      asChild = false,
+      ...props
+    },
+    ref
+  ) => {
     const Comp = asChild ? "div" : "div";
 
     return (
-      <div className="relative inline-block">
+      <div className={cn("relative inline-block", containerClassName)}>
         {/* Shadow Layer - giống hệt button component */}
         <div
           className={cn(

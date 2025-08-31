@@ -8,11 +8,12 @@ import Test4 from "./components/Test4";
 const Home = () => {
   return (
     <div>
+      <TestSection />
       {/* <TestSection />
       <Test2 /> */}
       {/* <Test3 />
       <LottieAnimation /> */}
-      <Test4 />
+      {/* <Test4 /> */}
     </div>
   );
 };
