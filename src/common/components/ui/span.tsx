@@ -9,11 +9,12 @@ const spanVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-white border-1 border-gray-400 hover:bg-gray-100",
-        destructive: "bg-red-100 border-red-300 text-red-700 hover:bg-red-200",
-        outline: "bg-transparent border-gray-300 hover:bg-gray-50",
+        default: "bg-white dark:bg-black border-border hover:bg-accent",
+        destructive:
+          "bg-destructive/10 border-destructive text-destructive hover:bg-destructive/20",
+        outline: "bg-white dark:bg-black border-border hover:bg-accent",
         whiteTextBlackBorder:
-          "text-white border-black bg-transparent hover:bg-black/10",
+          "text-foreground border-border bg-white dark:bg-black hover:bg-accent",
       },
       size: {
         sm: "text-sm py-1 px-2",

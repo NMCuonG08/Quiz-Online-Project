@@ -1,9 +1,8 @@
-import React from 'react'
+import React from "react";
+import HomeClientPage from "@/modules/client/pages/HomeClientPage";
 
 const page = () => {
-  return (
-    <div>page</div>
-  )
-}
+  return <HomeClientPage />;
+};
 
-export default page
+export default page;

@@ -1,19 +1,12 @@
 import React from "react";
-import TestSection from "./components/TestSection";
-import Test2 from "./components/Test2";
-import Test3 from "./components/Test3";
-import LottieAnimation from "./components/LottieAnimation";
-import Test4 from "./components/Test4";
+import QuizSection from "./components/QuizSection";
+import OffersSection from "./components/OffersSection";
 
 const Home = () => {
   return (
-    <div>
-      <TestSection />
-      {/* <TestSection />
-      <Test2 /> */}
-      {/* <Test3 />
-      <LottieAnimation /> */}
-      {/* <Test4 /> */}
+    <div className="w-full flex flex-col" style={{ overflow: "visible" }}>
+      <QuizSection />
+      <OffersSection />
     </div>
   );
 };

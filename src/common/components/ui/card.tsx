@@ -4,15 +4,15 @@ import { cn } from "@/lib/utils";
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div className="relative inline-block">
-      {/* Shadow Layer - giống hệt button component */}
-      <div className="absolute bg-black rounded-xl w-full h-full -bottom-1 -right-1 transition-all duration-200" />
+    <div className="relative inline-block group">
+      {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
+      <div className="absolute bg-black/20 dark:bg-white/20 rounded-xl w-full h-full -bottom-1 -right-1 transition-all duration-300 group-hover:-bottom-2 group-hover:-right-2 group-hover:scale-105 -z-10" />
 
       {/* Content Layer - với z-index cao hơn shadow */}
       <div
         data-slot="card"
         className={cn(
-          "bg-card border-gray-800 p-4 text-card-foreground flex flex-col gap-6 rounded-xl border py-6 relative z-10",
+          "bg-white dark:bg-black border-border p-4 text-card-foreground flex flex-col gap-6 rounded-xl border-2 py-6 relative z-10 transition-all duration-300 group-hover:scale-105",
           className
         )}
         {...props}

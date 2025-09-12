@@ -25,6 +25,7 @@ import {
   LogOut,
   Proportions,
   ChevronDown,
+  Target,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -70,6 +71,7 @@ const AdminSidebar: React.FC<{ children?: React.ReactNode }> = ({
   const menuItems = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/staff", label: "Staff", icon: UsersRound },
+    { href: "/admin/product", label: "Product", icon: Target },
     { href: "/admin/payments", label: "Payments & Invoices", icon: CreditCard },
     { href: "/admin/bookings", label: "Bookings", icon: Calendar },
     { href: "/admin/settings", label: "Settings", icon: SettingsIcon },

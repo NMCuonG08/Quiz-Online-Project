@@ -56,16 +56,20 @@ const Div = React.forwardRef<HTMLDivElement, DivProps>(
     const Comp = asChild ? "div" : "div";
 
     return (
-      <div className={cn("relative inline-block", containerClassName)}>
-        {/* Shadow Layer - giống hệt button component */}
+      <div className={cn("relative inline-block group", containerClassName)}>
+        {/* Shadow Layer - hiệu ứng đổ bóng đẹp */}
         <div
           className={cn(
-            "absolute bg-black rounded-md transition-all duration-200",
+            "absolute bg-black/20 dark:bg-white/20 transition-all duration-300 group-hover:scale-105 -z-10",
             // Shadow positioning giống button
-            variant === "default" && "w-full h-full -bottom-1 -right-1",
-            variant === "elevated" && "w-full h-full -bottom-1.5 -right-1.5",
-            variant === "large" && "w-full h-full -bottom-2 -right-2",
-            variant === "xl" && "w-full h-full -bottom-3 -right-3",
+            variant === "default" &&
+              "w-full h-full -bottom-1 -right-1 group-hover:-bottom-1.5 group-hover:-right-1.5",
+            variant === "elevated" &&
+              "w-full h-full -bottom-1.5 -right-1.5 group-hover:-bottom-2 group-hover:-right-2",
+            variant === "large" &&
+              "w-full h-full -bottom-2 -right-2 group-hover:-bottom-2.5 group-hover:-right-2.5",
+            variant === "xl" &&
+              "w-full h-full -bottom-3 -right-3 group-hover:-bottom-3.5 group-hover:-right-3.5",
             variant === "none" && "hidden",
             // Rounded corners cho shadow
             rounded === "none" && "rounded-none",
@@ -82,7 +86,7 @@ const Div = React.forwardRef<HTMLDivElement, DivProps>(
           ref={ref}
           className={cn(
             divVariants({ variant, size, rounded }),
-            "relative z-10 bg-white border border-gray-800",
+            "relative z-10 bg-white dark:bg-black border-2 border-border transition-all duration-300 group-hover:scale-105",
             className
           )}
           {...props}
