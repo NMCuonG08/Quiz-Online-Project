@@ -2,17 +2,36 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+type CardProps = React.ComponentProps<"div"> & {
+  disableHover?: boolean;
+  tightShadow?: boolean;
+};
+
+function Card({ className, disableHover, tightShadow, ...props }: CardProps) {
+  const wrapperClass = cn("relative inline-block", disableHover ? "" : "group");
+  const shadowHover = disableHover
+    ? ""
+    : "group-hover:-bottom-2 group-hover:-right-2 group-hover:scale-105";
+  const contentHover = disableHover ? "" : "group-hover:scale-105";
+  const shadowOffset = tightShadow ? "bottom-0 right-0" : "-bottom-1 -right-1";
+
   return (
-    <div className="relative inline-block group">
+    <div className={wrapperClass}>
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
-      <div className="absolute bg-black/20 dark:bg-white/20 rounded-xl w-full h-full -bottom-1 -right-1 transition-all duration-300 group-hover:-bottom-2 group-hover:-right-2 group-hover:scale-105 -z-10" />
+      <div
+        className={cn(
+          "absolute bg-black/20 dark:bg-white/20 rounded-xl w-full h-full transition-all duration-300 -z-10",
+          shadowOffset,
+          shadowHover
+        )}
+      />
 
       {/* Content Layer - với z-index cao hơn shadow */}
       <div
         data-slot="card"
         className={cn(
-          "bg-white dark:bg-black border-border p-4 text-card-foreground flex flex-col gap-6 rounded-xl border-2 py-6 relative z-10 transition-all duration-300 group-hover:scale-105",
+          "bg-white dark:bg-black border-border p-4 text-card-foreground flex flex-col gap-6 rounded-xl border-2 py-6 relative z-10 transition-all duration-300",
+          contentHover,
           className
         )}
         {...props}

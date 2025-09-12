@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Comfortaa } from "next/font/google";
-import "./globals.css";
+import { Geist, Geist_Mono, Comfortaa, Lato } from "next/font/google";
+import "../globals.css";
 import { ThemeProvider } from "@/common/contexts/ThemeContext";
 
 const comfortaa = Comfortaa({
@@ -8,7 +8,6 @@ const comfortaa = Comfortaa({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
 });
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -26,7 +25,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

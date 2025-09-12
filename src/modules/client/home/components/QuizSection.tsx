@@ -5,9 +5,9 @@ import { Button } from "@/common/components/ui/button";
 const QuizSection = () => {
   const quizCategories = [
     "/banners/th1.png",
-    "/banners/th2.jpg",
+    "/banners/th6.jpg",
     "/banners/th3.jpg",
-    "/banners/th4.jpg",
+    "/banners/th8.jpg",
   ];
 
   return (
@@ -47,7 +47,7 @@ const QuizSection = () => {
                     src={src}
                     alt={`Quiz Category ${idx + 1}`}
                     width={200}
-                    height={80}
+                    height={200}
                     className="h-10 sm:h-12 lg:h-14 w-auto object-contain"
                   />
                 </div>
