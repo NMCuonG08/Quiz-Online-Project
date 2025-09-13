@@ -63,6 +63,10 @@ module.exports = {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        coral: {
+          500: '#FF6B6B',
+          600: '#FF5252',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',
