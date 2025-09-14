@@ -44,47 +44,51 @@ const initialState: AuthState = {
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (credentials: LoginFormData, { rejectWithValue }) => {
-    try {
-      const response = await AuthenticationService.handleLogin(credentials);
+    const response = await AuthenticationService.handleLogin(credentials);
+    console.log("Login response:", response);
 
-      if (!response.success) {
-        return rejectWithValue(response.message);
-      }
-
-      return response;
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
+    // Kiểm tra nếu có error trong response
+    if (response.error) {
+      return rejectWithValue(response.error.message || "Login failed");
     }
+
+    return response;
   }
 );
 
 export const getUserProfile = createAsyncThunk(
   "auth/getUserProfile",
   async (_, { rejectWithValue }) => {
-    try {
-      const response = await AuthenticationService.getUserProfile();
-      console.log("User profile fetched successfully:", response);
-      return response.data;
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
+    const response = await AuthenticationService.getUserProfile();
+    console.log("User profile fetched successfully:", response);
+
+    // Kiểm tra nếu có error trong response
+    if (response.error) {
+      return rejectWithValue(
+        response.error.message || "Failed to get user profile"
+      );
     }
+
+    return response.data || response;
   }
 );
 
 export const registerUser = createAsyncThunk(
   "auth/registerUser",
   async (credentials: RegisterFormData, { rejectWithValue }) => {
-    try {
-      const response = await AuthenticationService.handleRegister(credentials);
+    // Remove confirmPassword before sending to service
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confirmPassword, ...registerData } = credentials;
+    const response = await AuthenticationService.handleRegister(registerData);
 
-      if (!response.success) {
-        return rejectWithValue(response.message);
-      }
+    console.log("Registration response:", response);
 
-      return response;
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
+    // Kiểm tra nếu có error trong response
+    if (response.error) {
+      return rejectWithValue(response.error.message || "Registration failed");
     }
+
+    return response;
   }
 );
 
@@ -92,33 +96,29 @@ export const registerUser = createAsyncThunk(
 export const refreshToken = createAsyncThunk(
   "auth/refreshToken",
   async (_, { rejectWithValue }) => {
-    try {
-      const response = await AuthenticationService.refreshToken();
+    const response = await AuthenticationService.refreshToken();
 
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
+    // Kiểm tra nếu có error trong response
+    if (response.error) {
+      return rejectWithValue(response.error.message || "Token refresh failed");
     }
+
+    return response;
   }
 );
 
 export const logout = createAsyncThunk(
   "auth/logout",
   async (_, { rejectWithValue }) => {
-    try {
-      await AuthenticationService.handleLogout();
-      TokenStorage.remove();
-      return null;
-    } catch (error) {
-      TokenStorage.remove();
-      if (error instanceof AxiosError) {
-        return rejectWithValue(
-          error.response?.data?.message || "Logout failed"
-        );
-      }
-      return rejectWithValue("Logout failed");
+    const response = await AuthenticationService.handleLogout();
+    TokenStorage.remove();
+
+    // Kiểm tra nếu có error trong response
+    if (response.error) {
+      return rejectWithValue(response.error.message || "Logout failed");
     }
+
+    return response;
   }
 );
 
@@ -193,7 +193,8 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        const { data } = action.payload;
+        const response = action.payload;
+        const data = response.data || response;
 
         const token = data?.token || data?.accessToken || null;
 
@@ -217,13 +218,20 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(registerUser.fulfilled, (state, action) => {
-        const { data } = action.payload;
+        const response = action.payload;
+        const data = response.data || response;
         const token = data?.token || data?.accessToken || null;
+
         state.isAuthenticated = true;
         state.token = token;
         state.user = data?.user || null;
         state.loading = false;
         state.error = null;
+
+        // Store token in localStorage
+        if (token) {
+          TokenStorage.set(token);
+        }
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -261,7 +269,8 @@ const authSlice = createSlice({
         state.loading = true;
       })
       .addCase(refreshToken.fulfilled, (state, action) => {
-        const { data } = action.payload;
+        const response = action.payload;
+        const data = response.data || response;
         const token = data?.token || data?.accessToken || null;
 
         if (token) {

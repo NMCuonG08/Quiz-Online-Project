@@ -138,7 +138,7 @@ class APILogger {
 }
 
 const apiClient = axios.create({
-  baseURL: "/api",
+  baseURL: "http://localhost:3333",
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
@@ -228,12 +228,26 @@ const performLogout = async (): Promise<void> => {
       }
     }
 
-    // Redirect to login
-    window.location.href = "/auth/login";
+    // Only redirect to login if not already on auth pages
+    const currentPath = window.location.pathname;
+    const isOnAuthPage =
+      currentPath.includes("/auth/login") ||
+      currentPath.includes("/auth/register");
+
+    if (!isOnAuthPage) {
+      window.location.href = "/auth/login";
+    }
   } catch (error) {
     console.error("Logout process failed:", error);
-    // Force redirect even if cleanup failed
-    window.location.href = "/auth/login";
+    // Only force redirect if not on auth pages
+    const currentPath = window.location.pathname;
+    const isOnAuthPage =
+      currentPath.includes("/auth/login") ||
+      currentPath.includes("/auth/register");
+
+    if (!isOnAuthPage) {
+      window.location.href = "/auth/login";
+    }
   }
 };
 
@@ -278,6 +292,28 @@ apiClient.interceptors.response.use(
       originalRequest &&
       !originalRequest._retry
     ) {
+      // Check if this is a login/register request - don't try to refresh token
+      const isAuthRequest =
+        originalRequest.url?.includes("/auth/login") ||
+        originalRequest.url?.includes("/auth/signup") ||
+        originalRequest.url?.includes("/auth/register");
+
+      if (isAuthRequest) {
+        // For auth requests, return the error response instead of rejecting
+        return Promise.resolve({
+          data: error.response?.data || {
+            error: {
+              message: "Authentication failed",
+              code: "AUTH_ERROR",
+            },
+          },
+          status: error.response?.status || 401,
+          statusText: error.response?.statusText || "Unauthorized",
+          headers: error.response?.headers || {},
+          config: error.config,
+        });
+      }
+
       originalRequest._retry = true;
       originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
 
@@ -285,16 +321,24 @@ apiClient.interceptors.response.use(
       if (originalRequest._retryCount > 3) {
         APILogger.logRefreshFailure();
         await performLogout();
-        return Promise.reject(error);
+        return Promise.resolve({
+          data: {
+            error: {
+              message: "Token refresh failed after multiple attempts",
+              code: "REFRESH_FAILED",
+            },
+          },
+          status: 401,
+          statusText: "Unauthorized",
+          headers: {},
+          config: error.config,
+        });
       }
 
       try {
         APILogger.logRefreshAttempt(originalRequest._retryCount);
 
         // Use existing AuthenticationService for token refresh
-        const { AuthenticationService } = await import(
-          "@/modules/auth/common/services/auth.service"
-        );
         const refreshData = await AuthenticationService.refreshToken();
 
         const newToken = refreshData?.token || refreshData?.accessToken;
@@ -310,44 +354,50 @@ apiClient.interceptors.response.use(
 
           return apiClient(originalRequest);
         } else {
-          throw new Error("No token received from refresh service");
+          return Promise.resolve({
+            data: {
+              error: {
+                message: "No token received from refresh service",
+                code: "REFRESH_ERROR",
+              },
+            },
+            status: 401,
+            statusText: "Unauthorized",
+            headers: {},
+            config: error.config,
+          });
         }
       } catch (refreshError) {
         APILogger.logRefreshFailure();
         await performLogout();
-        return Promise.reject(refreshError);
+        return Promise.resolve({
+          data: {
+            error: {
+              message: "Token refresh failed",
+              code: "REFRESH_ERROR",
+            },
+          },
+          status: 401,
+          statusText: "Unauthorized",
+          headers: {},
+          config: error.config,
+        });
       }
     }
 
-    // Create standardized error object
-    const standardError: StandardError = new Error(
-      error.message || "An unexpected error occurred"
-    ) as StandardError;
-
-    // Enhance error with additional context
-    if (error.response) {
-      standardError.status = error.response.status;
-      standardError.statusText = error.response.statusText;
-      standardError.data = error.response.data;
-
-      // Determine if error is retryable
-      standardError.isRetryable = [408, 429, 500, 502, 503, 504].includes(
-        error.response.status
-      );
-    } else if (error.request) {
-      standardError.isNetworkError = true;
-      standardError.isRetryable = true;
-    }
-
-    if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
-      standardError.isTimeoutError = true;
-      standardError.isRetryable = true;
-    }
-
-    standardError.code = error.code;
-    standardError.originalError = error;
-
-    return Promise.reject(standardError);
+    // For all other errors, return the response instead of rejecting
+    return Promise.resolve({
+      data: error.response?.data || {
+        error: {
+          message: error.message || "An unexpected error occurred",
+          code: error.code || "UNKNOWN_ERROR",
+        },
+      },
+      status: error.response?.status || 500,
+      statusText: error.response?.statusText || "Internal Server Error",
+      headers: error.response?.headers || {},
+      config: error.config,
+    });
   }
 );
 

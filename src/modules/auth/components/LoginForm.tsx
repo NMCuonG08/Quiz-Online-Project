@@ -45,16 +45,18 @@ const LoginForm = () => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       setIsLoading(true);
-      await dispatch(loginUser(data)).unwrap();
-    } catch (error: unknown) {
-      console.log("Login error:", error);
-      const errorMessage =
-        typeof error === "string"
-          ? error
-          : error instanceof Error
-          ? error.message
-          : "Login failed. Please try again.";
-      showError(errorMessage);
+      console.log("Starting login process with data:", { email: data.email });
+      const result = await dispatch(loginUser(data)).unwrap();
+      console.log("Login result:", result);
+      if (result.success) {
+        showSuccess("Login successful!");
+        router.push("/");
+      } else {
+        showError(result.error);
+      }
+    } catch (error) {
+      console.log("Login error in component:", error);
+      showError(error || "Login failed");
     } finally {
       setIsLoading(false);
     }
@@ -233,7 +235,7 @@ const LoginForm = () => {
           <p className="text-center text-xs text-muted-foreground mt-6">
             Dont have an account?{" "}
             <Link
-              href="/register"
+              href="/auth/register"
               className="text-foreground font-medium hover:underline"
             >
               Sign up

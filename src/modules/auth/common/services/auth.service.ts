@@ -5,22 +5,41 @@ export class AuthenticationService {
   // Handle user login
   static async handleLogin(credentials: LoginFormData) {
     try {
+      console.log("Attempting login with credentials:", {
+        email: credentials.email,
+      });
       const response = await apiClient.post("/auth/login", credentials);
-
+      console.log("Login API response:", response.data);
       return response.data;
     } catch (error) {
       console.error("Login error:", error);
-      throw error;
+      // Trả về response từ backend thay vì throw error
+      return (
+        error.response?.data || {
+          error: {
+            message: "Login failed",
+            code: "LOGIN_ERROR",
+          },
+        }
+      );
     }
   }
 
   static async handleRegister(credentials: RegisterFormData) {
     try {
-      const response = await apiClient.post("/auth/register", credentials);
+      const response = await apiClient.post("/auth/signup", credentials);
       return response.data;
     } catch (error) {
       console.error("Registration error:", error);
-      throw error;
+      // Trả về response từ backend thay vì throw error
+      return (
+        error.response?.data || {
+          error: {
+            message: "Registration failed",
+            code: "REGISTRATION_ERROR",
+          },
+        }
+      );
     }
   }
 
@@ -30,7 +49,15 @@ export class AuthenticationService {
       return response.data;
     } catch (error) {
       console.error("Get user profile error:", error);
-      throw error;
+      // Trả về response từ backend thay vì throw error
+      return (
+        error.response?.data || {
+          error: {
+            message: "Failed to get user profile",
+            code: "PROFILE_ERROR",
+          },
+        }
+      );
     }
   }
 
@@ -49,10 +76,23 @@ export class AuthenticationService {
       if (refreshResponse.data) {
         return refreshResponse.data.data;
       }
-      throw new Error("Token refresh failed");
+      return {
+        error: {
+          message: "Token refresh failed",
+          code: "REFRESH_ERROR",
+        },
+      };
     } catch (error) {
       console.error("Token refresh failed:", error);
-      throw error;
+      // Trả về response từ backend thay vì throw error
+      return (
+        error.response?.data || {
+          error: {
+            message: "Token refresh failed",
+            code: "REFRESH_ERROR",
+          },
+        }
+      );
     }
   }
 
@@ -62,7 +102,15 @@ export class AuthenticationService {
       return response.data;
     } catch (error) {
       console.error("Logout error:", error);
-      throw error;
+      // Trả về response từ backend thay vì throw error
+      return (
+        error.response?.data || {
+          error: {
+            message: "Logout failed",
+            code: "LOGOUT_ERROR",
+          },
+        }
+      );
     }
   }
 }

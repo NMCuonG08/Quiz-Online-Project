@@ -62,9 +62,10 @@ export const useAuth = () => {
     async (userData: RegisterFormData) => {
       try {
         const result = await dispatch(registerUser(userData)).unwrap();
-        return { success: true, data: result };
+        return result;
       } catch (error) {
-        return { success: false, error: error as string };
+        console.error("Register Hook Error:", error);
+        return error;
       }
     },
     [dispatch]

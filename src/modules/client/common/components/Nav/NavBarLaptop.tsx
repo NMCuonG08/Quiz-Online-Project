@@ -3,10 +3,18 @@ import Link from "next/link";
 import React from "react";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
 import { Button } from "@/common/components/ui/button";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/modules/auth/common/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/common/components/ui/dropdown-menu";
+import { User, LogOut, LayoutDashboard } from "lucide-react";
 
 const NavBarLaptop = () => {
-  const router = useRouter();
+  const { isLoggedIn, user, logout } = useAuth();
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
@@ -49,12 +57,41 @@ const NavBarLaptop = () => {
         {/* Actions */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
-          <Button
-            onClick={() => router.push("/login")}
-            className="inline-flex items-center  bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Sign in
-          </Button>
+          {isLoggedIn ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="inline-flex items-center justify-center w-9 h-9 p-0"
+                >
+                  <User className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link href="/user" className="flex items-center gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => logout()}
+                  className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Đăng xuất
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link href="/auth/login">
+              <Button className="inline-flex items-center bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                Sign in
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </header>

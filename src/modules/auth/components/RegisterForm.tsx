@@ -31,7 +31,7 @@ const RegisterForm = () => {
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      name: "",
+      full_name: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -47,7 +47,8 @@ const RegisterForm = () => {
         console.log("Registration successful:", result.data);
         router.push("/");
       } else {
-        showError(result.error || "Registration failed");
+        console.error("Registration failed:", result);
+        showError(result || "Registration failed");
       }
     } catch (error) {
       console.error("Error during registration:", error);
@@ -90,7 +91,7 @@ const RegisterForm = () => {
               {/* Name */}
               <FormField
                 control={form.control}
-                name="name"
+                name="full_name"
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
@@ -253,7 +254,7 @@ const RegisterForm = () => {
           <p className="text-center text-xs text-muted-foreground mt-6">
             Already have an account?{" "}
             <Link
-              href="/login"
+              href="/auth/login"
               className="text-foreground font-medium hover:underline"
             >
               Sign in
