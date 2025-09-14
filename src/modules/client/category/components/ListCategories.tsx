@@ -3,10 +3,7 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from "@/common/components/ui/carousel";
-import { Card, CardContent } from "@/common/components/ui/card";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -58,10 +55,10 @@ const categories = [
 
 const CategoryCarousel = () => {
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-center mb-2">Danh mục Quiz</h2>
-        <p className="text-gray-600 dark:text-gray-400 text-center">
+    <div className="w-full max-w-4xl mx-auto px-4 py-6">
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold text-center mb-2">Danh mục Quiz</h2>
+        <p className="text-gray-600 dark:text-gray-400 text-center text-sm">
           Chọn chủ đề yêu thích và bắt đầu thử thách
         </p>
       </div>
@@ -77,37 +74,28 @@ const CategoryCarousel = () => {
           {categories.map((category) => (
             <CarouselItem
               key={category.id}
-              className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3 xl:basis-1/4"
+              className="pl-2 md:pl-4 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6"
             >
-              <Link href={`/category/${category.slug}`}>
-                <Card className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-105">
-                  <CardContent className="p-0">
-                    <div className="relative aspect-square overflow-hidden rounded-t-lg">
-                      <Image
-                        src={category.image}
-                        alt={category.name}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-110"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      />
-                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-300" />
-                    </div>
-                    <div className="p-4 text-center">
-                      <h3 className="font-semibold text-lg mb-1 group-hover:text-primary transition-colors duration-300">
-                        {category.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                        {category.description}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
+              <Link
+                href={`/category/${category.slug}`}
+                className="block text-center"
+              >
+                <div className="relative w-12 h-12 mx-auto mb-2">
+                  <Image
+                    src={category.image}
+                    alt={category.name}
+                    fill
+                    className="object-contain"
+                    sizes="48px"
+                  />
+                </div>
+                <h3 className="font-medium text-sm text-center">
+                  {category.name}
+                </h3>
               </Link>
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselPrevious className="hidden md:flex" />
-        <CarouselNext className="hidden md:flex" />
       </Carousel>
     </div>
   );

@@ -35,6 +35,12 @@ const NavBarLaptop = () => {
             Home
           </Link>
           <Link
+            href="/category"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Quizzes
+          </Link>
+          <Link
             href="#courses"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >

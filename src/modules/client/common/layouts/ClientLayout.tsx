@@ -7,7 +7,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
     <div className="min-h-screen bg-background text-foreground">
       <NavBar />
       <main
-        className="mx-auto w-full max-w-6xl px-4 py-6"
+        className="mx-auto w-full max-w-7xl px-4 py-6"
         style={{ overflow: "visible" }}
       >
         {children}

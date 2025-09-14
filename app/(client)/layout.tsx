@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Comfortaa, Lato } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import { ThemeProvider } from "@/common/contexts/ThemeContext";
+import ReduxProvider from "@/common/contexts/ReduxProvider";
+import AuthRestorer from "@/common/contexts/AuthRestorer";
 
-const comfortaa = Comfortaa({
-  variable: "--font-comfortaa",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -39,7 +36,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ReduxProvider>
+            <AuthRestorer>{children}</AuthRestorer>
+          </ReduxProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

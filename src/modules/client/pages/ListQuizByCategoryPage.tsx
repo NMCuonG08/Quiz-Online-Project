@@ -1,8 +1,13 @@
 import React from "react";
 import ListQuizByCategory from "../category/ListQuizByCategory";
+import ClientLayout from "../common/layouts/ClientLayout";
 
 const ListQuizByCategoryPage = () => {
-  return <ListQuizByCategory />;
+  return (
+    <ClientLayout>
+      <ListQuizByCategory />
+    </ClientLayout>
+  );
 };
 
 export default ListQuizByCategoryPage;

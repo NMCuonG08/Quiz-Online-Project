@@ -1,11 +1,12 @@
 import React from "react";
 import ListQuizByCategory from "@/modules/client/category/ListQuizByCategory";
+import ClientLayout from "@/modules/client/common/layouts/ClientLayout";
 
 const page = () => {
   return (
-    <div>
+    <ClientLayout>
       <ListQuizByCategory />
-    </div>
+    </ClientLayout>
   );
 };
 
