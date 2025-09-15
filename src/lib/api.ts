@@ -6,7 +6,7 @@ export interface StandardError extends Error {
   status?: number;
   statusText?: string;
   code?: string;
-  data?: any;
+  data?: unknown;
   isNetworkError?: boolean;
   isTimeoutError?: boolean;
   isRetryable?: boolean;
@@ -62,7 +62,7 @@ class APILogger {
   private static formatError(
     status: number,
     statusText: string,
-    data?: any
+    data?: unknown
   ): string {
     const config = ERROR_CONFIG[status as keyof typeof ERROR_CONFIG];
     const severity = config?.severity || ErrorSeverity.MEDIUM;
@@ -151,10 +151,10 @@ interface AppStore {
   getState: () => {
     auth?: {
       token?: string;
-      user?: any;
+      user?: unknown;
     };
   };
-  dispatch: (action: any) => void;
+  dispatch: (action: unknown) => void;
 }
 
 interface WindowWithStore extends Window {
@@ -408,14 +408,6 @@ export const clearAuthData = (): void => {
 
 export const setAuthToken = (token: string): void => {
   setAccessToken(token);
-};
-
-export const isNetworkError = (error: any): error is StandardError => {
-  return error?.isNetworkError === true;
-};
-
-export const isRetryableError = (error: any): error is StandardError => {
-  return error?.isRetryable === true;
 };
 
 export { apiClient };

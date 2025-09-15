@@ -253,7 +253,7 @@ const ProductTable = () => {
     setFormOpen(true);
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = (data: unknown) => {
     if (formMode === "add") {
       console.log("Adding new product:", data);
     } else {

@@ -90,7 +90,7 @@ const Footer = () => {
                     href="#"
                     className="text-muted-foreground hover:text-foreground transition-colors text-base"
                   >
-                    FAQ's
+                    FAQ&apos;s
                   </a>
                 </li>
               </ul>

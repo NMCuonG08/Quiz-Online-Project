@@ -150,7 +150,8 @@ const DarkModeDemo = () => {
               This is muted text that should have lower contrast.
             </p>
             <blockquote className="border-l-4 border-primary pl-4 italic">
-              "This is a blockquote that should look good in both themes."
+              &quot;This is a blockquote that should look good in both
+              themes.&quot;
             </blockquote>
           </CardContent>
         </Card>

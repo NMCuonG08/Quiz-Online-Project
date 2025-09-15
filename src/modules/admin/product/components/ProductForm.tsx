@@ -93,7 +93,10 @@ const ProductForm: React.FC<ProductFormProps> = ({
     onOpenChange(false);
   };
 
-  const handleInputChange = (field: keyof ProductFormData, value: any) => {
+  const handleInputChange = <K extends keyof ProductFormData>(
+    field: K,
+    value: ProductFormData[K]
+  ) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -271,7 +274,10 @@ const ProductForm: React.FC<ProductFormProps> = ({
                 <Select
                   value={formData.status}
                   onValueChange={(value) =>
-                    handleInputChange("status", value as any)
+                    handleInputChange(
+                      "status",
+                      value as ProductFormData["status"]
+                    )
                   }
                 >
                   <SelectTrigger>

@@ -185,7 +185,7 @@ const StaffForm: React.FC<StaffFormProps> = ({
             <Select
               value={formData.status}
               onValueChange={(value) =>
-                handleInputChange("status", value as any)
+                handleInputChange("status", value as StaffFormData["status"])
               }
             >
               <SelectTrigger>

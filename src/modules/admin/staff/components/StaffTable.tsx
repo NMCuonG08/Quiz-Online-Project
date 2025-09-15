@@ -170,7 +170,7 @@ const StaffTable = () => {
     setFormOpen(true);
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = (data: Staff) => {
     if (formMode === "add") {
       console.log("Adding new staff:", data);
     } else {
