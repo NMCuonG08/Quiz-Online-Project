@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { Button } from "@/common/components/ui/button";
+import Link from "next/link";
 
 const QuizSection = () => {
   const quizCategories = [
@@ -33,7 +34,7 @@ const QuizSection = () => {
                 variant="outline"
                 className="px-6 py-3 text-base lg:text-lg"
               >
-                Xem danh sách Quiz
+                <Link href="/category">Xem danh sách Quiz</Link>
               </Button>
             </div>
 

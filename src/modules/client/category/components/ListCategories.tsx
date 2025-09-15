@@ -13,49 +13,63 @@ const categories = [
     id: 1,
     name: "Toán học",
     slug: "toan-hoc",
-    image: "/icons/icon1.png",
+    image: "/categories/cate1.png",
     description: "Các bài quiz về toán học cơ bản và nâng cao",
   },
   {
     id: 2,
     name: "Vật lý",
     slug: "vat-ly",
-    image: "/icons/icon2.png",
+    image: "/categories/cate2.png",
     description: "Kiến thức vật lý từ cơ bản đến chuyên sâu",
   },
   {
     id: 3,
     name: "Hóa học",
     slug: "hoa-hoc",
-    image: "/icons/icon3.png",
+    image: "/categories/cate3.png",
     description: "Các chủ đề hóa học thú vị và bổ ích",
   },
   {
     id: 4,
     name: "Lịch sử",
     slug: "lich-su",
-    image: "/icons/blue.jpg",
+    image: "/categories/cate4.png",
     description: "Khám phá lịch sử Việt Nam và thế giới",
   },
   {
     id: 5,
     name: "Địa lý",
     slug: "dia-ly",
-    image: "/icons/green.jpg",
+    image: "/categories/cate5.png",
     description: "Kiến thức địa lý tự nhiên và xã hội",
   },
   {
     id: 6,
     name: "Văn học",
     slug: "van-hoc",
-    image: "/icons/pink.jpg",
+    image: "/categories/cate6.png",
+    description: "Tác phẩm văn học và ngôn ngữ",
+  },
+  {
+    id: 7,
+    name: "Văn học",
+    slug: "van-hoc",
+    image: "/categories/cate7.png",
+    description: "Tác phẩm văn học và ngôn ngữ",
+  },
+  {
+    id: 8,
+    name: "Văn học",
+    slug: "van-hoc",
+    image: "/categories/cate8.png",
     description: "Tác phẩm văn học và ngôn ngữ",
   },
 ];
 
 const CategoryCarousel = () => {
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-6">
+    <div className="w-full max-w-6xl mx-auto px-4 py-6">
       <div className="mb-4">
         <h2 className="text-2xl font-bold text-center mb-2">Danh mục Quiz</h2>
         <p className="text-gray-600 dark:text-gray-400 text-center text-sm">
