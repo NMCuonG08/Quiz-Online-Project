@@ -2,10 +2,29 @@
 import Link from "next/link";
 import React from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
+import "@/styles/nav-link.css";
 
 const NavBarMobile = () => {
   const [open, setOpen] = React.useState(false);
+  const pathname = usePathname();
+  const [hash, setHash] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      setHash(window.location.hash || "");
+      const onHashChange = () => setHash(window.location.hash || "");
+      window.addEventListener("hashchange", onHashChange);
+      return () => window.removeEventListener("hashchange", onHashChange);
+    }
+  }, []);
+
+  const isActive = (href: string) => {
+    if (href.startsWith("#")) return hash === href;
+    if (href === "#") return pathname === "/";
+    return pathname === href;
+  };
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -48,29 +67,46 @@ const NavBarMobile = () => {
 
           <nav className="flex flex-col gap-3">
             <Link
-              href="#"
-              className="mobile-nav-link rounded-md px-3 py-2 text-base text-foreground hover:bg-accent transition-colors"
+              href="/"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
+                isActive("/") ? "active" : "hover:text-yellow-500"
+              }`}
               onClick={() => setOpen(false)}
             >
               Home
             </Link>
             <Link
+              href="/category"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
+                isActive("/category") ? "active" : "hover:text-yellow-500"
+              }`}
+              onClick={() => setOpen(false)}
+            >
+              Quizzes
+            </Link>
+            <Link
               href="#courses"
-              className="mobile-nav-link rounded-md px-3 py-2 text-base text-foreground hover:bg-accent transition-colors"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
+                isActive("#courses") ? "active" : "hover:text-yellow-500"
+              }`}
               onClick={() => setOpen(false)}
             >
               Courses
             </Link>
             <Link
               href="#community"
-              className="mobile-nav-link rounded-md px-3 py-2 text-base text-foreground hover:bg-accent transition-colors"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
+                isActive("#community") ? "active" : "hover:text-yellow-500"
+              }`}
               onClick={() => setOpen(false)}
             >
               Community
             </Link>
             <Link
               href="#about"
-              className="mobile-nav-link rounded-md px-3 py-2 text-base text-foreground hover:bg-accent transition-colors"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
+                isActive("#about") ? "active" : "hover:text-yellow-500"
+              }`}
               onClick={() => setOpen(false)}
             >
               About
@@ -126,7 +162,7 @@ const NavBarMobile = () => {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Link
-              href="/signin"
+              href="/auth/login"
               className="inline-flex items-center rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               Sign in
