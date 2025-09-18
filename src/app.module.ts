@@ -8,6 +8,7 @@ import { UserModule } from './modules/user/user.module';
 import { CommonRepositoriesModule } from './common/repositories/common-repositories.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './common/guards/auth.guard';
+import { QuizModule } from './modules/quizz/quiz.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuthGuard } from './common/guards/auth.guard';
     PrismaModule,
     AuthModule,
     UserModule,
+    QuizModule,
   ],
   controllers: [AppController],
   providers: [

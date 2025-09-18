@@ -3,13 +3,21 @@ import { BaseRepository } from './base.repository';
 import { PaginationQueryDto } from '@/common/dtos/responses/base.response';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
 import { CryptoRepository } from '@/common/repositories/crypto.repository';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { UserRepository } from '@/modules/user/repositories/user.repository';
+import { QuizRepository } from '@/modules/quizz/repositories/quiz.repository';
 
 @Injectable()
 export abstract class BaseService {
   constructor(
+    protected readonly jwtService: JwtService,
+    protected readonly configService: ConfigService,
     protected readonly repository: BaseRepository,
     protected readonly logger: LoggingRepository,
-    protected cryptoRepository: CryptoRepository,
+    protected readonly userRepository: UserRepository,
+    protected readonly quizRepository: QuizRepository,
+    protected readonly cryptoRepository: CryptoRepository,
   ) {}
 
   async findAll(paginationDto: PaginationQueryDto) {

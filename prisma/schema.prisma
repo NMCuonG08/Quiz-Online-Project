@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Existing models
 model User {
   id         String    @id @default(uuid()) @db.Uuid
   email      String    @unique
@@ -20,8 +21,23 @@ model User {
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
 
+  // Quiz relations
+  createdQuizzes      Quiz[]
+  quizAttempts        QuizAttempt[]
+  sessionParticipants SessionParticipant[]
+  hostedSessions      QuizSession[]        @relation("SessionHost")
+  activeConnections   ActiveConnection[]
+  notifications       Notification[]
+  pushSubscriptions   PushSubscription[]
+  userRoles           UserRole[]           @relation("UserToRoles")
+  activityLogs        ActivityLog[]
+  feedback            Feedback[]
+  leaderboards        Leaderboard[]
+  userStatistics      UserStatistics?
+
   // relations
-  roles          UserRole[]
+  // consolidated user role relations handled by `userRoles`
+
   @@map("users")
 }
 
@@ -36,11 +52,12 @@ model Image {
   height    Int?
   createdAt DateTime @default(now())
 
-  // relations
+  // Quiz relations
+  quizzes   Quiz[]
+  questions Question[]
 
   @@map("images")
 }
-
 
 model Role {
   id          String   @id @default(uuid()) @db.Uuid
@@ -72,7 +89,7 @@ model UserRole {
   roleId     String   @db.Uuid
   created_at DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation("UserToRoles", fields: [userId], references: [id])
   role Role @relation(fields: [roleId], references: [id])
 
   @@id([userId, roleId])
@@ -90,4 +107,582 @@ model RolePermission {
   @@id([roleId, permissionId])
   @@index([permissionId])
   @@map("role_permissions")
+}
+
+// Quiz System Models
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  icon_url    String?
+  parent_id   String?  @db.Uuid
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  parent       Category?     @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  children     Category[]    @relation("CategoryHierarchy")
+  quizzes      Quiz[]
+  leaderboards Leaderboard[]
+
+  @@index([parent_id])
+  @@index([is_active])
+  @@map("categories")
+}
+
+model Quiz {
+  id               String          @id @default(uuid()) @db.Uuid
+  title            String
+  description      String?         @db.Text
+  category_id      String          @db.Uuid
+  creator_id       String          @db.Uuid
+  difficulty_level DifficultyLevel @default(MEDIUM)
+  time_limit       Int? // seconds
+  max_attempts     Int             @default(1)
+  passing_score    Float           @default(70.0)
+  is_public        Boolean         @default(true)
+  is_active        Boolean         @default(true)
+  quiz_type        QuizType        @default(PRACTICE)
+  instructions     String?         @db.Text
+  thumbnail_id     String?         @db.Uuid
+  tags             String[]        @default([])
+  settings         Json            @default("{}")
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  published_at     DateTime?
+
+  category     Category        @relation(fields: [category_id], references: [id])
+  creator      User            @relation(fields: [creator_id], references: [id])
+  thumbnail    Image?          @relation(fields: [thumbnail_id], references: [id])
+  questions    Question[]
+  attempts     QuizAttempt[]
+  sessions     QuizSession[]
+  statistics   QuizStatistics?
+  cache        QuizCache[]
+  leaderboards Leaderboard[]
+  Feedback     Feedback[]
+
+  @@index([category_id])
+  @@index([creator_id])
+  @@index([is_active])
+  @@index([quiz_type])
+  @@index([published_at])
+  @@map("quizzes")
+}
+
+model Question {
+  id               String          @id @default(uuid()) @db.Uuid
+  quiz_id          String          @db.Uuid
+  question_text    String          @db.Text
+  question_type    QuestionType
+  points           Float           @default(1.0)
+  time_limit       Int? // seconds
+  explanation      String?         @db.Text
+  media_id         String?         @db.Uuid
+  media_type       MediaType?
+  difficulty_level DifficultyLevel @default(MEDIUM)
+  sort_order       Int             @default(0)
+  is_required      Boolean         @default(true)
+  settings         Json            @default("{}")
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+
+  quiz      Quiz               @relation(fields: [quiz_id], references: [id], onDelete: Cascade)
+  media     Image?             @relation(fields: [media_id], references: [id])
+  options   QuestionOption[]
+  responses QuestionResponse[]
+  analytics QuestionAnalytics?
+
+  @@index([quiz_id])
+  @@index([question_type])
+  @@index([sort_order])
+  @@map("questions")
+}
+
+model QuestionOption {
+  id          String   @id @default(uuid()) @db.Uuid
+  question_id String   @db.Uuid
+  option_text String   @db.Text
+  is_correct  Boolean  @default(false)
+  sort_order  Int      @default(0)
+  explanation String?  @db.Text
+  media_url   String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  question Question @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@index([question_id])
+  @@index([is_correct])
+  @@map("question_options")
+}
+
+// Quiz Session Models
+
+model QuizSession {
+  id                   String        @id @default(uuid()) @db.Uuid
+  quiz_id              String        @db.Uuid
+  session_code         String        @unique
+  host_id              String        @db.Uuid
+  session_type         SessionType   @default(PRACTICE)
+  status               SessionStatus @default(WAITING)
+  max_participants     Int           @default(100)
+  current_participants Int           @default(0)
+  start_time           DateTime?
+  end_time             DateTime?
+  settings             Json          @default("{}")
+  created_at           DateTime      @default(now())
+  updated_at           DateTime      @updatedAt
+
+  quiz           Quiz                 @relation(fields: [quiz_id], references: [id])
+  host           User                 @relation("SessionHost", fields: [host_id], references: [id])
+  participants   SessionParticipant[]
+  attempts       QuizAttempt[]
+  connections    ActiveConnection[]
+  realTimeEvents RealTimeEvent[]
+
+  @@index([quiz_id])
+  @@index([session_code])
+  @@index([status])
+  @@index([start_time])
+  @@map("quiz_sessions")
+}
+
+model SessionParticipant {
+  id          String            @id @default(uuid()) @db.Uuid
+  session_id  String            @db.Uuid
+  user_id     String            @db.Uuid
+  joined_at   DateTime          @default(now())
+  left_at     DateTime?
+  status      ParticipantStatus @default(JOINED)
+  device_info Json              @default("{}")
+  ip_address  String?
+
+  session QuizSession @relation(fields: [session_id], references: [id])
+  user    User        @relation(fields: [user_id], references: [id])
+
+  @@unique([session_id, user_id])
+  @@index([session_id])
+  @@index([user_id])
+  @@map("session_participants")
+}
+
+// Quiz Attempt Models
+
+model QuizAttempt {
+  id             String        @id @default(uuid()) @db.Uuid
+  quiz_id        String        @db.Uuid
+  user_id        String        @db.Uuid
+  session_id     String?       @db.Uuid
+  attempt_number Int           @default(1)
+  status         AttemptStatus @default(IN_PROGRESS)
+  score          Float         @default(0)
+  max_score      Float         @default(0)
+  percentage     Float         @default(0)
+  passed         Boolean       @default(false)
+  time_taken     Int? // seconds
+  started_at     DateTime      @default(now())
+  completed_at   DateTime?
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+
+  quiz      Quiz               @relation(fields: [quiz_id], references: [id])
+  user      User               @relation(fields: [user_id], references: [id])
+  session   QuizSession?       @relation(fields: [session_id], references: [id])
+  responses QuestionResponse[]
+
+  @@unique([quiz_id, user_id, attempt_number])
+  @@index([quiz_id])
+  @@index([user_id])
+  @@index([session_id])
+  @@index([status])
+  @@map("quiz_attempts")
+}
+
+model QuestionResponse {
+  id               String   @id @default(uuid()) @db.Uuid
+  attempt_id       String   @db.Uuid
+  question_id      String   @db.Uuid
+  selected_options String[] @default([]) // array of option IDs
+  text_answer      String?  @db.Text
+  is_correct       Boolean  @default(false)
+  points_earned    Float    @default(0)
+  time_taken       Int? // seconds
+  answered_at      DateTime @default(now())
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  attempt  QuizAttempt @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [question_id], references: [id])
+
+  @@unique([attempt_id, question_id])
+  @@index([attempt_id])
+  @@index([question_id])
+  @@map("question_responses")
+}
+
+// Real-time & Socket Models
+
+model ActiveConnection {
+  id              String         @id @default(uuid()) @db.Uuid
+  user_id         String         @db.Uuid
+  socket_id       String         @unique
+  session_id      String?        @db.Uuid
+  connection_type ConnectionType @default(QUIZ)
+  connected_at    DateTime       @default(now())
+  last_ping       DateTime       @default(now())
+  device_info     Json           @default("{}")
+  ip_address      String?
+
+  user    User         @relation(fields: [user_id], references: [id])
+  session QuizSession? @relation(fields: [session_id], references: [id])
+
+  @@index([user_id])
+  @@index([session_id])
+  @@index([socket_id])
+  @@map("active_connections")
+}
+
+model RealTimeEvent {
+  id         String    @id @default(uuid()) @db.Uuid
+  event_type EventType
+  session_id String    @db.Uuid
+  user_id    String?   @db.Uuid
+  event_data Json      @default("{}")
+  created_at DateTime  @default(now())
+
+  session QuizSession @relation(fields: [session_id], references: [id])
+
+  @@index([session_id])
+  @@index([event_type])
+  @@index([created_at])
+  @@map("real_time_events")
+}
+
+// Notification Models
+
+model Notification {
+  id              String               @id @default(uuid()) @db.Uuid
+  user_id         String               @db.Uuid
+  type            NotificationType
+  title           String
+  message         String               @db.Text
+  data            Json                 @default("{}")
+  is_read         Boolean              @default(false)
+  read_at         DateTime?
+  priority        NotificationPriority @default(NORMAL)
+  delivery_method DeliveryMethod[]     @default([IN_APP])
+  scheduled_at    DateTime?
+  sent_at         DateTime?
+  created_at      DateTime             @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([is_read])
+  @@index([type])
+  @@index([scheduled_at])
+  @@map("notifications")
+}
+
+model NotificationTemplate {
+  id               String           @id @default(uuid()) @db.Uuid
+  name             String           @unique
+  type             NotificationType
+  subject_template String
+  message_template String           @db.Text
+  data_schema      Json             @default("{}")
+  is_active        Boolean          @default(true)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+
+  @@index([type])
+  @@map("notification_templates")
+}
+
+model PushSubscription {
+  id            String     @id @default(uuid()) @db.Uuid
+  user_id       String     @db.Uuid
+  endpoint      String
+  p256dh_key    String
+  auth_key      String
+  device_type   DeviceType @default(WEB)
+  is_active     Boolean    @default(true)
+  subscribed_at DateTime   @default(now())
+  last_used_at  DateTime   @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, endpoint])
+  @@index([user_id])
+  @@map("push_subscriptions")
+}
+
+// Statistics & Analytics Models
+
+model QuizStatistics {
+  id                 String   @id @default(uuid()) @db.Uuid
+  quiz_id            String   @unique @db.Uuid
+  total_attempts     Int      @default(0)
+  total_participants Int      @default(0)
+  average_score      Float    @default(0)
+  average_time       Float    @default(0)
+  pass_rate          Float    @default(0)
+  difficulty_rating  Float    @default(0)
+  last_calculated_at DateTime @default(now())
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  quiz Quiz @relation(fields: [quiz_id], references: [id])
+
+  @@map("quiz_statistics")
+}
+
+model UserStatistics {
+  id                    String   @id @default(uuid()) @db.Uuid
+  user_id               String   @unique @db.Uuid
+  total_quizzes_taken   Int      @default(0)
+  total_quizzes_created Int      @default(0)
+  average_score         Float    @default(0)
+  total_time_spent      Int      @default(0) // seconds
+  streak_days           Int      @default(0)
+  last_activity_at      DateTime @default(now())
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("user_statistics")
+}
+
+model QuestionAnalytics {
+  id                   String   @id @default(uuid()) @db.Uuid
+  question_id          String   @unique @db.Uuid
+  total_responses      Int      @default(0)
+  correct_responses    Int      @default(0)
+  incorrect_responses  Int      @default(0)
+  average_time         Float    @default(0)
+  difficulty_index     Float    @default(0)
+  discrimination_index Float    @default(0)
+  last_calculated_at   DateTime @default(now())
+
+  question Question @relation(fields: [question_id], references: [id])
+
+  @@map("question_analytics")
+}
+
+// Support & Logs Models
+
+model ActivityLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String?  @db.Uuid
+  action        String
+  resource_type String
+  resource_id   String?
+  ip_address    String?
+  user_agent    String?
+  details       Json     @default("{}")
+  created_at    DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([action])
+  @@index([created_at])
+  @@map("activity_logs")
+}
+
+model SystemLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  level      LogLevel
+  message    String   @db.Text
+  context    Json     @default("{}")
+  created_at DateTime @default(now())
+
+  @@index([level])
+  @@index([created_at])
+  @@map("system_logs")
+}
+
+model Feedback {
+  id             String         @id @default(uuid()) @db.Uuid
+  user_id        String         @db.Uuid
+  quiz_id        String?        @db.Uuid
+  type           FeedbackType
+  subject        String
+  message        String         @db.Text
+  rating         Int?           @db.SmallInt // 1-5
+  status         FeedbackStatus @default(PENDING)
+  admin_response String?        @db.Text
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+
+  user User  @relation(fields: [user_id], references: [id])
+  quiz Quiz? @relation(fields: [quiz_id], references: [id])
+
+  @@index([user_id])
+  @@index([type])
+  @@index([status])
+  @@map("feedback")
+}
+
+// Cache & Optimization Models
+
+model QuizCache {
+  id         String   @id @default(uuid()) @db.Uuid
+  cache_key  String   @unique
+  quiz_id    String   @db.Uuid
+  data       Json
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  quiz Quiz @relation(fields: [quiz_id], references: [id])
+
+  @@index([cache_key])
+  @@index([expires_at])
+  @@map("quiz_cache")
+}
+
+model Leaderboard {
+  id            String   @id @default(uuid()) @db.Uuid
+  quiz_id       String   @db.Uuid
+  user_id       String   @db.Uuid
+  category_id   String   @db.Uuid
+  score         Float
+  rank_position Int
+  time_taken    Int // seconds
+  attempt_date  DateTime
+  created_at    DateTime @default(now())
+
+  quiz     Quiz     @relation(fields: [quiz_id], references: [id])
+  user     User     @relation(fields: [user_id], references: [id])
+  category Category @relation(fields: [category_id], references: [id])
+
+  @@unique([quiz_id, user_id])
+  @@index([quiz_id, rank_position])
+  @@index([category_id, rank_position])
+  @@map("leaderboards")
+}
+
+// Enums
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuizType {
+  PRACTICE
+  EXAM
+  TIMED
+  LIVE
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_BLANK
+  ESSAY
+  MATCHING
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+}
+
+enum SessionType {
+  LIVE
+  SCHEDULED
+  PRACTICE
+}
+
+enum SessionStatus {
+  WAITING
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum ParticipantStatus {
+  JOINED
+  ACTIVE
+  DISCONNECTED
+  FINISHED
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  TIMED_OUT
+}
+
+enum ConnectionType {
+  QUIZ
+  LOBBY
+  ADMIN
+}
+
+enum EventType {
+  QUESTION_CHANGE
+  USER_JOIN
+  USER_LEAVE
+  ANSWER_SUBMIT
+  TIMER_UPDATE
+  QUIZ_START
+  QUIZ_END
+}
+
+enum NotificationType {
+  QUIZ_INVITE
+  QUIZ_START
+  QUIZ_END
+  RESULT_READY
+  REMINDER
+  SYSTEM
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum DeliveryMethod {
+  IN_APP
+  EMAIL
+  PUSH
+  SMS
+}
+
+enum DeviceType {
+  WEB
+  IOS
+  ANDROID
+}
+
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+enum FeedbackType {
+  BUG
+  SUGGESTION
+  COMPLAINT
+  PRAISE
+}
+
+enum FeedbackStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
 }

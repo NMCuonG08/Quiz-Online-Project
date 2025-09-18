@@ -6,7 +6,7 @@ export class ResponseDto<T> {
   data?: T;
   constructor(statusCode: number, message: string, data?: T) {
     this.success = true;
-    this.error = false;
+
     this.statusCode = statusCode;
     this.message = message;
     this.data = data;

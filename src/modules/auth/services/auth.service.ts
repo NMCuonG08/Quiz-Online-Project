@@ -4,17 +4,13 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+
 import { IncomingHttpHeaders } from 'http';
 import { AuthDto, LoginDto, SignupDto } from '../dto';
 import { ImmichHeader } from '@/common/enums';
 import { Permission } from '@/common/enums';
 import { isGranted } from '@/common/utils/access';
 import { BaseService } from '@/common/base/base.service';
-import { UserRepository } from '@/modules/user/repositories/user.repository';
-import { LoggingRepository } from '@/common/repositories/logging.repository';
-import { CryptoRepository } from '@/common/repositories/crypto.repository';
 
 export type ValidateRequest = {
   headers: IncomingHttpHeaders;
@@ -43,16 +39,6 @@ interface UserData {
 
 @Injectable()
 export class AuthService extends BaseService {
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-    private readonly userRepository: UserRepository,
-    protected readonly logger: LoggingRepository,
-    protected readonly cryptoRepository: CryptoRepository,
-  ) {
-    super(userRepository, logger, cryptoRepository);
-  }
-
   // Login method
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
@@ -268,6 +254,7 @@ export class AuthService extends BaseService {
 
   private getBearerToken(headers: IncomingHttpHeaders): string | null {
     const [type, token] = (headers.authorization || '').split(' ');
+
     if (type.toLowerCase() === 'bearer') {
       return token;
     }
@@ -303,11 +290,11 @@ export class AuthService extends BaseService {
       return {
         user: {
           id: user.id,
+          roles,
           isAdmin: user.isAdmin || false,
           name: user.full_name || user.username || user.email,
           email: user.email,
-          roles,
-          quotaUsageInBytes: 0, // You can implement quota logic later
+          quotaUsageInBytes: 0, // You can impcement quota logic later
           quotaSizeInBytes: null,
         },
       };
@@ -315,11 +302,11 @@ export class AuthService extends BaseService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      throw new UnauthorizedException('Invalid or expired token');
+      throw new UnauthorizedException('Invalid or jxJired token');
     }
   }
 
-  // JWT token generation methods
+  // JWT token generction methods
   async generateAccessToken(userId: string): Promise<string> {
     const payload: JwtPayload = { sub: userId };
 

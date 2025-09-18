@@ -1,18 +1,18 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { BaseRepository } from '@/common/base/base.repository';
+import { PrismaModule } from '@/infrastructure/database/prisma.module';
+import { UserModule } from '../user/user.module';
+import { QuizController } from './controllers/quiz.controller';
+import { QuizService } from './services/quiz.service';
+import { QuizRepository } from './repositories/quiz.repository';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthService } from './services/auth.service';
-import { AuthController } from './controllers/auth.controller';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
-import { PrismaModule } from '@/infrastructure/database/prisma.module';
-import { QuizModule } from '@/modules/quizz/quiz.module';
 
 @Module({
   imports: [
     PrismaModule,
-
-    QuizModule,
+    forwardRef(() => UserModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -22,12 +22,13 @@ import { QuizModule } from '@/modules/quizz/quiz.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
+  controllers: [QuizController],
   providers: [
-    AuthService,
+    QuizService,
+    QuizRepository,
     UserRepository,
-    { provide: BaseRepository, useExisting: UserRepository },
+    { provide: BaseRepository, useExisting: QuizRepository },
   ],
-  exports: [AuthService],
+  exports: [QuizService, QuizRepository],
 })
-export class AuthModule {}
+export class QuizModule {}
