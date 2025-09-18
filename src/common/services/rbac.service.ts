@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { Permission } from '../enums/permisson';
+import { PrismaService } from '@/infrastructure/database/prisma.service';
+import { Permission } from '@/common/enums/permisson';
 
 @Injectable()
 export class RbacService {
@@ -108,9 +108,9 @@ export class RbacService {
     });
 
     const permissions = new Set<string>();
-    
-    userRoles.forEach(userRole => {
-      userRole.role.rolePermissions.forEach(rolePermission => {
+
+    userRoles.forEach((userRole) => {
+      userRole.role.rolePermissions.forEach((rolePermission) => {
         permissions.add(rolePermission.permission.key);
       });
     });
@@ -123,33 +123,46 @@ export class RbacService {
    */
   async hasPermission(userId: string, permission: string): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(userId);
-    return userPermissions.includes(permission) || userPermissions.includes(Permission.All);
+    return (
+      userPermissions.includes(permission) ||
+      userPermissions.includes(Permission.All)
+    );
   }
 
   /**
    * Check if user has any of the permissions
    */
-  async hasAnyPermission(userId: string, permissions: string[]): Promise<boolean> {
+  async hasAnyPermission(
+    userId: string,
+    permissions: string[],
+  ): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(userId);
-    
+
     if (userPermissions.includes(Permission.All)) {
       return true;
     }
 
-    return permissions.some(permission => userPermissions.includes(permission));
+    return permissions.some((permission) =>
+      userPermissions.includes(permission),
+    );
   }
 
   /**
    * Check if user has all permissions
    */
-  async hasAllPermissions(userId: string, permissions: string[]): Promise<boolean> {
+  async hasAllPermissions(
+    userId: string,
+    permissions: string[],
+  ): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(userId);
-    
+
     if (userPermissions.includes(Permission.All)) {
       return true;
     }
 
-    return permissions.every(permission => userPermissions.includes(permission));
+    return permissions.every((permission) =>
+      userPermissions.includes(permission),
+    );
   }
 
   /**
@@ -225,7 +238,10 @@ export class RbacService {
   /**
    * Update role
    */
-  async updateRole(roleId: string, data: { name?: string; description?: string }) {
+  async updateRole(
+    roleId: string,
+    data: { name?: string; description?: string },
+  ) {
     return this.prisma.role.update({
       where: { id: roleId },
       data,
@@ -267,7 +283,7 @@ export class RbacService {
       },
     });
 
-    return roles.map(role => ({
+    return roles.map((role) => ({
       id: role.id,
       name: role.name,
       description: role.description,
@@ -277,4 +293,4 @@ export class RbacService {
       updatedAt: role.updated_at,
     }));
   }
-} 
+}

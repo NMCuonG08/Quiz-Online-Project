@@ -1,7 +1,12 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RbacService } from '../services/rbac.service';
-import { Permission } from '../enums/permisson';
+import { RbacService } from '@/common/services/rbac.service';
+import { Permission } from '@/common/enums/permisson';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -11,10 +16,10 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermissions = this.reflector.getAllAndOverride<Permission[]>('permissions', [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredPermissions = this.reflector.getAllAndOverride<Permission[]>(
+      'permissions',
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredPermissions) {
       return true;
@@ -40,4 +45,4 @@ export class PermissionGuard implements CanActivate {
 
     return true;
   }
-} 
+}

@@ -1,8 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
-import { RbacService } from '../services/rbac.service';
-import { PermissionGuard } from '../guards/permission.guard';
-import { RequirePermissions } from '../decorators/permissions.decorator';
-import { Permission } from '../enums/permisson';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
+import { RbacService } from '@/common/services/rbac.service';
+import { PermissionGuard } from '@/common/guards/permission.guard';
+import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { Permission } from '@/common/enums/permisson';
 
 @Controller('rbac')
 @UseGuards(PermissionGuard)
@@ -107,4 +116,4 @@ export class RbacController {
   async getRoleStatistics() {
     return this.rbacService.getRoleStatistics();
   }
-} 
+}

@@ -7,8 +7,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
-import { ErrorCode } from '../exceptions/error-codes.enum';
-import { ErrorResponse } from '../exceptions/error-response.interface';
+import { ErrorCode } from '@/common/exceptions/error-codes.enum';
+import { ErrorResponse } from '@/common/exceptions/error-response.interface';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -207,9 +207,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     return details;
   }
 
-  private isStructuredError(
-    value: unknown,
-  ): value is {
+  private isStructuredError(value: unknown): value is {
     code: ErrorCode;
     message: string;
     details?: Array<{
