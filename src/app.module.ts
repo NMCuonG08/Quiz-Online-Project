@@ -9,6 +9,7 @@ import { CommonRepositoriesModule } from './common/repositories/common-repositor
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './common/guards/auth.guard';
 import { QuizModule } from './modules/quizz/quiz.module';
+import { CategoryModule } from './modules/category/category.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { QuizModule } from './modules/quizz/quiz.module';
     AuthModule,
     UserModule,
     QuizModule,
+    CategoryModule,
   ],
   controllers: [AppController],
   providers: [

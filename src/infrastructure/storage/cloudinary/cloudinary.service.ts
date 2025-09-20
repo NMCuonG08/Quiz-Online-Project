@@ -16,7 +16,14 @@ export class CloudinaryService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    // Configure Cloudinary with environment variables
+    cloudinary.config({
+      cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
+      api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
+      api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
+    });
+  }
 
   async uploadImage(file: Express.Multer.File): Promise<Image | null> {
     if (!file?.buffer) {

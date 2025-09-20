@@ -1,3 +1,4 @@
+import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { BaseRepository } from './base.repository';
 import { PaginationQueryDto } from '@/common/dtos/responses/base.response';
@@ -7,6 +8,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 import { QuizRepository } from '@/modules/quizz/repositories/quiz.repository';
+import { CategoryRepository } from '@/modules/category/repositories/category.repository';
+import { JobRepository } from '@/common/repositories/job.repository';
 
 @Injectable()
 export abstract class BaseService {
@@ -18,6 +21,9 @@ export abstract class BaseService {
     protected readonly userRepository: UserRepository,
     protected readonly quizRepository: QuizRepository,
     protected readonly cryptoRepository: CryptoRepository,
+    protected readonly categoryRepository: CategoryRepository,
+    protected readonly cloudinaryService: CloudinaryService,
+    protected readonly jobRepository: JobRepository,
   ) {}
 
   async findAll(paginationDto: PaginationQueryDto) {

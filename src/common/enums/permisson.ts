@@ -185,3 +185,7 @@ export enum ImmichQuery {
   ApiKey = 'apiKey',
   SessionKey = 'sessionKey',
 }
+export enum OAuthTokenEndpointAuthMethod {
+  ClientSecretPost = 'client_secret_post',
+  ClientSecretBasic = 'client_secret_basic',
+}

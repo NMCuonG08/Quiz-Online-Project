@@ -28,5 +28,18 @@ export default () => ({
     keyPrefix: process.env.REDIS_KEY_PREFIX || 'app:',
     tls: process.env.REDIS_TLS === 'true',
   },
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+    folder: process.env.CLOUDINARY_FOLDER || 'quiz-thumbnails',
+    allowedFormats: process.env.CLOUDINARY_ALLOWED_FORMATS?.split(',') || [
+      'jpg',
+      'jpeg',
+      'png',
+      'gif',
+      'webp',
+    ],
+  },
   environment: process.env.NODE_ENV || 'development',
 });
