@@ -2,6 +2,7 @@ export enum JobName {
   AssetDelete = 'AssetDelete',
   AssetDeleteCheck = 'AssetDeleteCheck',
   VersionCheck = 'VersionCheck',
+  UploadImage = 'UploadImage',
 }
 
 export enum JobStatus {

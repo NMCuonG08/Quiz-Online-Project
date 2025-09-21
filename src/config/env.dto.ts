@@ -168,7 +168,7 @@ export class EnvDto {
 
   @IsString()
   @Optional()
-  REDIS_HOSTNAME?: string;
+  REDIS_HOST?: string;
 
   @IsInt()
   @Optional()

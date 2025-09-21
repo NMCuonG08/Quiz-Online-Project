@@ -3,6 +3,7 @@ import { ClsModule } from 'nestjs-cls';
 import { LoggingRepository } from './logging.repository';
 import { CryptoRepository } from './crypto.repository';
 import { ConfigRepository } from './config.repository';
+import { MockEventRepository } from './mock-event.repository';
 
 @Global()
 @Module({
@@ -15,7 +16,17 @@ import { ConfigRepository } from './config.repository';
       },
     }),
   ],
-  providers: [LoggingRepository, CryptoRepository, ConfigRepository],
-  exports: [LoggingRepository, CryptoRepository, ConfigRepository],
+  providers: [
+    LoggingRepository,
+    CryptoRepository,
+    ConfigRepository,
+    MockEventRepository,
+  ],
+  exports: [
+    LoggingRepository,
+    CryptoRepository,
+    ConfigRepository,
+    MockEventRepository,
+  ],
 })
-export class CommonRepositoriesModule {} 
+export class CommonRepositoriesModule {}

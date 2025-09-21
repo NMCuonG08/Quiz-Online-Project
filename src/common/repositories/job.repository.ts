@@ -13,7 +13,7 @@ import {
   QueueName,
 } from '@/common/enums';
 import { ConfigRepository } from '@/common/repositories/config.repository';
-import { EventRepository } from '@/common/repositories/event.repository';
+import { MockEventRepository } from '@/common/repositories/mock-event.repository';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
 import { JobCounts, JobItem, JobOf, QueueStatus } from '@/common/types';
 import {
@@ -37,7 +37,7 @@ export class JobRepository {
   constructor(
     private moduleRef: ModuleRef,
     private configRepository: ConfigRepository,
-    private eventRepository: EventRepository,
+    private eventRepository: MockEventRepository,
     private logger: LoggingRepository,
   ) {
     this.logger.setContext(JobRepository.name);
@@ -49,37 +49,24 @@ export class JobRepository {
     // discovery
     for (const Service of services) {
       const instance = this.moduleRef.get<any>(Service);
-      for (const methodName of getMethodNames(instance)) {
-        const handler = instance[methodName];
-        const config = reflector.get<JobConfig>(MetadataKey.JobConfig, handler);
-        if (!config) {
-          continue;
-        }
-
-        const { name: jobName, queue: queueName } = config;
-        const label = `${Service.name}.${handler.name}`;
-
-        // one handler per job
-        if (this.handlers[jobName]) {
-          const jobKey = getKeyByValue(JobName, jobName);
-          const errorMessage = `Failed to add job handler for ${label}`;
-          this.logger.error(
-            `${errorMessage}. JobName.${jobKey} is already handled by ${this.handlers[jobName].label}.`,
-          );
-          throw new ProjetStartupError(errorMessage);
-        }
-
-        this.handlers[jobName] = {
-          label,
-          jobName,
-          queueName,
-          handler: handler.bind(instance),
-        };
-
-        this.logger.verbose(`Added job handler: ${jobName} => ${label}`);
-      }
+      this.setupService(instance, reflector);
     }
 
+    this.validateAllHandlers();
+  }
+
+  setupWithInstances(instances: any[]) {
+    const reflector = this.moduleRef.get(Reflector, { strict: false });
+
+    // discovery
+    for (const instance of instances) {
+      this.setupService(instance, reflector);
+    }
+
+    this.validateAllHandlers();
+  }
+
+  private validateAllHandlers() {
     // no missing handlers
     for (const [jobKey, jobName] of Object.entries(JobName)) {
       const item = this.handlers[jobName];
@@ -93,15 +80,58 @@ export class JobRepository {
     }
   }
 
+  private setupService(instance: any, reflector: Reflector) {
+    for (const methodName of getMethodNames(instance)) {
+      const handler = instance[methodName];
+      const config = reflector.get<JobConfig>(MetadataKey.JobConfig, handler);
+      if (!config) {
+        continue;
+      }
+
+      const { name: jobName, queue: queueName } = config;
+      const label = `${instance.constructor.name}.${handler.name}`;
+
+      // one handler per job
+      if (this.handlers[jobName]) {
+        const jobKey = getKeyByValue(JobName, jobName);
+        const errorMessage = `Failed to add job handler for ${label}`;
+        this.logger.error(
+          `${errorMessage}. JobName.${jobKey} is already handled by ${this.handlers[jobName].label}.`,
+        );
+        throw new ProjetStartupError(errorMessage);
+      }
+
+      this.handlers[jobName] = {
+        label,
+        jobName,
+        queueName,
+        handler: handler.bind(instance),
+      };
+
+      this.logger.verbose(`Added job handler: ${jobName} => ${label}`);
+    }
+  }
+
   startWorkers() {
-    const { bull } = this.configRepository.getEnv();
+    const redisConfig = this.configRepository.getEnv().redis;
     for (const queueName of Object.values(QueueName)) {
       this.logger.debug(`Starting worker for queue: ${queueName}`);
       this.workers[queueName] = new Worker(
         queueName,
-        (job) =>
-          this.eventRepository.emit('JobStart', queueName, job as JobItem),
-        { ...bull.config, concurrency: 1 },
+        async (job) => {
+          this.logger.debug(`Processing job: ${job.name} with data:`, job.data);
+          this.eventRepository.emit('JobStart', queueName, job as JobItem);
+          const result = await this.run({
+            name: job.name as any,
+            data: job.data,
+          });
+          this.logger.debug(`Job ${job.name} completed with result:`, result);
+          return result;
+        },
+        {
+          connection: redisConfig,
+          concurrency: 1,
+        },
       );
     }
   }

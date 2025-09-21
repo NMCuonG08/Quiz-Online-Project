@@ -19,11 +19,18 @@ export interface IEntityJob extends IBaseJob {
   notify?: boolean;
 }
 
+export interface IUploadImageJob extends IBaseJob {
+  id: string;
+  image: Express.Multer.File;
+}
+
 export interface QueueStatus {
   isActive: boolean;
   isPaused: boolean;
 }
-export type JobItem = { name: JobName.VersionCheck; data: IBaseJob };
+export type JobItem =
+  | { name: JobName.VersionCheck; data: IBaseJob }
+  | { name: JobName.UploadImage; data: IUploadImageJob };
 // // Backups
 // | { name: JobName.DatabaseBackup; data?: IBaseJob }
 
