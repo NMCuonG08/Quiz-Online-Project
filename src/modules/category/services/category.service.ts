@@ -13,10 +13,29 @@ export class CategoryService extends BaseService {
       throw new BadRequestException('Category already exists');
     }
 
-    return this.categoryRepository.create(createCategoryDto);
+    const newCategory = await this.categoryRepository.create(createCategoryDto);
+
+    // Invalidate cache khi tạo category mới
+    await this.redisService.del('categories:all');
+
+    return newCategory;
   }
 
   async findAllCategories() {
-    return this.categoryRepository.findMany();
+    const cacheKey = 'categories:all';
+
+    // Thử lấy từ cache trước
+    const cachedCategories = await this.redisService.get(cacheKey);
+    if (cachedCategories) {
+      return cachedCategories;
+    }
+
+    // Nếu không có trong cache, query từ database
+    const categories = await this.categoryRepository.findMany();
+
+    // Cache kết quả với TTL 5 phút (300 giây)
+    await this.redisService.set(cacheKey, categories, 300);
+
+    return categories;
   }
 }

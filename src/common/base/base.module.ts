@@ -10,11 +10,14 @@ import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinar
 import { JobRepository } from '@/common/repositories/job.repository';
 import { EventRepository } from '@/common/repositories/event.repository';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
+import { RedisService } from '@/infrastructure/cache/redis/redis.service';
+import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
 
 @Module({
   imports: [
     PrismaModule,
     CloudinaryModule,
+    RedisModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -32,6 +35,7 @@ import { LoggingRepository } from '@/common/repositories/logging.repository';
     JobRepository,
     EventRepository,
     LoggingRepository,
+    RedisService,
   ],
   exports: [
     PrismaModule,
@@ -43,6 +47,7 @@ import { LoggingRepository } from '@/common/repositories/logging.repository';
     JobRepository,
     EventRepository,
     LoggingRepository,
+    RedisService,
   ],
 })
 export class BaseModule {}

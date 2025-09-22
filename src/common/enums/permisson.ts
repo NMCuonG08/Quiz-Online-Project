@@ -23,12 +23,12 @@ export enum Permission {
   AssetUpload = 'asset.upload',
   AssetReplace = 'asset.replace',
 
-  AlbumCreate = 'album.create',
-  AlbumRead = 'album.read',
-  AlbumUpdate = 'album.update',
-  AlbumDelete = 'album.delete',
-  AlbumStatistics = 'album.statistics',
-  AlbumShare = 'album.share',
+  QuizCreate = 'quiz.create',
+  QuizRead = 'quiz.read',
+  QuizUpdate = 'quiz.update',
+  QuizDelete = 'quiz.delete',
+  QuizStatistics = 'quiz.statistics',
+  QuizShare = 'quiz.share',
   AlbumDownload = 'album.download',
 
   AlbumAssetCreate = 'albumAsset.create',

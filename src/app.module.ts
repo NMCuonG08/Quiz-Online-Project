@@ -23,10 +23,13 @@ import configuration from './config/configuration';
       envFilePath: ['.env.local', '.env'],
       load: [configuration],
     }),
+    // Import RedisModule trước để đảm bảo RedisService được khởi tạo
+    RedisModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const redisConfig = configService.get<{
+          url?: string;
           host: string;
           port: number;
           password?: string;
@@ -36,6 +39,8 @@ import configuration from './config/configuration';
         if (!redisConfig) {
           throw new Error('Redis configuration not found');
         }
+
+        // Sử dụng cùng config với RedisService
         return {
           connection: {
             host: redisConfig.host,
@@ -60,7 +65,6 @@ import configuration from './config/configuration';
     ),
     CommonRepositoriesModule,
     PrismaModule,
-    RedisModule,
     AuthModule,
     UserModule,
     QuizModule,
