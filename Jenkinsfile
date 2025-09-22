@@ -30,6 +30,15 @@ pipeline {
                  sh(script: """  ${buildScript}  """, label: "build with node" )
             }
         }
+        stage('Deploy Files') {
+            steps {
+                sh """
+                    sudo mkdir -p /var/www/nest-shopping-api
+                    sudo rsync -av --delete dist/ /var/www/nest-shopping-api/
+                    sudo cp package*.json /var/www/nest-shopping-api/
+                """
+            }
+        }
         stage('Copy Files') {
         steps {
                 sh "${copyScript}"        // copy dist/
