@@ -1,6 +1,6 @@
 pipeline {
     agent {
-      label 'quiz-server'
+        label 'quiz-server'
     }
     environment {
         apiUser = "nestdev"
@@ -9,61 +9,87 @@ pipeline {
         appType = "node"  
         appContext = "api/v1"
         folderDeploy = "/var/www/${appName}"
-        buildScript = "npm install && npm run build"  
-        copyScript = "sudo cp -r dist/* ${folderDeploy}"
-        copyPackageScript = "sudo cp package*.json ${folderDeploy}"
+        buildScript = "npm install && npm run build"
         installProdScript = "cd ${folderDeploy} && sudo npm install --production"
-        chownScript = "sudo chown -R ${appUser}. ${folderDeploy}"
-        killScript = "sudo pkill -f 'node.*main.js' || true"  // kill Node process
-        runScript = "sudo su ${appUser} -c 'cd ${folderDeploy}; npm run start:prod > nohup.out 2>&1 &'"
-
-
+        chownScript = "sudo chown -R ${apiUser}:${apiUser} ${folderDeploy}"
+        killScript = "sudo pkill -f 'node.*main.js' || true"
+        runScript = "sudo su ${apiUser} -c 'cd ${folderDeploy}; npm run start:prod > nohup.out 2>&1 &'"
     }
     stages {
-        stage('info') {
+        stage('Info') {
             steps {
-                sh(script: """  whoami;pwd;ls -la  """, label: "first stage" )
+                sh(script: "whoami; pwd; ls -la", label: "Environment Info")
             }
         }
-        stage('build'){
+        
+        stage('Build') {
             steps {
-                 sh(script: """  ${buildScript}  """, label: "build with node" )
+                sh(script: "${buildScript}", label: "Build NestJS App")
             }
         }
-        stage('Deploy Files') {
+        
+        stage('Stop Old Process') {
+            steps {
+                sh(script: "${killScript}", label: "Stop Old Node Process")
+            }
+        }
+        
+        stage('Prepare Deploy Directory') {
             steps {
                 sh """
-                    sudo mkdir -p /var/www/nest-shopping-api
-                    sudo rsync -av --delete dist/ /var/www/nest-shopping-api/
-                    sudo cp package*.json /var/www/nest-shopping-api/
+                    sudo rm -rf ${folderDeploy}
+                    sudo mkdir -p ${folderDeploy}
                 """
             }
         }
-        stage('Copy Files') {
-        steps {
-                sh "${copyScript}"        // copy dist/
-                sh "${copyPackageScript}" // copy package.json
+        
+        stage('Deploy Files') {
+            steps {
+                sh """
+                    sudo cp -r dist/* ${folderDeploy}/
+                    sudo cp package*.json ${folderDeploy}/
+                """
             }
         }
+        
         stage('Install Production Dependencies') {
             steps {
-                sh "${installProdScript}" // npm install --production
+                sh "${installProdScript}"
             }
         }
+        
         stage('Set Permissions') {
             steps {
                 sh "${chownScript}"
             }
         }
-        stage('Stop Old Process') {
-            steps {
-                sh "${killScript}"  // kill node process
-            }
-        }
+        
         stage('Start New Process') {
             steps {
-                sh "${runScript}"   // npm run start:prod
+                sh(script: "${runScript}", label: "Start NestJS App")
             }
+        }
+        
+        stage('Health Check') {
+            steps {
+                sh """
+                    sleep 5
+                    curl -f http://localhost:3000/api/v1/health || echo "Health check failed"
+                """
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo "Pipeline completed"
+        }
+        success {
+            echo "Deployment successful!"
+        }
+        failure {
+            echo "Deployment failed!"
+            // Rollback logic có thể thêm ở đây
         }
     }
 }
