@@ -1,31 +1,17 @@
 import { Module } from '@nestjs/common';
 import { BaseRepository } from '@/common/base/base.repository';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BaseModule } from '@/common/base/base.module';
+import { UserRepository } from '@/modules/user/repositories/user.repository';
 import { AuthService } from './services/auth.service';
 import { AuthController } from './controllers/auth.controller';
-import { UserRepository } from '@/modules/user/repositories/user.repository';
-import { PrismaModule } from '@/infrastructure/database/prisma.module';
 import { QuizModule } from '@/modules/quizz/quiz.module';
+import { CategoryModule } from '@/modules/category/category.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-
-    QuizModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
-      }),
-      inject: [ConfigService],
-    }),
-  ],
+  imports: [BaseModule, QuizModule, CategoryModule],
   controllers: [AuthController],
   providers: [
     AuthService,
-    UserRepository,
     { provide: BaseRepository, useExisting: UserRepository },
   ],
   exports: [AuthService],

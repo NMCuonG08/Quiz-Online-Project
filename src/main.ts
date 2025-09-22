@@ -10,9 +10,17 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { TransformResponseInterceptor } from '@/common/interceptors/transform-response.interceptor';
 import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter';
 import { PrismaExceptionFilter } from '@/common/filters/prisma-exception.filter';
+import { JobRepository } from '@/common/repositories/job.repository';
+import { QuizService } from '@/modules/quizz/services/quiz.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Debug Redis connection
+  console.log('Environment variables:');
+  console.log('REDIS_URL:', process.env.REDIS_URL);
+  console.log('REDIS_HOST:', process.env.REDIS_HOST);
+  console.log('REDIS_PORT:', process.env.REDIS_PORT);
 
   // Helper function to map validation errors to error codes
   const getValidationErrorCode = (error: any) => {
@@ -158,6 +166,14 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api', app, document);
+
+  // Initialize job repository with services that have job handlers
+  const jobRepository = app.get(JobRepository);
+  const quizService = app.get(QuizService);
+  jobRepository.setupWithInstances([quizService]);
+
+  // Start workers to process jobs
+  jobRepository.startWorkers();
 
   const port = process.env.PORT || 5000;
   await app.listen(port, '0.0.0.0');

@@ -2,10 +2,22 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/infrastructure/database/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { UserRepository } from '@/modules/user/repositories/user.repository';
+import { QuizRepository } from '@/modules/quizz/repositories/quiz.repository';
+import { CategoryRepository } from '@/modules/category/repositories/category.repository';
+import { CloudinaryModule } from '@/infrastructure/storage/cloudinary/cloudinary.module';
+import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
+import { JobRepository } from '@/common/repositories/job.repository';
+import { EventRepository } from '@/common/repositories/event.repository';
+import { LoggingRepository } from '@/common/repositories/logging.repository';
+import { RedisService } from '@/infrastructure/cache/redis/redis.service';
+import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
 
 @Module({
   imports: [
     PrismaModule,
+    CloudinaryModule,
+    RedisModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -15,7 +27,27 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
     }),
   ],
-  providers: [],
-  exports: [],
+  providers: [
+    UserRepository,
+    QuizRepository,
+    CategoryRepository,
+    CloudinaryService,
+    JobRepository,
+    EventRepository,
+    LoggingRepository,
+    RedisService,
+  ],
+  exports: [
+    PrismaModule,
+    JwtModule,
+    UserRepository,
+    QuizRepository,
+    CategoryRepository,
+    CloudinaryService,
+    JobRepository,
+    EventRepository,
+    LoggingRepository,
+    RedisService,
+  ],
 })
 export class BaseModule {}

@@ -164,7 +164,7 @@ const getEnv = (): EnvData => {
   };
 
   let redisConfig = {
-    host: dto.REDIS_HOSTNAME || 'redis',
+    host: dto.REDIS_HOST || 'localhost',
     port: dto.REDIS_PORT || 6379,
     db: dto.REDIS_DBINDEX || 0,
     username: dto.REDIS_USERNAME || undefined,

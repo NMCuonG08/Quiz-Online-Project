@@ -5,102 +5,116 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClient, RedisClientType } from 'redis';
+import Redis, { RedisOptions } from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
-  private client: RedisClientType | null = null;
+  private client: Redis | null = null;
   private readonly logger = new Logger(RedisService.name);
 
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit(): Promise<void> {
-    await this.connect();
+    // Không auto-connect, để BullModule quản lý connection
+    this.logger.log('RedisService initialized (no auto-connect)');
   }
 
   async onModuleDestroy(): Promise<void> {
     await this.disconnect();
   }
 
-  private getRedisUrl(): string | null {
+  private getRedisConfig(): string | RedisOptions {
+    // Ưu tiên sử dụng REDIS_URL từ environment variable
     const url = this.configService.get<string>('REDIS_URL');
-    console.log('url', url);
-    return url || null;
-  }
+    console.log('REDIS_URL from env:', url);
 
-  private buildUrlFromParts(): string {
-    const host = this.configService.get<string>('redis.host') || '';
-    const port = this.configService.get<number>('redis.port') || 6379;
-    const username = this.configService.get<string>('redis.username');
-    const password = this.configService.get<string>('redis.password');
-    const db = this.configService.get<number>('redis.db') ?? 0;
-    const tls = this.configService.get<boolean>('redis.tls') || false;
-
-    const authPart =
-      username || password ? `${username || ''}:${password || ''}@` : '';
-    const protocol = tls ? 'rediss' : 'redis';
-    return `${protocol}://${authPart}${host}:${port}/${db}`;
-  }
-
-  private shouldUseTls(url: string): boolean {
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol === 'rediss:';
-    } catch {
-      return false;
+    if (url) {
+      return url;
     }
+
+    // Fallback về cấu hình từ config object
+    const redisConfig = this.configService.get<{
+      url?: string;
+      host: string;
+      port: number;
+      username?: string;
+      password?: string;
+      db: number;
+      tls?: boolean;
+    }>('redis');
+
+    if (redisConfig?.url) {
+      console.log('REDIS_URL from config:', redisConfig.url);
+      return redisConfig.url;
+    }
+
+    // Build config từ các phần riêng lẻ
+    if (!redisConfig) {
+      throw new Error('Redis configuration not found');
+    }
+
+    const host = redisConfig.host || '127.0.0.1';
+    const port = redisConfig.port || 6379;
+    const username = redisConfig.username;
+    const password = redisConfig.password;
+    const db = redisConfig.db ?? 0;
+
+    return {
+      host,
+      port,
+      username,
+      password,
+      db,
+    };
   }
 
   async connect(): Promise<void> {
-    if (this.client) return;
-
-    let url = this.getRedisUrl();
-    if (url) {
-      try {
-        const parsed = new URL(url);
-        if (!parsed.hostname) throw new Error('Missing host');
-      } catch {
-        this.logger.warn(
-          'Invalid REDIS_URL provided. Falling back to discrete redis.* config.',
-        );
-        url = null;
-      }
-    }
-    url = url || this.buildUrlFromParts();
-
-    const useTls = this.shouldUseTls(url);
-    const parsed = new URL(url);
-
-    const socketConfig: any = {
-      reconnectStrategy: (retries) => Math.min(retries * 50, 2000),
-    };
-
-    if (useTls) {
-      socketConfig.tls = true;
-      socketConfig.rejectUnauthorized = false; // tránh lỗi cert self-signed
-      socketConfig.servername = parsed.hostname; // bắt buộc cho Redis Cloud
+    if (this.client) {
+      this.logger.log('Redis client already connected');
+      return;
     }
 
-    const clientConfig: any = {
-      url,
-      socket: socketConfig,
-    };
+    this.logger.log('Attempting to connect to Redis...');
 
-    this.client = createClient(clientConfig);
+    const config = this.getRedisConfig();
 
-    this.client.on('error', (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      const stack = err instanceof Error ? err.stack : undefined;
-      this.logger.error(`Redis error: ${message}`, stack);
+    this.logger.log(
+      `Using Redis config: ${typeof config === 'string' ? config : JSON.stringify(config)}`,
+    );
+
+    // ioredis có thể nhận string URL hoặc object config
+    // Sử dụng lazyConnect để tránh auto-connect
+    if (typeof config === 'string') {
+      this.client = new Redis(config, { lazyConnect: true });
+    } else {
+      this.client = new Redis({
+        ...config,
+        lazyConnect: true,
+      });
+    }
+
+    this.client.on('error', (err: Error) => {
+      this.logger.error(`Redis error: ${err.message}`, err.stack);
     });
+
     this.client.on('connect', () => this.logger.log('Redis connecting...'));
-    this.client.on('ready', () => this.logger.log('Redis connected'));
+    this.client.on('ready', () =>
+      this.logger.log('Redis connected successfully'),
+    );
     this.client.on('reconnecting', () =>
       this.logger.warn('Redis reconnecting...'),
     );
-    this.client.on('end', () => this.logger.warn('Redis connection closed'));
+    this.client.on('close', () => this.logger.warn('Redis connection closed'));
 
-    await this.client.connect();
+    try {
+      await this.client.connect();
+      this.logger.log('Redis connection established');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to connect to Redis: ${errorMessage}`);
+      throw error;
+    }
   }
 
   async disconnect(): Promise<void> {
@@ -112,11 +126,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private ensureClient(): RedisClientType {
+  private async ensureClient(): Promise<Redis> {
     if (!this.client) {
-      throw new Error('Redis client not connected');
+      await this.connect();
     }
-    return this.client;
+    return this.client!;
   }
 
   private withPrefix(key: string): string {
@@ -125,7 +139,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async get<T = unknown>(key: string): Promise<T | null> {
-    const raw = await this.ensureClient().get(this.withPrefix(key));
+    const client = await this.ensureClient();
+    const raw = await client.get(this.withPrefix(key));
     if (raw == null) return null;
     try {
       return JSON.parse(raw) as T;
@@ -135,49 +150,47 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+    const client = await this.ensureClient();
     const payload = typeof value === 'string' ? value : JSON.stringify(value);
     const fullKey = this.withPrefix(key);
     if (ttlSeconds && ttlSeconds > 0) {
-      await this.ensureClient().set(fullKey, payload, { EX: ttlSeconds });
+      await client.setex(fullKey, ttlSeconds, payload);
     } else {
-      await this.ensureClient().set(fullKey, payload);
+      await client.set(fullKey, payload);
     }
   }
 
   async del(key: string | string[]): Promise<void> {
-    const client = this.ensureClient();
+    const client = await this.ensureClient();
     if (Array.isArray(key)) {
       if (key.length === 0) return;
       const keys = key.map((k) => this.withPrefix(k));
-      await client.del(keys);
+      await client.del(...keys);
       return;
     }
     await client.del(this.withPrefix(key));
   }
 
   async keys(pattern: string): Promise<string[]> {
-    const client = this.ensureClient();
-    const prefix =
-      this.configService.get<string>('REDIS_KEY_PREFIX') || 'app:';
-    const iter = client.scanIterator({ MATCH: `${prefix}${pattern}` });
-    const results: string[] = [];
-    for await (const key of iter) {
-      results.push(String(key));
-    }
-    return results;
+    const client = await this.ensureClient();
+    const prefix = this.configService.get<string>('REDIS_KEY_PREFIX') || 'app:';
+    const keys = await client.keys(`${prefix}${pattern}`);
+    return keys;
   }
 
   async delByPattern(pattern: string): Promise<void> {
     const keys = await this.keys(pattern);
     if (keys.length) {
-      await this.ensureClient().del(keys);
+      const client = await this.ensureClient();
+      await client.del(...keys);
     }
   }
 
   async flushNamespace(): Promise<void> {
     const keys = await this.keys('*');
     if (keys.length) {
-      await this.ensureClient().del(keys);
+      const client = await this.ensureClient();
+      await client.del(...keys);
     }
   }
 }
