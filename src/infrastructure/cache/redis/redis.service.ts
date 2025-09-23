@@ -14,7 +14,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async onModuleInit(): Promise<void> {
+  onModuleInit(): void {
     // Không auto-connect, để BullModule quản lý connection
     this.logger.log('RedisService initialized (no auto-connect)');
   }
@@ -29,6 +29,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     console.log('REDIS_URL from env:', url);
 
     if (url) {
+      // Nếu người dùng bật REDIS_TLS nhưng URL không phải rediss://, cảnh báo để tránh timeout do sai giao thức
+      const wantTls = this.configService.get<boolean>('redis.tls');
+      if (wantTls && /^redis:\/\//i.test(url) && !/^rediss:\/\//i.test(url)) {
+        this.logger.warn(
+          'REDIS_TLS=true nhưng REDIS_URL không phải rediss://. Hãy dùng rediss:// hoặc tắt REDIS_TLS, nếu không có thể lỗi ETIMEDOUT.',
+        );
+      }
       return url;
     }
 
@@ -58,6 +65,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const username = redisConfig.username;
     const password = redisConfig.password;
     const db = redisConfig.db ?? 0;
+    const tlsEnabled = !!redisConfig.tls;
 
     return {
       host,
@@ -65,6 +73,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       username,
       password,
       db,
+      // Bật TLS nếu cấu hình yêu cầu. Có thể thêm các option như servername/ca nếu cần.
+      tls: tlsEnabled ? {} : undefined,
     };
   }
 

@@ -34,19 +34,47 @@ import configuration from './config/configuration';
           port: number;
           password?: string;
           db: number;
+          tls?: boolean;
+          cluster?: {
+            enabled: boolean;
+            nodes: Array<{ host: string; port: number }>;
+            dnsLookup: boolean;
+          };
         }>('redis');
 
         if (!redisConfig) {
           throw new Error('Redis configuration not found');
         }
 
-        // Sử dụng cùng config với RedisService
+        // Check if cluster is enabled
+        if (
+          redisConfig.cluster?.enabled &&
+          redisConfig.cluster.nodes.length > 0
+        ) {
+          return {
+            connection: {
+              host: redisConfig.cluster.nodes[0].host,
+              port: redisConfig.cluster.nodes[0].port,
+              password: redisConfig.password,
+              db: redisConfig.db,
+              tls: redisConfig.tls ? {} : undefined,
+            },
+            defaultJobOptions: {
+              attempts: 3,
+              removeOnComplete: true,
+              removeOnFail: false,
+            },
+          };
+        }
+
+        // Single Redis instance
         return {
           connection: {
             host: redisConfig.host,
             port: redisConfig.port,
             password: redisConfig.password,
             db: redisConfig.db,
+            tls: redisConfig.tls ? {} : undefined,
           },
           defaultJobOptions: {
             attempts: 3,
