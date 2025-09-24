@@ -14,9 +14,9 @@ import { EnvDto } from '@/config/env.dto';
 import {
   DatabaseExtension,
   DatabaseEnvironment,
-  ImmichHeader,
-  ImmichTelemetry,
-  ImmichWorker,
+  projectHeader,
+  projectTelemetry,
+  projectWorker,
   LogLevel,
   QueueName,
 } from '@/common/enums';
@@ -92,7 +92,7 @@ export interface EnvData {
   telemetry: {
     apiPort: number;
     microservicesPort: number;
-    metrics: Set<ImmichTelemetry>;
+    metrics: Set<projectTelemetry>;
   };
 
   storage: {
@@ -100,7 +100,7 @@ export interface EnvData {
     mediaLocation?: string;
   };
 
-  workers: ImmichWorker[];
+  workers: projectWorker[];
 
   noColor: boolean;
   nodeVersion?: string;
@@ -120,8 +120,8 @@ const stagingKeys = {
     'LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUE3Sy8yd3ZLUS9NdU8ydi9MUm5saAoyUy9zTHhDOGJiTEw1UUlKOGowQ3BVZW40YURlY2dYMUpKUmtGNlpUVUtpNTdTbEhtS3RSM2JOTzJmdTBUUVg5Ck5WMEJzVzllZVB0MmlTMWl4VVFmTzRObjdvTjZzbEtac01qd29RNGtGRGFmM3VHTlZJc0dMb3UxVWRLUVhpeDEKUlRHcXVTb3NZVjNWRlk3Q1hGYTVWaENBL3poVXNsNGFuVXp3eEF6M01jUFVlTXBaenYvbVZiQlRKVzBPSytWZgpWQUJvMXdYMkVBanpBekVHVzQ3Vko4czhnMnQrNHNPaHFBNStMQjBKVzlORUg5QUpweGZzWE4zSzVtM00yNUJVClZXcTlRYStIdHRENnJ0bnAvcUFweXVkWUdwZk9HYTRCUlZTR1MxMURZM0xrb2FlRzYwUEU5NHpoYjduOHpMWkgKelFJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tDQo=',
 };
 
-const WORKER_TYPES = new Set(Object.values(ImmichWorker));
-const TELEMETRY_TYPES = new Set(Object.values(ImmichTelemetry));
+const WORKER_TYPES = new Set(Object.values(projectWorker));
+const TELEMETRY_TYPES = new Set(Object.values(projectTelemetry));
 
 const asSet = <T>(value: string | undefined, defaults: T[]) => {
   const values = (value || '').replaceAll(/\s/g, '').split(',').filter(Boolean);
@@ -141,11 +141,11 @@ const getEnv = (): EnvData => {
     throw new Error(messages.join('\n'));
   }
 
-  const includedWorkers = asSet(dto.IMMICH_WORKERS_INCLUDE, [
-    ImmichWorker.Api,
-    ImmichWorker.Microservices,
+  const includedWorkers = asSet(dto.project_WORKERS_INCLUDE, [
+    projectWorker.Api,
+    projectWorker.Microservices,
   ]);
-  const excludedWorkers = asSet(dto.IMMICH_WORKERS_EXCLUDE, []);
+  const excludedWorkers = asSet(dto.project_WORKERS_EXCLUDE, []);
   const workers = [...setDifference(includedWorkers, excludedWorkers)];
   for (const worker of workers) {
     if (!WORKER_TYPES.has(worker)) {
@@ -154,10 +154,10 @@ const getEnv = (): EnvData => {
   }
 
   const environment =
-    (dto.IMMICH_ENV as unknown as DatabaseEnvironment) ||
+    (dto.project_ENV as unknown as DatabaseEnvironment) ||
     DatabaseEnvironment.Production;
   const isProd = environment === DatabaseEnvironment.Production;
-  const buildFolder = dto.IMMICH_BUILD_DATA || '/build';
+  const buildFolder = dto.project_BUILD_DATA || '/build';
   const folders = {
     geodata: join(buildFolder, 'geodata'),
     web: join(buildFolder, 'www'),
@@ -184,12 +184,12 @@ const getEnv = (): EnvData => {
   }
 
   const includedTelemetries =
-    dto.IMMICH_TELEMETRY_INCLUDE === 'all'
-      ? new Set(Object.values(ImmichTelemetry))
-      : asSet<ImmichTelemetry>(dto.IMMICH_TELEMETRY_INCLUDE, []);
+    dto.project_TELEMETRY_INCLUDE === 'all'
+      ? new Set(Object.values(projectTelemetry))
+      : asSet<projectTelemetry>(dto.project_TELEMETRY_INCLUDE, []);
 
-  const excludedTelemetries = asSet<ImmichTelemetry>(
-    dto.IMMICH_TELEMETRY_EXCLUDE,
+  const excludedTelemetries = asSet<projectTelemetry>(
+    dto.project_TELEMETRY_EXCLUDE,
     [],
   );
   const telemetries = setDifference(includedTelemetries, excludedTelemetries);
@@ -207,7 +207,7 @@ const getEnv = (): EnvData => {
         port: dto.DB_PORT || 5432,
         username: dto.DB_USERNAME || 'postgres',
         password: dto.DB_PASSWORD || 'postgres',
-        database: dto.DB_DATABASE_NAME || 'immich',
+        database: dto.DB_DATABASE_NAME || 'project',
         ssl: dto.DB_SSL_MODE || undefined,
       };
 
@@ -228,31 +228,31 @@ const getEnv = (): EnvData => {
   }
 
   return {
-    host: dto.IMMICH_HOST,
-    port: dto.IMMICH_PORT || 2283,
+    host: dto.project_HOST,
+    port: dto.project_PORT || 2283,
     environment,
-    configFile: dto.IMMICH_CONFIG_FILE,
-    logLevel: dto.IMMICH_LOG_LEVEL,
+    configFile: dto.project_CONFIG_FILE,
+    logLevel: dto.project_LOG_LEVEL,
 
     buildMetadata: {
-      build: dto.IMMICH_BUILD,
-      buildUrl: dto.IMMICH_BUILD_URL,
-      buildImage: dto.IMMICH_BUILD_IMAGE,
-      buildImageUrl: dto.IMMICH_BUILD_IMAGE_URL,
-      repository: dto.IMMICH_REPOSITORY,
-      repositoryUrl: dto.IMMICH_REPOSITORY_URL,
-      sourceRef: dto.IMMICH_SOURCE_REF,
-      sourceCommit: dto.IMMICH_SOURCE_COMMIT,
-      sourceUrl: dto.IMMICH_SOURCE_URL,
-      thirdPartySourceUrl: dto.IMMICH_THIRD_PARTY_SOURCE_URL,
-      thirdPartyBugFeatureUrl: dto.IMMICH_THIRD_PARTY_BUG_FEATURE_URL,
-      thirdPartyDocumentationUrl: dto.IMMICH_THIRD_PARTY_DOCUMENTATION_URL,
-      thirdPartySupportUrl: dto.IMMICH_THIRD_PARTY_SUPPORT_URL,
+      build: dto.project_BUILD,
+      buildUrl: dto.project_BUILD_URL,
+      buildImage: dto.project_BUILD_IMAGE,
+      buildImageUrl: dto.project_BUILD_IMAGE_URL,
+      repository: dto.project_REPOSITORY,
+      repositoryUrl: dto.project_REPOSITORY_URL,
+      sourceRef: dto.project_SOURCE_REF,
+      sourceCommit: dto.project_SOURCE_COMMIT,
+      sourceUrl: dto.project_SOURCE_URL,
+      thirdPartySourceUrl: dto.project_THIRD_PARTY_SOURCE_URL,
+      thirdPartyBugFeatureUrl: dto.project_THIRD_PARTY_BUG_FEATURE_URL,
+      thirdPartyDocumentationUrl: dto.project_THIRD_PARTY_DOCUMENTATION_URL,
+      thirdPartySupportUrl: dto.project_THIRD_PARTY_SUPPORT_URL,
     },
 
     bull: {
       config: {
-        prefix: 'immich_bull',
+        prefix: 'project_bull',
         connection: { ...redisConfig },
         defaultJobOptions: {
           attempts: 3,
@@ -271,13 +271,13 @@ const getEnv = (): EnvData => {
           mount: true,
           generateId: true,
           setup: (cls, req: Request, res: Response) => {
-            const headerValues = req.headers[ImmichHeader.Cid];
+            const headerValues = req.headers[projectHeader.Cid];
             const headerValue = Array.isArray(headerValues)
               ? headerValues[0]
               : headerValues;
             const cid = headerValue || cls.get(CLS_ID);
             cls.set(CLS_ID, cid);
-            res.header(ImmichHeader.Cid, cid);
+            res.header(projectHeader.Cid, cid);
           },
         },
       },
@@ -292,7 +292,7 @@ const getEnv = (): EnvData => {
     licensePublicKey: isProd ? productionKeys : stagingKeys,
 
     network: {
-      trustedProxies: dto.IMMICH_TRUSTED_PROXIES ?? [
+      trustedProxies: dto.project_TRUSTED_PROXIES ?? [
         'linklocal',
         'uniquelocal',
       ],
@@ -300,9 +300,9 @@ const getEnv = (): EnvData => {
 
     otel: {
       metrics: {
-        hostMetrics: telemetries.has(ImmichTelemetry.Host),
+        hostMetrics: telemetries.has(projectTelemetry.Host),
         apiMetrics: {
-          enable: telemetries.has(ImmichTelemetry.Api),
+          enable: telemetries.has(projectTelemetry.Api),
           ignoreRoutes: excludePaths,
         },
       },
@@ -329,13 +329,13 @@ const getEnv = (): EnvData => {
     },
 
     storage: {
-      ignoreMountCheckErrors: !!dto.IMMICH_IGNORE_MOUNT_CHECK_ERRORS,
-      mediaLocation: dto.IMMICH_MEDIA_LOCATION,
+      ignoreMountCheckErrors: !!dto.project_IGNORE_MOUNT_CHECK_ERRORS,
+      mediaLocation: dto.project_MEDIA_LOCATION,
     },
 
     telemetry: {
-      apiPort: dto.IMMICH_API_METRICS_PORT || 8081,
-      microservicesPort: dto.IMMICH_MICROSERVICES_METRICS_PORT || 8082,
+      apiPort: dto.project_API_METRICS_PORT || 8081,
+      microservicesPort: dto.project_MICROSERVICES_METRICS_PORT || 8082,
       metrics: telemetries,
     },
 
@@ -350,7 +350,7 @@ let cached: EnvData | undefined;
 @Injectable()
 @Telemetry({ enabled: false })
 export class ConfigRepository {
-  constructor(@Inject(IWorker) @Optional() private worker?: ImmichWorker) {}
+  constructor(@Inject(IWorker) @Optional() private worker?: projectWorker) {}
 
   getEnv() {
     if (!cached) {

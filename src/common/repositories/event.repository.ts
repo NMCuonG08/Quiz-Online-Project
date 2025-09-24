@@ -10,7 +10,7 @@ import { ModuleRef } from '@nestjs/core';
 import { Reflector } from '@nestjs/core';
 import { ConfigRepository } from '@/common/repositories/config.repository';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
-import { MetadataKey, ImmichWorker, QueueName } from '@/common/enums';
+import { MetadataKey, projectWorker, QueueName } from '@/common/enums';
 import { EventConfig } from '@/common/decorators';
 import _ from 'lodash';
 import { Server, Socket } from 'socket.io';
@@ -132,7 +132,7 @@ export class EventRepository
           continue;
         }
 
-        const workers = event.workers ?? Object.values(ImmichWorker);
+        const workers = event.workers ?? Object.values(projectWorker);
         if (!workers.includes(worker)) {
           continue;
         }

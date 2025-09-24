@@ -176,10 +176,10 @@ export enum MetadataKey {
   TelemetryEnabled = 'telemetry_enabled',
 }
 export enum ApiCustomExtension {
-  Permission = 'x-immich-permission',
-  AdminOnly = 'x-immich-admin-only',
+  Permission = 'x-project-permission',
+  AdminOnly = 'x-project-admin-only',
 }
-export enum ImmichQuery {
+export enum projectQuery {
   SharedLinkKey = 'key',
   SharedLinkSlug = 'slug',
   ApiKey = 'apiKey',

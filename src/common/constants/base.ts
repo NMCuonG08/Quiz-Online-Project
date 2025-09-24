@@ -13,7 +13,7 @@ export const VECTORS_VERSION_RANGE = '>=0.2 <0.4';
 export const VECTOR_VERSION_RANGE = '>=0.5 <1';
 
 export const NEXT_RELEASE = 'NEXT_RELEASE';
-export const LIFECYCLE_EXTENSION = 'x-immich-lifecycle';
+export const LIFECYCLE_EXTENSION = 'x-project-lifecycle';
 export const DEPRECATED_IN_PREFIX = 'This property was deprecated in ';
 export const ADDED_IN_PREFIX = 'This property was added in ';
 
@@ -61,11 +61,11 @@ export const MACHINE_LEARNING_AVAILABILITY_BACKOFF_TIME = Number(
 export const citiesFile = 'cities500.txt';
 export const reverseGeocodeMaxDistance = 25_000;
 
-export const MOBILE_REDIRECT = 'app.immich:///oauth-callback';
+export const MOBILE_REDIRECT = 'app.project:///oauth-callback';
 export const LOGIN_URL = '/auth/login?autoLaunch=0';
 
 export const excludePaths = [
-  '/.well-known/immich',
+  '/.well-known/project',
   '/custom.css',
   '/favicon.ico',
 ];

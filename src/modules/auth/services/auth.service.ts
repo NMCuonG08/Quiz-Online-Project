@@ -7,7 +7,7 @@ import {
 
 import { IncomingHttpHeaders } from 'http';
 import { AuthDto, LoginDto, SignupDto } from '../dto';
-import { ImmichHeader } from '@/common/enums';
+import { projectHeader } from '@/common/enums';
 import { Permission } from '@/common/enums';
 import { isGranted } from '@/common/utils/access';
 import { BaseService } from '@/common/base/base.service';
@@ -241,7 +241,7 @@ export class AuthService extends BaseService {
   private async validate({
     headers,
   }: Omit<ValidateRequest, 'metadata'>): Promise<AuthDto> {
-    const jwtToken = (headers[ImmichHeader.UserToken] ||
+    const jwtToken = (headers[projectHeader.UserToken] ||
       this.getBearerToken(headers) ||
       this.getCookieToken(headers)) as string;
 
