@@ -17,7 +17,7 @@ import {
   MetadataKey,
   Permission,
   ApiCustomExtension,
-  ImmichQuery,
+  projectQuery,
 } from '@/common/enums';
 import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
 import { Request } from 'express';
@@ -55,12 +55,12 @@ export const Authenticated = (
   if ((options as SharedLinkRoute)?.sharedLink) {
     decorators.push(
       ApiQuery({
-        name: ImmichQuery.SharedLinkKey,
+        name: projectQuery.SharedLinkKey,
         type: String,
         required: false,
       }),
       ApiQuery({
-        name: ImmichQuery.SharedLinkSlug,
+        name: projectQuery.SharedLinkSlug,
         type: String,
         required: false,
       }),

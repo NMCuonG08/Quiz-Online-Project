@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { ImmichWorker, JobName, MetadataKey, QueueName } from '@/common/enums';
+import { projectWorker, JobName, MetadataKey, QueueName } from '@/common/enums';
 import { EmitEvent } from '@/common/repositories/event.repository';
 
 export const Telemetry = (options: { enabled?: boolean }) =>
@@ -11,7 +11,7 @@ export type EventConfig = {
   /** lower value has higher priority, defaults to 0 */
   priority?: number;
   /** register events for these workers, defaults to all workers */
-  workers?: ImmichWorker[];
+  workers?: projectWorker[];
 };
 export const OnEvent = (config: EventConfig) =>
   SetMetadata(MetadataKey.EventConfig, config);

@@ -131,8 +131,8 @@ export const defaults = Object.freeze<SystemConfig>({
 
   map: {
     enabled: true,
-    lightStyle: 'https://tiles.immich.cloud/v1/style/light.json',
-    darkStyle: 'https://tiles.immich.cloud/v1/style/dark.json',
+    lightStyle: 'https://tiles.project.cloud/v1/style/light.json',
+    darkStyle: 'https://tiles.project.cloud/v1/style/dark.json',
   },
   reverseGeocoding: {
     enabled: true,
@@ -157,8 +157,8 @@ export const defaults = Object.freeze<SystemConfig>({
     signingAlgorithm: 'RS256',
     profileSigningAlgorithm: 'none',
     storageLabelClaim: 'preferred_username',
-    storageQuotaClaim: 'immich_quota',
-    roleClaim: 'immich_role',
+    storageQuotaClaim: 'project_quota',
+    roleClaim: 'project_role',
     tokenEndpointAuthMethod: OAuthTokenEndpointAuthMethod.ClientSecretPost,
     timeout: 30_000,
   },
