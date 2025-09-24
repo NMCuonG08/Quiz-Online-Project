@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis, { RedisOptions } from 'ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -23,59 +23,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.disconnect();
   }
 
-  private getRedisConfig(): string | RedisOptions {
-    // Ưu tiên sử dụng REDIS_URL từ environment variable
+  private getRedisConfig(): string {
+    // Chỉ sử dụng REDIS_URL từ environment variable
     const url = this.configService.get<string>('REDIS_URL');
     console.log('REDIS_URL from env:', url);
 
-    if (url) {
-      // Nếu người dùng bật REDIS_TLS nhưng URL không phải rediss://, cảnh báo để tránh timeout do sai giao thức
-      const wantTls = this.configService.get<boolean>('redis.tls');
-      if (wantTls && /^redis:\/\//i.test(url) && !/^rediss:\/\//i.test(url)) {
-        this.logger.warn(
-          'REDIS_TLS=true nhưng REDIS_URL không phải rediss://. Hãy dùng rediss:// hoặc tắt REDIS_TLS, nếu không có thể lỗi ETIMEDOUT.',
-        );
-      }
-      return url;
+    if (!url) {
+      throw new Error('REDIS_URL environment variable is required');
     }
 
-    // Fallback về cấu hình từ config object
-    const redisConfig = this.configService.get<{
-      url?: string;
-      host: string;
-      port: number;
-      username?: string;
-      password?: string;
-      db: number;
-      tls?: boolean;
-    }>('redis');
-
-    if (redisConfig?.url) {
-      console.log('REDIS_URL from config:', redisConfig.url);
-      return redisConfig.url;
-    }
-
-    // Build config từ các phần riêng lẻ
-    if (!redisConfig) {
-      throw new Error('Redis configuration not found');
-    }
-
-    const host = redisConfig.host || '127.0.0.1';
-    const port = redisConfig.port || 6379;
-    const username = redisConfig.username;
-    const password = redisConfig.password;
-    const db = redisConfig.db ?? 0;
-    const tlsEnabled = !!redisConfig.tls;
-
-    return {
-      host,
-      port,
-      username,
-      password,
-      db,
-      // Bật TLS nếu cấu hình yêu cầu. Có thể thêm các option như servername/ca nếu cần.
-      tls: tlsEnabled ? {} : undefined,
-    };
+    return url;
   }
 
   async connect(): Promise<void> {
@@ -88,18 +45,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     const config = this.getRedisConfig();
 
-    this.logger.log(
-      `Using Redis config: ${typeof config === 'string' ? config : JSON.stringify(config)}`,
-    );
+    this.logger.log(`Using Redis URL: ${config}`);
 
-    // ioredis có thể nhận string URL hoặc object config
     // Sử dụng lazyConnect để tránh auto-connect
-    if (typeof config === 'string') {
-      this.client = new Redis(config, { lazyConnect: true });
-    } else {
-      this.client = new Redis({
-        ...config,
+    // Check if it's a rediss:// URL and add TLS options
+    if (/^rediss:\/\//i.test(config)) {
+      const urlObj = new URL(config);
+      const host = urlObj.hostname;
+      this.client = new Redis(config, {
         lazyConnect: true,
+        tls: {
+          rejectUnauthorized: false,
+          servername: host,
+        },
+        connectTimeout: 10000,
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: false,
+      });
+    } else {
+      this.client = new Redis(config, {
+        lazyConnect: true,
+        connectTimeout: 10000,
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: false,
       });
     }
 
