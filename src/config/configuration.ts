@@ -19,14 +19,8 @@ export default () => ({
   },
   redis: {
     url: process.env.REDIS_URL,
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    username: process.env.REDIS_USERNAME,
-    password: process.env.REDIS_PASSWORD,
-    db: parseInt(process.env.REDIS_DB || '0', 10),
     ttl: parseInt(process.env.REDIS_TTL || '60', 10),
     keyPrefix: process.env.REDIS_KEY_PREFIX || 'app:',
-    tls: process.env.REDIS_TLS === 'true',
   },
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME,

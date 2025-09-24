@@ -34,19 +34,109 @@ import configuration from './config/configuration';
           port: number;
           password?: string;
           db: number;
+          tls?: boolean;
+          cluster?: {
+            enabled: boolean;
+            nodes: Array<{ host: string; port: number }>;
+            dnsLookup: boolean;
+          };
         }>('redis');
 
         if (!redisConfig) {
           throw new Error('Redis configuration not found');
         }
 
-        // Sử dụng cùng config với RedisService
+        // Nếu có REDIS_URL, ưu tiên dùng URL
+        const url = configService.get<string>('REDIS_URL');
+        if (url) {
+          const wantTls = redisConfig.tls;
+          if (wantTls && /^rediss:\/\//i.test(url)) {
+            const urlObj = new URL(url);
+            const host = urlObj.hostname;
+
+            return {
+              connection: {
+                url,
+                tls: {
+                  rejectUnauthorized: false,
+                  servername: host,
+                },
+                connectTimeout: 10000,
+                maxRetriesPerRequest: 3,
+                enableReadyCheck: false,
+              },
+              defaultJobOptions: {
+                attempts: 3,
+                removeOnComplete: true,
+                removeOnFail: false,
+              },
+            };
+          }
+
+          return {
+            connection: {
+              url,
+              connectTimeout: 10000,
+              maxRetriesPerRequest: 3,
+              enableReadyCheck: false,
+            },
+            defaultJobOptions: {
+              attempts: 3,
+              removeOnComplete: true,
+              removeOnFail: false,
+            },
+          };
+        }
+
+        // Check if cluster is enabled
+        if (
+          redisConfig.cluster?.enabled &&
+          redisConfig.cluster.nodes.length > 0
+        ) {
+          const tlsConfig = redisConfig.tls
+            ? {
+                rejectUnauthorized: false,
+                servername: redisConfig.cluster.nodes[0].host,
+              }
+            : undefined;
+
+          return {
+            connection: {
+              host: redisConfig.cluster.nodes[0].host,
+              port: redisConfig.cluster.nodes[0].port,
+              password: redisConfig.password,
+              db: redisConfig.db,
+              tls: tlsConfig,
+              connectTimeout: 10000,
+              maxRetriesPerRequest: 3,
+              enableReadyCheck: false,
+            },
+            defaultJobOptions: {
+              attempts: 3,
+              removeOnComplete: true,
+              removeOnFail: false,
+            },
+          };
+        }
+
+        // Single Redis instance
+        const tlsConfig = redisConfig.tls
+          ? {
+              rejectUnauthorized: false,
+              servername: redisConfig.host,
+            }
+          : undefined;
+
         return {
           connection: {
             host: redisConfig.host,
             port: redisConfig.port,
             password: redisConfig.password,
             db: redisConfig.db,
+            tls: tlsConfig,
+            connectTimeout: 10000,
+            maxRetriesPerRequest: 3,
+            enableReadyCheck: false,
           },
           defaultJobOptions: {
             attempts: 3,
