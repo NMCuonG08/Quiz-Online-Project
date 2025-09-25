@@ -8,10 +8,21 @@ import {
   Delete,
   Query,
   UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
+  Res,
+  Req,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Response, Request } from 'express';
+
+interface RequestWithCookies extends Request {
+  cookies: {
+    __refreshToken?: string;
+    refreshToken?: string;
+  };
+}
 import { AuthService } from '../services/auth.service';
 import { CreateAuthDto } from '../dto/create-auth.dto';
 import { UpdateAuthDto } from '../dto/update-auth.dto';
@@ -29,7 +40,10 @@ import {
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -57,8 +71,27 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(loginDto);
+
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
+    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
+
+    // Only set refresh token in cookie
+    res.cookie('__refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      domain,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+
+    return { user: result.user, accessToken: result.accessToken };
   }
 
   @Post('signup')
@@ -87,8 +120,27 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 409, description: 'Email or username already exists' })
-  async signup(@Body() signupDto: SignupDto) {
-    return this.authService.signup(signupDto);
+  async signup(
+    @Body() signupDto: SignupDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.signup(signupDto);
+
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
+    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
+
+    // Only set refresh token in cookie
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      domain,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    return { user: result.user, accessToken: result.accessToken };
   }
 
   @Post('logout')
@@ -104,23 +156,84 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiOperation({
+    summary: 'Refresh access token using refresh token from body',
+  })
   @ApiResponse({
     status: 200,
     description: 'Token refreshed successfully',
     schema: {
       type: 'object',
       properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            username: { type: 'string' },
+            full_name: { type: 'string' },
+            isAdmin: { type: 'boolean' },
+            roles: { type: 'array', items: { type: 'string' } },
+          },
+        },
         accessToken: { type: 'string' },
+        refreshToken: { type: 'string' },
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
+  async refreshToken(
+    @Body() refreshTokenDto: RefreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const { refreshToken } = refreshTokenDto;
-    const newAccessToken =
-      await this.authService.refreshAccessToken(refreshToken);
-    return { accessToken: newAccessToken };
+    const result = await this.authService.refreshAccessToken(refreshToken);
+
+    return { accessToken: result.accessToken };
+  }
+
+  @Post('refresh-cookie')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Refresh access token using refresh token from cookie',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token refreshed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            username: { type: 'string' },
+            full_name: { type: 'string' },
+            isAdmin: { type: 'boolean' },
+            roles: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        accessToken: { type: 'string' },
+        refreshToken: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async refreshTokenFromCookie(
+    @Req() req: RequestWithCookies,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken =
+      req.cookies?.__refreshToken || req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token not found in cookies');
+    }
+
+    const result = await this.authService.refreshAccessToken(refreshToken);
+
+    return { accessToken: result.accessToken };
   }
 
   @Get('me')

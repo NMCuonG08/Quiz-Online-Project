@@ -312,7 +312,7 @@ export class AuthService extends BaseService {
 
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: '7d',
+      expiresIn: '15m',
     });
   }
 
@@ -328,7 +328,9 @@ export class AuthService extends BaseService {
     });
   }
 
-  async refreshAccessToken(refreshToken: string): Promise<string> {
+  async refreshAccessToken(refreshToken: string): Promise<{
+    accessToken: string;
+  }> {
     try {
       const payload = await this.jwtService.verifyAsync<{
         type: string;
@@ -346,8 +348,23 @@ export class AuthService extends BaseService {
         throw new UnauthorizedException('User not found');
       }
 
-      return this.generateAccessToken(user.id);
-    } catch {
+      // Check if user is still active
+      if (user.deletedAt) {
+        throw new UnauthorizedException('User account is deactivated');
+      }
+
+      // Generate new tokens
+      const newAccessToken = await this.generateAccessToken(user.id);
+
+      // Get user roles
+
+      return {
+        accessToken: newAccessToken,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid refresh token');
     }
   }

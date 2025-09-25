@@ -12,9 +12,13 @@ import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter'
 import { PrismaExceptionFilter } from '@/common/filters/prisma-exception.filter';
 import { JobRepository } from '@/common/repositories/job.repository';
 import { QuizService } from '@/modules/quizz/services/quiz.service';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Add cookie parser middleware
+  app.use(cookieParser());
 
   // Debug Redis connection
   console.log('Environment variables:');

@@ -8,7 +8,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { RbacService } from '@/common/services/rbac.service';
+import { RbacService } from '@/common/rbac/rbac.service';
 import { PermissionGuard } from '@/common/guards/permission.guard';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { Permission } from '@/common/enums/permisson';
