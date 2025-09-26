@@ -4,7 +4,7 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'DEPLOY_ENV', choices: ['production'])
+        choice(name: 'DEPLOY_ENV', choices: ['production'], description: 'Select deployment environment')
     }
 
     environment {
@@ -24,33 +24,17 @@ pipeline {
 
     stages {
 
-        stage('Load Environment') {
+        stage('Load Environment & Credentials') {
             steps {
-                script {
-                    def envPrefix = "${params.DEPLOY_ENV.toUpperCase()}_"
-                    
-                    System.getenv().each { key, value ->
-                        if (key.startsWith(envPrefix)) {
-                            def cleanKey = key.replace(envPrefix, '')
-                            env[cleanKey] = value
-                        }
-                    }
-
-                    withCredentials([
-                        string(credentialsId: "${params.DEPLOY_ENV}-database-url", variable: 'DATABASE_URL'),
-                        string(credentialsId: "${params.DEPLOY_ENV}-redis-password", variable: 'REDIS_PASSWORD'),
-                        string(credentialsId: "${params.DEPLOY_ENV}-jwt-secret", variable: 'JWT_SECRET'),
-                        string(credentialsId: "${params.DEPLOY_ENV}-jwt-refresh-secret", variable: 'JWT_REFRESH_SECRET'),
-                        string(credentialsId: "${params.DEPLOY_ENV}-cloudinary-secret", variable: 'CLOUDINARY_API_SECRET')
-                    ]) {
-                        env.DATABASE_URL = DATABASE_URL
-                        env.REDIS_PASSWORD = REDIS_PASSWORD
-                        env.JWT_SECRET = JWT_SECRET
-                        env.JWT_REFRESH_SECRET = JWT_REFRESH_SECRET
-                        env.CLOUDINARY_API_SECRET = CLOUDINARY_API_SECRET
-                    }
-
-                    echo "✅ Loaded environment for: ${params.DEPLOY_ENV}"
+                // Load all credentials via Jenkins credentials plugin
+                withCredentials([
+                    string(credentialsId: "${params.DEPLOY_ENV}-database-url", variable: 'DATABASE_URL'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-redis-password", variable: 'REDIS_PASSWORD'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-secret", variable: 'JWT_SECRET'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-refresh-secret", variable: 'JWT_REFRESH_SECRET'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-cloudinary-secret", variable: 'CLOUDINARY_API_SECRET')
+                ]) {
+                    echo "✅ Loaded credentials for ${params.DEPLOY_ENV}"
                 }
             }
         }
@@ -69,41 +53,39 @@ pipeline {
             steps {
                 sh """
                 set -x
+
+                # Stop previous app
                 ${killScript}
+
+                # Prepare folder
                 sudo rm -rf ${folderDeploy}
                 sudo mkdir -p ${folderDeploy}
                 sudo cp -r dist/* ${folderDeploy}/
                 sudo cp package*.json ${folderDeploy}/
 
-                # Tạo .env file
+                # Create .env file
                 sudo tee ${folderDeploy}/.env > /dev/null <<EOF
-DATABASE_URL=${env.DATABASE_URL}
-REDIS_URL=${env.REDIS_URL}
-REDIS_SCHEME=${env.REDIS_SCHEME}
-REDIS_HOST=${env.REDIS_HOST}
-REDIS_PORT=${env.REDIS_PORT}
-REDIS_USERNAME=${env.REDIS_USERNAME}
-REDIS_PASSWORD=${env.REDIS_PASSWORD}
-REDIS_DB=${env.REDIS_DB}
-REDIS_KEY_PREFIX=${env.REDIS_KEY_PREFIX}
-REDIS_TLS=${env.REDIS_TLS}
-CLOUDINARY_CLOUD_NAME=${env.CLOUDINARY_CLOUD_NAME}
-CLOUDINARY_API_KEY=${env.CLOUDINARY_API_KEY}
-CLOUDINARY_API_SECRET=${env.CLOUDINARY_API_SECRET}
-CLOUDINARY_FOLDER=${env.CLOUDINARY_FOLDER}
+DATABASE_URL=${DATABASE_URL}
+REDIS_PASSWORD=${REDIS_PASSWORD}
+JWT_SECRET=${JWT_SECRET}
+JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
 PORT=${env.PORT}
 NODE_ENV=${env.NODE_ENV}
 FRONTEND_URL=${env.FRONTEND_URL}
-JWT_SECRET=${env.JWT_SECRET}
-JWT_REFRESH_SECRET=${env.JWT_REFRESH_SECRET}
 EOF
 
+                # Install production dependencies
                 ${installProdScript}
+
+                # Fix permissions
                 ${chownScript}
                 sudo chmod 600 ${folderDeploy}/.env
+
+                # Run application
                 ${runScript}
 
-                # Health check, fail pipeline nếu không thành công
+                # Health check (pipeline fail if health check fail)
                 curl -f http://localhost:${env.PORT}/api/v1/health
                 """
             }
