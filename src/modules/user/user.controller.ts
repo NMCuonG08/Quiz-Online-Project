@@ -6,13 +6,15 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ApiOperation } from '@nestjs/swagger';
-import { Authenticated } from '@/common/guards/auth.guard';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Auth, Authenticated, AuthGuard } from '@/common/guards/auth.guard';
 import { Permission } from '@/common/enums';
+import { AuthDto } from '@/modules/auth/dto';
 
 @Controller('user')
 export class UserController {
@@ -36,6 +38,13 @@ export class UserController {
   @Authenticated({ permission: Permission.ActivityRead })
   findAll() {
     return this.userService.findAll();
+  }
+
+  @Get('profile')
+  @UseGuards(AuthGuard)
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  getProfile(@Auth() auth: AuthDto) {
+    return auth.user;
   }
 
   @Get(':id')

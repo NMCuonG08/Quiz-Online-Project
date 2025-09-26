@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response, Request } from 'express';
+import type { AuthLoginResult } from '../services/auth.service';
 
 interface RequestWithCookies extends Request {
   cookies: {
@@ -44,6 +45,60 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {}
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with Google OAuth code' })
+  @ApiResponse({ status: 200, description: 'Google login successful' })
+  async loginWithGoogle(
+    @Body('code') code: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result: AuthLoginResult =
+      await this.authService.loginWithGoogle(code);
+
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
+    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
+
+    res.cookie('__refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      domain,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    return { user: result.user, accessToken: result.accessToken };
+  }
+
+  // Compatibility route for clients posting to /auth/google/callback
+  @Post('google/callback')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Google OAuth callback (compat)' })
+  async loginWithGoogleCallback(
+    @Body('code') code: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result: AuthLoginResult =
+      await this.authService.loginWithGoogle(code);
+
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
+    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
+
+    res.cookie('__refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      domain,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    return { user: result.user, accessToken: result.accessToken };
+  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -75,7 +130,7 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(loginDto);
+    const result: AuthLoginResult = await this.authService.login(loginDto);
 
     const isProduction =
       this.configService.get<string>('NODE_ENV') === 'production';
@@ -124,7 +179,7 @@ export class AuthController {
     @Body() signupDto: SignupDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.signup(signupDto);
+    const result: AuthLoginResult = await this.authService.signup(signupDto);
 
     const isProduction =
       this.configService.get<string>('NODE_ENV') === 'production';
@@ -182,10 +237,7 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshToken(
-    @Body() refreshTokenDto: RefreshTokenDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     const { refreshToken } = refreshTokenDto;
     const result = await this.authService.refreshAccessToken(refreshToken);
 
@@ -220,10 +272,7 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshTokenFromCookie(
-    @Req() req: RequestWithCookies,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async refreshTokenFromCookie(@Req() req: RequestWithCookies) {
     const refreshToken =
       req.cookies?.__refreshToken || req.cookies?.refreshToken;
 

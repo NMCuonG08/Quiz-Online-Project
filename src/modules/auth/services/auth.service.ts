@@ -11,6 +11,26 @@ import { projectHeader } from '@/common/enums';
 import { Permission } from '@/common/enums';
 import { isGranted } from '@/common/utils/access';
 import { BaseService } from '@/common/base/base.service';
+import { randomBytes } from 'crypto';
+
+type GoogleTokenResponse = {
+  access_token: string;
+  expires_in: number;
+  refresh_token?: string;
+  scope: string;
+  token_type: string;
+  id_token: string;
+};
+
+type GoogleUserInfo = {
+  sub: string;
+  email: string;
+  email_verified: boolean;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+};
 
 export type ValidateRequest = {
   headers: IncomingHttpHeaders;
@@ -37,10 +57,129 @@ interface UserData {
   deletedAt?: Date;
 }
 
+export type AuthLoginResult = {
+  user: {
+    id: string;
+    email: string;
+    username?: string | null;
+    full_name?: string | null;
+    isAdmin: boolean;
+    roles: string[];
+  };
+  accessToken: string;
+  refreshToken: string;
+};
+
 @Injectable()
 export class AuthService extends BaseService {
+  async loginWithGoogle(code: string): Promise<AuthLoginResult> {
+    if (!code) {
+      throw new UnauthorizedException('Missing authorization code');
+    }
+
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
+    const redirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new UnauthorizedException('Google OAuth is not configured');
+    }
+
+    // 1) Exchange code for tokens
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      throw new UnauthorizedException('Failed to exchange code for token');
+    }
+    const tokenJson = (await tokenRes.json()) as GoogleTokenResponse;
+
+    // 2) Verify token and get user info
+    const userInfoRes = await fetch(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      {
+        headers: {
+          Authorization: `Bearer ${tokenJson.access_token}`,
+        },
+      },
+    );
+    if (!userInfoRes.ok) {
+      throw new UnauthorizedException('Failed to fetch Google user info');
+    }
+    const gUser = (await userInfoRes.json()) as GoogleUserInfo;
+
+    if (!gUser.email || !gUser.email_verified) {
+      throw new UnauthorizedException('Google email not verified');
+    }
+
+    // 3) Upsert user
+    let user = await this.userRepository.findByEmail(gUser.email);
+    if (!user) {
+      const generatedPassword = randomBytes(16).toString('hex');
+      const hashedPassword = await this.cryptoRepository.hashBcrypt(
+        generatedPassword,
+        10,
+      );
+      user = await this.userRepository.create({
+        email: gUser.email,
+        full_name: gUser.name ?? undefined,
+        username: undefined,
+        password: hashedPassword,
+        avatar: gUser.picture ?? undefined,
+        isAdmin: false,
+      });
+
+      try {
+        await this.userRepository.assignRole(user.id, 'user');
+      } catch {
+        this.logger.warn(
+          `Failed to assign default role to new Google user ${user.id}`,
+        );
+      }
+    } else if (gUser.picture && user.avatar !== gUser.picture) {
+      try {
+        await this.userRepository.update(user.id, { avatar: gUser.picture });
+      } catch {
+        // no-op
+      }
+    }
+
+    if (user.deletedAt) {
+      throw new UnauthorizedException('User account is deactivated');
+    }
+
+    // 4) Issue app tokens
+    const accessToken = await this.generateAccessToken(user.id);
+    const refreshToken = await this.generateRefreshToken(user.id);
+
+    const roles = await this.getUserRoles(user.id);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        full_name: user.full_name,
+        isAdmin: user.isAdmin || false,
+        roles,
+      },
+      accessToken,
+      refreshToken,
+    };
+  }
   // Login method
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto): Promise<AuthLoginResult> {
     const { email, password } = loginDto;
 
     // Find user by email
@@ -86,7 +225,7 @@ export class AuthService extends BaseService {
   }
 
   // Signup method
-  async signup(signupDto: SignupDto) {
+  async signup(signupDto: SignupDto): Promise<AuthLoginResult> {
     const { email, password, full_name, username } = signupDto;
 
     // Check if email already exists
