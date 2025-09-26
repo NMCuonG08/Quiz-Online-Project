@@ -4,7 +4,7 @@ pipeline {
     }
     
     parameters {
-        choice(name: 'DEPLOY_ENV', choices: ['dev', 'staging', 'production'])
+        choice(name: 'DEPLOY_ENV', choices: ['production'])
     }
     
     environment {
