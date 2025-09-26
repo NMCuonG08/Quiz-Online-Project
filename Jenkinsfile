@@ -2,12 +2,14 @@ pipeline {
     agent {
         label 'quiz-server'
     }
+    
+    parameters {
+        choice(name: 'DEPLOY_ENV', choices: ['dev', 'staging', 'production'])
+    }
+    
     environment {
         apiUser = "nestdev"
         appName = "nest-shopping-api"
-        appVersion = "1.0.0"
-        appType = "node"  
-        appContext = "api/v1"
         folderDeploy = "/var/www/${appName}"
         buildScript = "npm install && npm run build"
         installProdScript = "cd ${folderDeploy} && sudo npm install --production"
@@ -15,81 +17,97 @@ pipeline {
         killScript = "sudo pkill -f 'node.*main.js' || true"
         runScript = "sudo su ${apiUser} -c 'cd ${folderDeploy}; npm run start:prod > nohup.out 2>&1 &'"
     }
+    
     stages {
-        stage('Info') {
+        stage('Load Environment') {
             steps {
-                sh(script: "whoami; pwd; ls -la", label: "Environment Info")
+                script {
+                    // 🎯 Lấy env từ Jenkins Global Properties theo pattern
+                    def envPrefix = "${params.DEPLOY_ENV.toUpperCase()}_"
+                    
+                    System.getenv().each { key, value ->
+                        if (key.startsWith(envPrefix)) {
+                            def cleanKey = key.replace(envPrefix, '')
+                            env[cleanKey] = value
+                        }
+                    }
+                    
+                    // Load secrets cho các env khác nhau
+                    withCredentials([
+                        string(credentialsId: "${params.DEPLOY_ENV}-database-url", variable: 'DATABASE_URL'),
+                        string(credentialsId: "${params.DEPLOY_ENV}-redis-password", variable: 'REDIS_PASSWORD'),
+                        string(credentialsId: "${params.DEPLOY_ENV}-jwt-secret", variable: 'JWT_SECRET'),
+                        string(credentialsId: "${params.DEPLOY_ENV}-jwt-refresh-secret", variable: 'JWT_REFRESH_SECRET'),
+                        string(credentialsId: "${params.DEPLOY_ENV}-cloudinary-secret", variable: 'CLOUDINARY_API_SECRET')
+                    ]) {
+                        env.DATABASE_URL = DATABASE_URL
+                        env.REDIS_PASSWORD = REDIS_PASSWORD
+                        env.JWT_SECRET = JWT_SECRET
+                        env.JWT_REFRESH_SECRET = JWT_REFRESH_SECRET
+                        env.CLOUDINARY_API_SECRET = CLOUDINARY_API_SECRET
+                    }
+                    
+                    echo "✅ Loaded environment for: ${params.DEPLOY_ENV}"
+                }
             }
         }
         
         stage('Build') {
             steps {
-                sh(script: "${buildScript}", label: "Build NestJS App")
+                sh "${buildScript}"
             }
         }
         
-        stage('Stop Old Process') {
-            steps {
-                sh(script: "${killScript}", label: "Stop Old Node Process")
-            }
-        }
-        
-        stage('Prepare Deploy Directory') {
+        stage('Deploy') {
             steps {
                 sh """
+                    ${killScript}
                     sudo rm -rf ${folderDeploy}
                     sudo mkdir -p ${folderDeploy}
-                """
-            }
-        }
-        
-        stage('Deploy Files') {
-            steps {
-                sh """
                     sudo cp -r dist/* ${folderDeploy}/
                     sudo cp package*.json ${folderDeploy}/
-                """
-            }
-        }
-        
-        stage('Install Production Dependencies') {
-            steps {
-                sh "${installProdScript}"
-            }
-        }
-        
-        stage('Set Permissions') {
-            steps {
-                sh "${chownScript}"
-            }
-        }
-        
-        stage('Start New Process') {
-            steps {
-                sh(script: "${runScript}", label: "Start NestJS App")
-            }
-        }
-        
-        stage('Health Check') {
-            steps {
-                sh """
+                    
+                    # Tạo .env file với tất cả env variables của bạn
+                    sudo tee ${folderDeploy}/.env > /dev/null <<EOF
+DATABASE_URL=${env.DATABASE_URL}
+REDIS_URL=${env.REDIS_URL}
+REDIS_SCHEME=${env.REDIS_SCHEME}
+REDIS_HOST=${env.REDIS_HOST}
+REDIS_PORT=${env.REDIS_PORT}
+REDIS_USERNAME=${env.REDIS_USERNAME}
+REDIS_PASSWORD=${env.REDIS_PASSWORD}
+REDIS_DB=${env.REDIS_DB}
+REDIS_KEY_PREFIX=${env.REDIS_KEY_PREFIX}
+REDIS_TLS=${env.REDIS_TLS}
+CLOUDINARY_CLOUD_NAME=${env.CLOUDINARY_CLOUD_NAME}
+CLOUDINARY_API_KEY=${env.CLOUDINARY_API_KEY}
+CLOUDINARY_API_SECRET=${env.CLOUDINARY_API_SECRET}
+CLOUDINARY_FOLDER=${env.CLOUDINARY_FOLDER}
+PORT=${env.PORT}
+NODE_ENV=${env.NODE_ENV}
+FRONTEND_URL=${env.FRONTEND_URL}
+JWT_SECRET=${env.JWT_SECRET}
+JWT_REFRESH_SECRET=${env.JWT_REFRESH_SECRET}
+EOF
+                    
+                    ${installProdScript}
+                    ${chownScript}
+                    sudo chmod 600 ${folderDeploy}/.env
+                    ${runScript}
+                    
                     sleep 5
-                    curl -f http://localhost:3000/api/v1/health || echo "Health check failed"
+                    curl -f http://localhost:${env.PORT}/api/v1/health || echo "Health check failed"
                 """
             }
         }
     }
     
     post {
-        always {
-            echo "Pipeline completed"
-        }
         success {
-            echo "Deployment successful!"
+            echo "✅ Deployed ${params.DEPLOY_ENV} successfully!"
         }
         failure {
-            echo "Deployment failed!"
-            // Rollback logic có thể thêm ở đây
+            echo "❌ Deploy failed for ${params.DEPLOY_ENV}"
         }
     }
 }
