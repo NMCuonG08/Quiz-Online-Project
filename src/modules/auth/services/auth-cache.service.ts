@@ -11,12 +11,22 @@ export class AuthCacheService {
 
   constructor(private readonly redisService: RedisService) {}
 
-  // Cache auth data by token
-  async cacheAuthData(token: string, authData: AuthDto): Promise<void> {
+  // Cache auth data by token with JWT expiration time
+  async cacheAuthData(
+    token: string,
+    authData: AuthDto,
+    jwtExpiresAt: number,
+  ): Promise<void> {
     try {
       const key = `auth:token:${token}`;
-      await this.redisService.set(key, authData, this.CACHE_TTL);
-      this.logger.debug('Cached auth data for token');
+      // Calculate TTL based on JWT expiration time minus 30 seconds buffer
+      const now = Math.floor(Date.now() / 1000);
+      const ttl = Math.max(jwtExpiresAt - now - 30, 60); // At least 1 minute
+
+      await this.redisService.set(key, authData, ttl);
+      this.logger.debug(
+        `Cached auth data for token with TTL: ${ttl}s (expires at: ${new Date(jwtExpiresAt * 1000).toISOString()})`,
+      );
     } catch (error) {
       this.logger.error('Failed to cache auth data:', error);
     }

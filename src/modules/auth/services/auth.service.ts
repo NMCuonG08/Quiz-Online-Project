@@ -387,7 +387,6 @@ export class AuthService extends BaseService {
 
     // Check API key permissions (map roles -> permissions here if API keys are used)
     if (authDto.apiKey && requestedPermission !== false) {
-      // Example: derive permissions from API key roles if needed
       const apiKeyPermissions: Permission[] = [];
       if (
         !isGranted({
@@ -444,7 +443,9 @@ export class AuthService extends BaseService {
       }
 
       // Verify JWT token
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+      const payload = await this.jwtService.verifyAsync<
+        JwtPayload & { exp: number }
+      >(token, {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
 
@@ -495,8 +496,8 @@ export class AuthService extends BaseService {
         },
       };
 
-      // Cache the complete auth data for this token
-      await this.authCacheService.cacheAuthData(token, authData);
+      // Cache the complete auth data for this token with JWT expiration time
+      await this.authCacheService.cacheAuthData(token, authData, payload.exp);
 
       return authData;
     } catch (error) {
