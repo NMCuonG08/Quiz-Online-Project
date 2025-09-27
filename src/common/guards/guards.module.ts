@@ -5,6 +5,6 @@ import { AuthModule } from '@/modules/auth/auth.module';
 @Module({
   imports: [forwardRef(() => AuthModule)],
   providers: [AuthGuard],
-  exports: [AuthGuard],
+  exports: [AuthGuard, forwardRef(() => AuthModule)],
 })
 export class GuardsModule {}

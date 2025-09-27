@@ -4,14 +4,13 @@ import { BaseModule } from '@/common/base/base.module';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 import { AuthService } from './services/auth.service';
 import { AuthController } from './controllers/auth.controller';
-import { QuizModule } from '@/modules/quizz/quiz.module';
-import { CategoryModule } from '@/modules/category/category.module';
 
 @Module({
-  imports: [BaseModule, QuizModule, CategoryModule],
+  imports: [BaseModule],
   controllers: [AuthController],
   providers: [
     AuthService,
+    UserRepository,
     { provide: BaseRepository, useExisting: UserRepository },
   ],
   exports: [AuthService],

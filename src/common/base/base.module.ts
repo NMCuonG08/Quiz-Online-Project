@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PrismaModule } from '@/infrastructure/database/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -12,12 +12,16 @@ import { EventRepository } from '@/common/repositories/event.repository';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
 import { RedisService } from '@/infrastructure/cache/redis/redis.service';
 import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
+import { GuardsModule } from '../guards/guards.module';
+import { AuthModule } from '@/modules/auth/auth.module';
 
 @Module({
   imports: [
     PrismaModule,
     CloudinaryModule,
     RedisModule,
+    GuardsModule,
+    forwardRef(() => AuthModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -40,6 +44,7 @@ import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
   exports: [
     PrismaModule,
     JwtModule,
+    GuardsModule,
     UserRepository,
     QuizRepository,
     CategoryRepository,
