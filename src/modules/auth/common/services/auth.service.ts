@@ -114,7 +114,7 @@ export class AuthenticationService {
       );
       console.log("Token refresh response:", refreshResponse.data.data);
       if (refreshResponse.data) {
-        return refreshResponse.data.data.accessToken;
+        return refreshResponse.data.data;
       }
       return {
         error: {

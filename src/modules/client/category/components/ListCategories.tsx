@@ -1,4 +1,5 @@
-import React from "react";
+"use client";
+import React, { useEffect } from "react";
 import {
   Carousel,
   CarouselContent,
@@ -6,9 +7,10 @@ import {
 } from "@/common/components/ui/carousel";
 import Image from "next/image";
 import Link from "next/link";
+import { useCategory } from "../hooks/useCategory";
 
-// Dữ liệu mẫu cho các category
-const categories = [
+// Fallback data nếu API chưa có dữ liệu
+const fallbackCategories = [
   {
     id: 1,
     name: "Toán học",
@@ -68,6 +70,24 @@ const categories = [
 ];
 
 const CategoryCarousel = () => {
+  const { categories, loading, error, getCategories } = useCategory();
+
+  // Fetch categories khi component mount
+  useEffect(() => {
+    getCategories();
+  }, [getCategories]);
+
+  // Sử dụng dữ liệu từ Redux hoặc fallback data
+  const displayCategories =
+    categories.length > 0 ? categories : fallbackCategories;
+
+  // Xử lý lỗi ảnh - fallback về ảnh mặc định
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    // Nếu ảnh lỗi, thay thế bằng ảnh mặc định
+    target.src = "/categories/cate1.png"; // Ảnh mặc định
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-6">
       <div className="mb-4">
@@ -75,6 +95,16 @@ const CategoryCarousel = () => {
         <p className="text-gray-600 dark:text-gray-400 text-center text-sm">
           Chọn chủ đề yêu thích và bắt đầu thử thách
         </p>
+        {loading && (
+          <p className="text-center text-sm text-blue-600 dark:text-blue-400">
+            Đang tải danh mục...
+          </p>
+        )}
+        {error && (
+          <p className="text-center text-sm text-red-600 dark:text-red-400">
+            Lỗi: {error}
+          </p>
+        )}
       </div>
 
       <Carousel
@@ -85,7 +115,7 @@ const CategoryCarousel = () => {
         className="w-full"
       >
         <CarouselContent className="-ml-2 md:-ml-4">
-          {categories.map((category) => (
+          {displayCategories.map((category) => (
             <CarouselItem
               key={category.id}
               className="pl-2 md:pl-4 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6"
@@ -95,12 +125,13 @@ const CategoryCarousel = () => {
                 className="block text-center"
               >
                 <div className="relative w-12 h-12 mx-auto mb-2">
-                  <Image
-                    src={category.image}
+                  <img
+                    src={category.icon_url}
                     alt={category.name}
                     fill
                     className="object-contain"
                     sizes="48px"
+                    onError={handleImageError}
                   />
                 </div>
                 <h3 className="font-medium text-sm text-center">

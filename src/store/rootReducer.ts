@@ -1,5 +1,6 @@
 import { combineReducers } from "@reduxjs/toolkit";
 import authReducer from "@/modules/auth/common/slices/authSlice";
+import categoryReducer from "@/modules/client/category/slices/category.slice";
 
 // Temporarily disable persistence for auth slice to test logout
 // const authPersistConfig = {
@@ -14,6 +15,7 @@ import authReducer from "@/modules/auth/common/slices/authSlice";
 
 const rootReducer = combineReducers({
   auth: authReducer, // Use non-persisted version for testing
+  category: categoryReducer,
 });
 
 export default rootReducer;

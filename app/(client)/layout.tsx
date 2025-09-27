@@ -4,6 +4,7 @@ import "../globals.css";
 import { ThemeProvider } from "@/common/contexts/ThemeContext";
 import ReduxProvider from "@/common/contexts/ReduxProvider";
 import AuthRestorer from "@/common/contexts/AuthRestorer";
+import ClientLayout from "@/modules/client/common/layouts/ClientLayout";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,7 +39,9 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <ReduxProvider>
-            <AuthRestorer>{children}</AuthRestorer>
+            <AuthRestorer>
+              <ClientLayout>{children}</ClientLayout>
+            </AuthRestorer>
           </ReduxProvider>
         </ThemeProvider>
       </body>
