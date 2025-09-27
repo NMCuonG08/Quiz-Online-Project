@@ -299,23 +299,50 @@ export class AuthService extends BaseService {
     await this.userRepository.update(userId, {
       refreshToken: null,
     });
+
+    // Invalidate all user-related cache
+    await this.authCacheService.invalidateAllUserTokens(userId);
+
     return true;
   }
 
   // Get user permissions from DB via roles
   private async getUserPermissions(userId: string): Promise<Permission[]> {
-    const user = await this.userRepository.findOne(userId);
-    if (user?.isAdmin) {
-      return Object.values(Permission);
+    // Try to get from cache first
+    const cachedPermissions =
+      await this.authCacheService.getCachedUserPermissions(userId);
+    if (cachedPermissions) {
+      return cachedPermissions;
     }
-    const perms: Permission[] =
-      await this.userRepository.getUserPermissions(userId);
-    return perms;
+
+    // If not in cache, fetch from database
+    const user = await this.userRepository.findOne(userId);
+    let permissions: Permission[];
+
+    if (user?.isAdmin) {
+      permissions = Object.values(Permission);
+    } else {
+      permissions = await this.userRepository.getUserPermissions(userId);
+    }
+
+    // Cache the permissions
+    await this.authCacheService.cacheUserPermissions(userId, permissions);
+    return permissions;
   }
 
   // Public wrappers for controller
   async getUserRoles(userId: string): Promise<string[]> {
+    // Try to get from cache first
+    const cachedRoles = await this.authCacheService.getCachedUserRoles(userId);
+    if (cachedRoles) {
+      return cachedRoles;
+    }
+
+    // If not in cache, fetch from database
     const roles: string[] = await this.userRepository.getUserRoles(userId);
+
+    // Cache the roles
+    await this.authCacheService.cacheUserRoles(userId, roles);
     return roles;
   }
 
@@ -408,40 +435,75 @@ export class AuthService extends BaseService {
 
   private async validateJwtToken(token: string): Promise<AuthDto> {
     try {
+      // First, check cache for complete auth data
+      const cachedAuthData =
+        await this.authCacheService.getCachedAuthData(token);
+      if (cachedAuthData) {
+        this.logger.debug('Using cached auth data for token validation');
+        return cachedAuthData;
+      }
+
       // Verify JWT token
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
 
-      // Check if user still exists in database
-      const user = (await this.userRepository.findOne(payload.sub)) as UserData;
-      if (!user) {
-        throw new UnauthorizedException('User not found');
+      // Try to get roles and permissions from cache first
+      let roles = await this.authCacheService.getCachedUserRoles(payload.sub);
+      let permissions = await this.authCacheService.getCachedUserPermissions(
+        payload.sub,
+      );
+
+      // If not in cache, fetch from database and cache it
+      if (!roles || !permissions) {
+        this.logger.debug('User data not in cache, fetching from database');
+
+        // Check if user still exists in database
+        const user = (await this.userRepository.findOne(
+          payload.sub,
+        )) as UserData;
+        if (!user) {
+          throw new UnauthorizedException('User not found');
+        }
+
+        // Check if user is still active
+        if (user.deletedAt) {
+          throw new UnauthorizedException('User account is deactivated');
+        }
+
+        // Fetch roles and permissions
+        roles = await this.getUserRoles(user.id);
+        permissions = await this.getUserPermissions(user.id);
+
+        // Cache the data
+        await this.authCacheService.cacheUserRoles(payload.sub, roles);
+        await this.authCacheService.cacheUserPermissions(
+          payload.sub,
+          permissions,
+        );
       }
 
-      // Check if user is still active
-      if (user.deletedAt) {
-        throw new UnauthorizedException('User account is deactivated');
-      }
-
-      const roles = await this.getUserRoles(user.id);
-
-      return {
+      const authData: AuthDto = {
         user: {
-          id: user.id,
+          id: payload.sub,
           roles,
-          isAdmin: user.isAdmin || false,
-          name: user.full_name || user.username || user.email,
-          email: user.email,
-          quotaUsageInBytes: 0, // You can impcement quota logic later
+          isAdmin: permissions?.includes(Permission.All) || false,
+          name: '', // Will be filled from user data if needed
+          email: '', // Will be filled from user data if needed
+          quotaUsageInBytes: 0,
           quotaSizeInBytes: null,
         },
       };
+
+      // Cache the complete auth data for this token
+      await this.authCacheService.cacheAuthData(token, authData);
+
+      return authData;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      throw new UnauthorizedException('Invalid or jxJired token');
+      throw new UnauthorizedException('Invalid or expired token');
     }
   }
 

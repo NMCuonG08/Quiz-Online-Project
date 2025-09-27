@@ -19,6 +19,11 @@ export class CreateQuizDto {
   @IsNotEmpty()
   title: string;
 
+  @ApiProperty({ example: 'quiz-1' })
+  @IsString()
+  @IsNotEmpty()
+  slug: string;
+
   @ApiProperty({ example: '2a639f98-cf28-4afb-8924-17d4a92c1517' })
   @IsString()
   @IsNotEmpty()

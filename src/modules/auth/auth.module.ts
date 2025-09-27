@@ -4,15 +4,17 @@ import { BaseModule } from '@/common/base/base.module';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 import { AuthService } from './services/auth.service';
 import { AuthController } from './controllers/auth.controller';
+import { AuthCacheService } from './services/auth-cache.service';
 
 @Module({
   imports: [BaseModule],
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthCacheService,
     UserRepository,
     { provide: BaseRepository, useExisting: UserRepository },
   ],
-  exports: [AuthService],
+  exports: [AuthService, AuthCacheService],
 })
 export class AuthModule {}
