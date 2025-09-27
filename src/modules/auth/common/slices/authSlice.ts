@@ -73,6 +73,23 @@ export const getUserProfile = createAsyncThunk(
   }
 );
 
+// Google OAuth: exchange code for token
+export const loginWithGoogleCode = createAsyncThunk(
+  "auth/loginWithGoogleCode",
+  async (
+    payload: { code: string; state?: string; redirectUri?: string } | string,
+    { rejectWithValue }
+  ) => {
+    const normalized =
+      typeof payload === "string" ? { code: payload } : payload;
+    const response = await AuthenticationService.exchangeGoogleCode(normalized);
+    if (response.error) {
+      return rejectWithValue(response.error.message || "Google login failed");
+    }
+    return response;
+  }
+);
+
 export const registerUser = createAsyncThunk(
   "auth/registerUser",
   async (credentials: RegisterFormData, { rejectWithValue }) => {
@@ -210,6 +227,30 @@ const authSlice = createSlice({
         }
       })
       .addCase(loginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(loginWithGoogleCode.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(loginWithGoogleCode.fulfilled, (state, action) => {
+        const response = action.payload;
+        const data = response.data || response;
+        const token = data?.token || data?.accessToken || null;
+
+        state.isAuthenticated = true;
+        state.token = token;
+        state.user = data?.user || null;
+        state.loading = false;
+        state.error = null;
+
+        if (token) {
+          // Persist token similar to email/password flow
+          localStorage.setItem("auth_token", token);
+        }
+      })
+      .addCase(loginWithGoogleCode.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })

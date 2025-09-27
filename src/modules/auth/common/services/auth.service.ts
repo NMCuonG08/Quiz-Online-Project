@@ -25,6 +25,46 @@ export class AuthenticationService {
     }
   }
 
+  // Get Google OAuth URL (server generates URL with state, etc.)
+  static async getGoogleAuthUrl() {
+    try {
+      const response = await apiClient.get("/auth/google/url");
+      return response.data;
+    } catch (error) {
+      console.error("Get Google URL error:", error);
+      return (
+        error.response?.data || {
+          error: {
+            message: "Failed to get Google auth URL",
+            code: "GOOGLE_URL_ERROR",
+          },
+        }
+      );
+    }
+  }
+
+  // Exchange Google code for tokens on server
+  static async exchangeGoogleCode(payload: {
+    code: string;
+    state?: string;
+    redirectUri?: string;
+  }) {
+    try {
+      const response = await apiClient.post("/auth/google/callback", payload);
+      return response.data;
+    } catch (error) {
+      console.error("Exchange Google code error:", error);
+      return (
+        error.response?.data || {
+          error: {
+            message: "Failed to exchange Google code",
+            code: "GOOGLE_EXCHANGE_ERROR",
+          },
+        }
+      );
+    }
+  }
+
   static async handleRegister(credentials: RegisterFormData) {
     try {
       const response = await apiClient.post("/auth/signup", credentials);
@@ -64,7 +104,7 @@ export class AuthenticationService {
   static async refreshToken() {
     try {
       const refreshResponse = await apiClient.post(
-        "/auth/refresh",
+        "/auth/refresh-cookie",
         {},
         {
           headers: {
@@ -74,7 +114,7 @@ export class AuthenticationService {
       );
       console.log("Token refresh response:", refreshResponse.data.data);
       if (refreshResponse.data) {
-        return refreshResponse.data.data;
+        return refreshResponse.data.data.accessToken;
       }
       return {
         error: {

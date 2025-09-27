@@ -4,10 +4,21 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
+import { Button } from "@/common/components/ui/button";
+import { useAuth } from "@/modules/auth/common/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/common/components/ui/dropdown-menu";
+import { User, LogOut, LayoutDashboard } from "lucide-react";
 import "@/styles/nav-link.css";
 
 const NavBarMobile = () => {
   const [open, setOpen] = React.useState(false);
+  const { isLoggedIn, logout } = useAuth();
   const pathname = usePathname();
   const [hash, setHash] = React.useState<string>("");
 
@@ -113,15 +124,7 @@ const NavBarMobile = () => {
             </Link>
           </nav>
 
-          {/* Theme toggle in mobile menu */}
-          <div className="mt-6 pt-6 border-t border-border">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                Chế độ hiển thị
-              </span>
-              <ThemeToggle />
-            </div>
-          </div>
+          {/* Removed theme toggle from sidebar per request */}
         </div>
       </div>
     ) : null;
@@ -161,12 +164,41 @@ const NavBarMobile = () => {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Link
-              href="/auth/login"
-              className="inline-flex items-center rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              Sign in
-            </Link>
+            {isLoggedIn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="inline-flex items-center justify-center w-9 h-9 p-0"
+                  >
+                    <User className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link href="/user" className="flex items-center gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => logout()}
+                    className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Đăng xuất
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link href="/auth/login">
+                <Button className="inline-flex items-center bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                  Sign in
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>

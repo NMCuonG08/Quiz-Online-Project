@@ -1,0 +1,67 @@
+// components/guards/AuthGuard.tsx
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { ReactNode } from "react";
+import CreateLoading from "@/common/components/CreateLoading";
+
+interface AuthGuardProps {
+  children: ReactNode;
+  requiredRole?: string | null;
+  redirectTo?: string;
+  fallback?: ReactNode | null;
+}
+
+const AuthGuard = ({
+  children,
+  requiredRole = null,
+  redirectTo = "/auth/login",
+  fallback = null,
+}: AuthGuardProps) => {
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+  const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      // Đợi auth loading xong
+      if (loading) return;
+
+      // Nếu chưa authenticate
+      if (!isAuthenticated) {
+        router.replace(redirectTo);
+        return;
+      }
+
+      // Nếu cần role specific và user không có quyền
+      if (requiredRole && user?.role !== requiredRole) {
+        router.replace("/unauthorized");
+        return;
+      }
+
+      setIsChecking(false);
+    };
+
+    checkAuth();
+  }, [isAuthenticated, user, loading, requiredRole, router, redirectTo]);
+
+  // Vẫn đang check auth status
+  if (loading || isChecking) {
+    return (
+      fallback || (
+        <div className="min-h-screen flex items-center justify-center">
+          <CreateLoading />
+        </div>
+      )
+    );
+  }
+
+  // Nếu không authenticated hoặc không đủ quyền thì không render gì
+  if (!isAuthenticated || (requiredRole && user?.role !== requiredRole)) {
+    return null;
+  }
+
+  return children;
+};
+
+export default AuthGuard;
