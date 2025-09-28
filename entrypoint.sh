@@ -19,6 +19,10 @@ done
 echo "Running Prisma migrate..."
 npx prisma migrate deploy
 
+# Chạy seed data
+echo "Running Prisma seed..."
+npm run prisma:seed
+
 # Start app
 echo "Starting app..."
 npm run start:prod
