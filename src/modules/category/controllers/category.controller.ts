@@ -5,7 +5,7 @@ import { Authenticated } from '@/common/guards/auth.guard';
 import { Permission } from '@/common/enums';
 import { AuthGuard } from '@/common/guards/auth.guard';
 
-@Controller('categories')
+@Controller('/api/categories')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 

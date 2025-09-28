@@ -16,7 +16,7 @@ import { Auth, Authenticated, AuthGuard } from '@/common/guards/auth.guard';
 import { Permission } from '@/common/enums';
 import { AuthDto } from '@/modules/auth/dto';
 
-@Controller('user')
+@Controller('/api/user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
