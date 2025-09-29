@@ -17,8 +17,15 @@ pipeline {
             steps {
                 sh """
                 set -x
+                # Prepare folder
+                sudo mkdir -p ${folderDeploy}
+                
+                # Copy necessary files
+                sudo cp -r . ${folderDeploy}/
+                
+                # Deploy
                 cd ${folderDeploy}
-                docker-compose up --build -d
+                sudo docker-compose up --build -d
                 """
             }
         }
