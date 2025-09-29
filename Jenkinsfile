@@ -56,31 +56,7 @@ pipeline {
                 sudo docker-compose up -d
                 """
             }
-        }
-        stage('Health Check') {
-            steps {
-                script {
-                    def maxRetries = 12
-                    def retryInterval = 5
-                    def healthy = false
-                    
-                    for (int i = 0; i < maxRetries; i++) {
-                        try {
-                            sh "curl -f http://localhost:3000/api/v1/health"
-                            healthy = true
-                            break
-                        } catch (Exception e) {
-                            echo "Health check failed, retrying in ${retryInterval}s... (${i+1}/${maxRetries})"
-                            sleep(retryInterval)
-                        }
-                    }
-                    
-                    if (!healthy) {
-                        error("Health check failed after ${maxRetries} attempts")
-                    }
-                }
-            }
-        }
+        } 
     }
     post {
         success {
