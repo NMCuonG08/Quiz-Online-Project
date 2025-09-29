@@ -30,13 +30,14 @@ import { UpdateAuthDto } from '../dto/update-auth.dto';
 import { LoginDto, SignupDto, RefreshTokenDto, AuthDto } from '../dto';
 import { PaginationQueryDto } from '@/common/dtos/responses/base.response';
 import { AuthGuard } from '@/common/guards/auth.guard';
-import { Auth } from '@/common/guards/auth.guard';
+import { Authenticated, Auth } from '@/common/guards/auth.guard';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { Permission } from '@/common/enums';
 
 @ApiTags('Authentication')
 @Controller('/api/auth')
@@ -304,6 +305,7 @@ export class AuthController {
       },
     },
   })
+  @Authenticated({ permission: Permission.ActivityRead })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getCurrentUser(@Auth() auth: AuthDto) {
     return auth.user;
