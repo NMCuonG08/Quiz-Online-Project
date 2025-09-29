@@ -5,10 +5,11 @@ pipeline {
     
     parameters {
         choice(name: 'DEPLOY_ENV', choices: ['production', 'staging'], description: 'Select deployment environment')
+        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip tests?')
     }
     
     environment {
-        COMPOSE_FILE = "docker-compose.${params.DEPLOY_ENV}.yml"
+        COMPOSE_FILE = "docker-compose.yml"
     }
     
     tools {
@@ -27,7 +28,7 @@ pipeline {
             steps {
                 echo "🐳 Building Docker image..."
                 sh """
-                    docker compose -f ${COMPOSE_FILE} build --no-cache
+                    docker-compose -f ${COMPOSE_FILE} build --no-cache
                 """
             }
         }
@@ -37,10 +38,10 @@ pipeline {
                 echo "🚀 Deploying with Docker Compose..."
                 sh """
                     # Stop old containers
-                    docker compose -f ${COMPOSE_FILE} down || true
+                    docker-compose -f ${COMPOSE_FILE} down || true
                     
                     # Start new containers in detached mode
-                    docker compose -f ${COMPOSE_FILE} up -d
+                    docker-compose -f ${COMPOSE_FILE} up -d
                 """
             }
         }
@@ -50,7 +51,7 @@ pipeline {
                 echo "🏥 Running health check..."
                 sh """
                     sleep 5
-                    docker compose -f ${COMPOSE_FILE} ps
+                    docker-compose -f ${COMPOSE_FILE} ps
                     
                     # Optional: Check if container is healthy
                     # curl -f http://localhost:3000/health || exit 1
