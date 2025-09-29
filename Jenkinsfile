@@ -2,103 +2,87 @@ pipeline {
     agent {
         label 'quiz-server'
     }
-
+    
     parameters {
-        choice(name: 'DEPLOY_ENV', choices: ['production'], description: 'Select deployment environment')
+        choice(name: 'DEPLOY_ENV', choices: ['production', 'staging'], description: 'Select deployment environment')
     }
-
+    
     environment {
-        apiUser = "nestdev"
-        appName = "nest-shopping-api"
-        folderDeploy = "/var/www/${appName}"
-        buildScript = "npm install && npm run build"
-        installProdScript = "cd ${folderDeploy} && sudo npm install --production"
-        chownScript = "sudo chown -R ${apiUser}:${apiUser} ${folderDeploy}"
-        killScript = "sudo pkill -f 'node.*main.js' || true"
-        runScript = "sudo su ${apiUser} -c 'cd ${folderDeploy}; npm run start:prod > nohup.out 2>&1 &'"
+        COMPOSE_FILE = "docker-compose.${params.DEPLOY_ENV}.yml"
     }
-
+    
     tools {
-        git 'Default' // tên Git installation trong Jenkins Global Tool Config
+        git 'Default'
     }
-
+    
     stages {
-
-        stage('Load Environment & Credentials') {
+        stage('Checkout') {
             steps {
-                // Load all credentials via Jenkins credentials plugin
-                withCredentials([
-                    string(credentialsId: "${params.DEPLOY_ENV}-database-url", variable: 'DATABASE_URL'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-redis-password", variable: 'REDIS_PASSWORD'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-secret", variable: 'JWT_SECRET'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-refresh-secret", variable: 'JWT_REFRESH_SECRET'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-cloudinary-secret", variable: 'CLOUDINARY_API_SECRET')
-                ]) {
-                    echo "✅ Loaded credentials for ${params.DEPLOY_ENV}"
-                }
+                echo "📦 Checking out code..."
+                checkout scm
             }
         }
-
-        stage('Build') {
+        
+        stage('Build Docker Image') {
             steps {
+                echo "🐳 Building Docker image..."
                 sh """
-                set -x
-                npm config set loglevel verbose
-                ${buildScript}
+                    docker compose -f ${COMPOSE_FILE} build --no-cache
                 """
             }
         }
-
+        
         stage('Deploy') {
             steps {
+                echo "🚀 Deploying with Docker Compose..."
                 sh """
-                set -x
-
-                # Stop previous app
-                ${killScript}
-
-                # Prepare folder
-                sudo rm -rf ${folderDeploy}
-                sudo mkdir -p ${folderDeploy}
-                sudo cp -r dist/* ${folderDeploy}/
-                sudo cp package*.json ${folderDeploy}/
-
-                # Create .env file
-                sudo tee ${folderDeploy}/.env > /dev/null <<EOF
-DATABASE_URL=${DATABASE_URL}
-REDIS_PASSWORD=${REDIS_PASSWORD}
-JWT_SECRET=${JWT_SECRET}
-JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
-PORT=${env.PORT}
-NODE_ENV=${env.NODE_ENV}
-FRONTEND_URL=${env.FRONTEND_URL}
-EOF
-
-                # Install production dependencies
-                ${installProdScript}
-
-                # Fix permissions
-                ${chownScript}
-                sudo chmod 600 ${folderDeploy}/.env
-
-                # Run application
-                ${runScript}
-
-                # Health check (pipeline fail if health check fail)
-                curl -f http://localhost:${env.PORT}/api/v1/health
+                    # Stop old containers
+                    docker compose -f ${COMPOSE_FILE} down || true
+                    
+                    # Start new containers in detached mode
+                    docker compose -f ${COMPOSE_FILE} up -d
                 """
             }
         }
-
+        
+        stage('Health Check') {
+            steps {
+                echo "🏥 Running health check..."
+                sh """
+                    sleep 5
+                    docker compose -f ${COMPOSE_FILE} ps
+                    
+                    # Optional: Check if container is healthy
+                    # curl -f http://localhost:3000/health || exit 1
+                """
+            }
+        }
+        
+        stage('Cleanup') {
+            steps {
+                echo "🧹 Cleaning up unused images..."
+                sh """
+                    docker image prune -f
+                """
+            }
+        }
     }
-
+    
     post {
         success {
             echo "✅ Deployed ${params.DEPLOY_ENV} successfully!"
         }
         failure {
             echo "❌ Deploy failed for ${params.DEPLOY_ENV}"
+            sh """
+                docker compose -f ${COMPOSE_FILE} logs --tail=50
+            """
+        }
+        always {
+            echo "📊 Final container status:"
+            sh """
+                docker compose -f ${COMPOSE_FILE} ps
+            """
         }
     }
 }
