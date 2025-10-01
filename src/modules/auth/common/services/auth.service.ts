@@ -8,7 +8,7 @@ export class AuthenticationService {
       console.log("Attempting login with credentials:", {
         email: credentials.email,
       });
-      const response = await apiClient.post("/auth/login", credentials);
+      const response = await apiClient.post("/api/auth/login", credentials);
       console.log("Login API response:", response.data);
       return response.data;
     } catch (error) {
@@ -28,7 +28,7 @@ export class AuthenticationService {
   // Get Google OAuth URL (server generates URL with state, etc.)
   static async getGoogleAuthUrl() {
     try {
-      const response = await apiClient.get("/auth/google/url");
+      const response = await apiClient.get("/api/auth/google/url");
       return response.data;
     } catch (error) {
       console.error("Get Google URL error:", error);
@@ -50,7 +50,10 @@ export class AuthenticationService {
     redirectUri?: string;
   }) {
     try {
-      const response = await apiClient.post("/auth/google/callback", payload);
+      const response = await apiClient.post(
+        "/api/auth/google/callback",
+        payload
+      );
       return response.data;
     } catch (error) {
       console.error("Exchange Google code error:", error);
@@ -67,7 +70,7 @@ export class AuthenticationService {
 
   static async handleRegister(credentials: RegisterFormData) {
     try {
-      const response = await apiClient.post("/auth/signup", credentials);
+      const response = await apiClient.post("/api/auth/register", credentials);
       return response.data;
     } catch (error) {
       console.error("Registration error:", error);
@@ -85,7 +88,7 @@ export class AuthenticationService {
 
   static async getUserProfile() {
     try {
-      const response = await apiClient.get("/auth/profile");
+      const response = await apiClient.get("/api/auth/profile");
       return response.data;
     } catch (error) {
       console.error("Get user profile error:", error);
@@ -104,7 +107,7 @@ export class AuthenticationService {
   static async refreshToken() {
     try {
       const refreshResponse = await apiClient.post(
-        "/auth/refresh-cookie",
+        "/api/auth/refresh-cookie",
         {},
         {
           headers: {
@@ -138,7 +141,7 @@ export class AuthenticationService {
 
   static async handleLogout() {
     try {
-      const response = await apiClient.post("/auth/logout");
+      const response = await apiClient.post("/api/auth/logout");
       return response.data;
     } catch (error) {
       console.error("Logout error:", error);

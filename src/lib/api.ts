@@ -138,7 +138,7 @@ class APILogger {
 }
 
 const apiClient = axios.create({
-  baseURL: "http://localhost:3333",
+  baseURL: "http://13.239.240.6:5000",
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
