@@ -18,6 +18,11 @@ export class CreateCategoryDto {
   @IsNotEmpty()
   icon_url: string;
 
+  @ApiProperty({ example: 'category-1' })
+  @IsString()
+  @IsNotEmpty()
+  slug: string;
+
   @ApiProperty({
     example: '5b3c4f8a-9d2c-4b2e-8f1a-1b2c3d4e5f6a',
     required: false,

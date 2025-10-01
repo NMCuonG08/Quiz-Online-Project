@@ -11,6 +11,8 @@ import { QuizRepository } from '@/modules/quizz/repositories/quiz.repository';
 import { CategoryRepository } from '@/modules/category/repositories/category.repository';
 import { JobRepository } from '@/common/repositories/job.repository';
 import { RedisService } from '@/infrastructure/cache/redis/redis.service';
+import { AuthCacheService } from '@/modules/auth/services/auth-cache.service';
+import { EmailRepository } from '../repositories/email.repository';
 
 @Injectable()
 export abstract class BaseService {
@@ -26,6 +28,8 @@ export abstract class BaseService {
     protected readonly cloudinaryService: CloudinaryService,
     protected readonly jobRepository: JobRepository,
     protected readonly redisService: RedisService,
+    protected readonly authCacheService: AuthCacheService,
+    protected readonly emailRepository: EmailRepository,
   ) {}
 
   async findAll(paginationDto: PaginationQueryDto) {

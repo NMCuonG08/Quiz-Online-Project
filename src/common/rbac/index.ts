@@ -2,7 +2,7 @@
 export * from './rbac.module';
 
 // Services
-export * from '../services/rbac.service';
+export * from './rbac.service';
 
 // Guards
 export * from '../guards/permission.guard';

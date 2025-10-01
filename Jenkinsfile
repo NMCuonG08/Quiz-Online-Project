@@ -2,12 +2,14 @@ pipeline {
     agent {
         label 'quiz-server'
     }
+
+    parameters {
+        choice(name: 'DEPLOY_ENV', choices: ['production'], description: 'Select deployment environment')
+    }
+
     environment {
         apiUser = "nestdev"
         appName = "nest-shopping-api"
-        appVersion = "1.0.0"
-        appType = "node"  
-        appContext = "api/v1"
         folderDeploy = "/var/www/${appName}"
         buildScript = "npm install && npm run build"
         installProdScript = "cd ${folderDeploy} && sudo npm install --production"
@@ -15,81 +17,88 @@ pipeline {
         killScript = "sudo pkill -f 'node.*main.js' || true"
         runScript = "sudo su ${apiUser} -c 'cd ${folderDeploy}; npm run start:prod > nohup.out 2>&1 &'"
     }
+
+    tools {
+        git 'Default' // tên Git installation trong Jenkins Global Tool Config
+    }
+
     stages {
-        stage('Info') {
+
+        stage('Load Environment & Credentials') {
             steps {
-                sh(script: "whoami; pwd; ls -la", label: "Environment Info")
+                // Load all credentials via Jenkins credentials plugin
+                withCredentials([
+                    string(credentialsId: "${params.DEPLOY_ENV}-database-url", variable: 'DATABASE_URL'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-redis-password", variable: 'REDIS_PASSWORD'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-secret", variable: 'JWT_SECRET'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-refresh-secret", variable: 'JWT_REFRESH_SECRET'),
+                    string(credentialsId: "${params.DEPLOY_ENV}-cloudinary-secret", variable: 'CLOUDINARY_API_SECRET')
+                ]) {
+                    echo "✅ Loaded credentials for ${params.DEPLOY_ENV}"
+                }
             }
         }
-        
+
         stage('Build') {
             steps {
-                sh(script: "${buildScript}", label: "Build NestJS App")
-            }
-        }
-        
-        stage('Stop Old Process') {
-            steps {
-                sh(script: "${killScript}", label: "Stop Old Node Process")
-            }
-        }
-        
-        stage('Prepare Deploy Directory') {
-            steps {
                 sh """
-                    sudo rm -rf ${folderDeploy}
-                    sudo mkdir -p ${folderDeploy}
+                set -x
+                npm config set loglevel verbose
+                ${buildScript}
                 """
             }
         }
-        
-        stage('Deploy Files') {
+
+        stage('Deploy') {
             steps {
                 sh """
-                    sudo cp -r dist/* ${folderDeploy}/
-                    sudo cp package*.json ${folderDeploy}/
+                set -x
+
+                # Stop previous app
+                ${killScript}
+
+                # Prepare folder
+                sudo rm -rf ${folderDeploy}
+                sudo mkdir -p ${folderDeploy}
+                sudo cp -r dist/* ${folderDeploy}/
+                sudo cp package*.json ${folderDeploy}/
+
+                # Create .env file
+                sudo tee ${folderDeploy}/.env > /dev/null <<EOF
+DATABASE_URL=${DATABASE_URL}
+REDIS_PASSWORD=${REDIS_PASSWORD}
+JWT_SECRET=${JWT_SECRET}
+JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+PORT=${env.PORT}
+NODE_ENV=${env.NODE_ENV}
+FRONTEND_URL=${env.FRONTEND_URL}
+EOF
+
+                # Install production dependencies
+                ${installProdScript}
+
+                # Fix permissions
+                ${chownScript}
+                sudo chmod 600 ${folderDeploy}/.env
+
+                # Run application
+                ${runScript}
+
+                # Health check (pipeline fail if health check fail)
+                curl -f http://localhost:${env.PORT}/api/v1/health
                 """
             }
         }
-        
-        stage('Install Production Dependencies') {
-            steps {
-                sh "${installProdScript}"
-            }
-        }
-        
-        stage('Set Permissions') {
-            steps {
-                sh "${chownScript}"
-            }
-        }
-        
-        stage('Start New Process') {
-            steps {
-                sh(script: "${runScript}", label: "Start NestJS App")
-            }
-        }
-        
-        stage('Health Check') {
-            steps {
-                sh """
-                    sleep 5
-                    curl -f http://localhost:3000/api/v1/health || echo "Health check failed"
-                """
-            }
-        }
+
     }
-    
+
     post {
-        always {
-            echo "Pipeline completed"
-        }
         success {
-            echo "Deployment successful!"
+            echo "✅ Deployed ${params.DEPLOY_ENV} successfully!"
         }
         failure {
-            echo "Deployment failed!"
-            // Rollback logic có thể thêm ở đây
+            echo "❌ Deploy failed for ${params.DEPLOY_ENV}"
         }
     }
 }

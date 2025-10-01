@@ -6,6 +6,7 @@ import {
   Body,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { QuizService } from '../services/quiz.service';
@@ -13,13 +14,14 @@ import { CreateQuizDto } from '../dtos/create-quiz.dto';
 import { ApiOperation, ApiConsumes } from '@nestjs/swagger';
 
 import { Permission } from '@/common/enums/permisson';
-import { Authenticated } from '@/common/guards/auth.guard';
+import { Authenticated, AuthGuard } from '@/common/guards/auth.guard';
 
-@Controller('api/quiz')
+@Controller('/api/quiz')
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
   @Get()
+  @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.QuizRead })
   async getQuizzes() {
     return this.quizService.getQuizzes();

@@ -12,6 +12,7 @@ import {
   ExecutionContext,
   Injectable,
   SetMetadata,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   MetadataKey,
@@ -71,7 +72,11 @@ export const Authenticated = (
 };
 export const Auth = createParamDecorator(
   (data: unknown, context: ExecutionContext): AuthDto => {
-    return context.switchToHttp().getRequest<AuthenticatedRequest>().user;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    if (!request.user) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return request.user;
   },
 );
 
@@ -113,7 +118,12 @@ export class AuthGuard implements CanActivate {
     request.user = await this.authService.authenticate({
       headers: request.headers,
       queryParams: request.query as Record<string, string>,
-      metadata: { adminRoute, sharedLinkRoute, permission, uri: request.path },
+      metadata: {
+        adminRoute,
+        sharedLinkRoute,
+        permission,
+        uri: request.path,
+      },
     });
 
     return true;

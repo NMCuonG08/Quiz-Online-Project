@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RbacService } from '@/common/services/rbac.service';
+import { RbacService } from '@/common/rbac/rbac.service';
 import { Permission } from '@/common/enums/permisson';
 
 @Injectable()

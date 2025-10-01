@@ -8,8 +8,8 @@ COPY package*.json ./
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (use install to avoid lockfile strictness in CI)
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -17,32 +17,44 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && \
+    sed -i 's/\r$//' /app/entrypoint.sh
+
 # Build NestJS app
 RUN npm run build
+
+# Prune dev dependencies to keep only production deps for final image
+RUN npm prune --omit=dev && npm cache clean --force
 
 # 2. Production stage  
 FROM node:22-alpine AS production
 
+# Install wget for healthcheck, redis-cli for entrypoint, and postgresql-client for pg_isready
+RUN apk add --no-cache wget redis postgresql-client
+
 WORKDIR /app
 
-# Copy package files
+# Copy package metadata required at runtime (version read in code)
 COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application và prisma files
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+RUN chmod +x /app/entrypoint.sh && \
+    sed -i 's/\r$//' /app/entrypoint.sh
 RUN chown -R nestjs:nodejs /app
 USER nestjs
 
 # Expose port
-EXPOSE 3000
+EXPOSE 5000
+
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Start application
 CMD ["node", "dist/src/main.js"]

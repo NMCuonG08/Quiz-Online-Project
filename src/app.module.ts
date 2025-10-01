@@ -7,7 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { CommonRepositoriesModule } from './common/repositories/common-repositories.module';
 import { APP_GUARD } from '@nestjs/core';
-import { AuthGuard } from './common/guards/auth.guard';
+import { GuardsModule } from './common/guards/guards.module';
 import { QuizModule } from './modules/quizz/quiz.module';
 import { CategoryModule } from './modules/category/category.module';
 import { BullModule } from '@nestjs/bullmq';
@@ -155,19 +155,13 @@ import configuration from './config/configuration';
     ),
     CommonRepositoriesModule,
     PrismaModule,
+    GuardsModule,
     AuthModule,
     UserModule,
     QuizModule,
     CategoryModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    JobRepository,
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard,
-    },
-  ],
+  providers: [AppService, JobRepository],
 })
 export class AppModule {}
