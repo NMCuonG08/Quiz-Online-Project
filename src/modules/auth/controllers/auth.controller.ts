@@ -3,10 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -25,10 +21,7 @@ interface RequestWithCookies extends Request {
   };
 }
 import { AuthService } from '../services/auth.service';
-import { CreateAuthDto } from '../dto/create-auth.dto';
-import { UpdateAuthDto } from '../dto/update-auth.dto';
 import { LoginDto, SignupDto, RefreshTokenDto, AuthDto } from '../dto';
-import { PaginationQueryDto } from '@/common/dtos/responses/base.response';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { Authenticated, Auth } from '@/common/guards/auth.guard';
 import {
@@ -38,6 +31,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { Permission } from '@/common/enums';
+import { ForgotPasswordDto } from '../dto';
 
 @ApiTags('Authentication')
 @Controller('/api/auth')
@@ -150,7 +144,7 @@ export class AuthController {
     return { user: result.user, accessToken: result.accessToken };
   }
 
-  @Post('signup')
+  @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'User registration' })
   @ApiResponse({
@@ -176,38 +170,39 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 409, description: 'Email or username already exists' })
-  async signup(
-    @Body() signupDto: SignupDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async signup(@Body() signupDto: SignupDto) {
     const result: AuthLoginResult = await this.authService.signup(signupDto);
-
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
-    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
-
-    // Only set refresh token in cookie
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      domain,
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
-
     return { user: result.user, accessToken: result.accessToken };
   }
 
   @Post('logout')
   @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.ActivityRead })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User logout' })
   @ApiResponse({ status: 200, description: 'Logout successful' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async logout(@Auth() auth: AuthDto) {
-    return await this.authService.logout(auth.user.id);
+  async logout(
+    @Auth() auth: AuthDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.logout(auth.user.id);
+
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
+    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
+
+    // Clear refresh token cookies on client
+    res.clearCookie('__refreshToken', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      domain,
+      path: '/',
+    });
+
+    return result;
   }
 
   @Post('refresh')
@@ -288,6 +283,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.ActivityRead })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user info' })
   @ApiResponse({
@@ -313,6 +309,7 @@ export class AuthController {
 
   @Get('me/roles')
   @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.ActivityRead })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user roles' })
   getMyRoles(@Auth() auth: AuthDto) {
@@ -321,35 +318,19 @@ export class AuthController {
 
   @Get('me/permissions')
   @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.ActivityRead })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user permissions' })
   getMyPermissions(@Auth() auth: AuthDto) {
     return this.authService.getUserPermissionsPublic(auth.user.id);
   }
 
-  // Legacy methods (keep for compatibility)
-  @Post()
-  create(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.create(createAuthDto);
-  }
-
-  @Get()
-  findAll(@Query() paginationDto: PaginationQueryDto) {
-    return this.authService.findAll(paginationDto);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.authService.findOne(id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuthDto: UpdateAuthDto) {
-    return this.authService.update(id, updateAuthDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.authService.remove(id);
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Forgot password' })
+  @ApiResponse({ status: 200, description: 'Forgot password successful' })
+  @ApiResponse({ status: 401, description: 'Invalid email' })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return await this.authService.forgotPassword(forgotPasswordDto);
   }
 }

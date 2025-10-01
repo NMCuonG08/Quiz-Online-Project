@@ -14,6 +14,7 @@ import { RedisService } from '@/infrastructure/cache/redis/redis.service';
 import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
 import { GuardsModule } from '../guards/guards.module';
 import { AuthModule } from '@/modules/auth/auth.module';
+import { EmailRepository } from '../repositories/email.repository';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AuthModule } from '@/modules/auth/auth.module';
     JobRepository,
     EventRepository,
     LoggingRepository,
+    EmailRepository,
     RedisService,
   ],
   exports: [
@@ -52,7 +54,7 @@ import { AuthModule } from '@/modules/auth/auth.module';
     JobRepository,
     EventRepository,
     LoggingRepository,
-    RedisService,
+    EmailRepository,
   ],
 })
 export class BaseModule {}

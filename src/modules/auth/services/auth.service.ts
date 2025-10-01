@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { IncomingHttpHeaders } from 'http';
-import { AuthDto, LoginDto, SignupDto } from '../dto';
+import { AuthDto, ForgotPasswordDto, LoginDto, SignupDto } from '../dto';
 import { projectHeader } from '@/common/enums';
 import { Permission } from '@/common/enums';
 import { isGranted } from '@/common/utils/access';
@@ -569,6 +569,12 @@ export class AuthService extends BaseService {
       }
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+
+    await this.emailRepository.sendWelcomeEmail(email, 'User', 'User');
   }
 
   // Legacy placeholder methods removed to avoid signature conflicts with BaseService
