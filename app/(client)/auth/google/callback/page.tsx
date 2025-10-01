@@ -1,11 +1,11 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAppDispatch } from "@/hooks/useRedux";
 import { loginWithGoogleCode } from "@/modules/auth/common/slices/authSlice";
 import { showError, showSuccess } from "@/lib/Notification";
 
-export default function GoogleCallbackPage() {
+function GoogleCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
@@ -82,5 +82,22 @@ export default function GoogleCallbackPage() {
         Đang xử lý đăng nhập Google...
       </div>
     </div>
+  );
+}
+
+export default function GoogleCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            Đang tải...
+          </div>
+        </div>
+      }
+    >
+      <GoogleCallbackContent />
+    </Suspense>
   );
 }

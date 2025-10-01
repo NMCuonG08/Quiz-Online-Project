@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronUpIcon } from "@/modules/admin/common/layouts/header/search-icons";
+import { ChevronUpIcon } from "@/modules/admin/common/components/icons";
 import {
   Dropdown,
   DropdownContent,
@@ -25,9 +25,9 @@ export function UserInfo() {
     <Dropdown
       isOpen={isOpen}
       setIsOpen={setIsOpen}
-      className="bg-white dark:bg-[#122031]"
+      className="bg-white  dark:bg-[#122031]"
     >
-      <DropdownTrigger className="rounded align-middle bg-white dark:bg-[#122031] outline-none ring-primary ring-offset-2 focus-visible:ring-1 dark:ring-offset-gray-dark">
+      <DropdownTrigger className="rounded align-middle bg-white  dark:bg-[#122031] outline-none ring-primary ring-offset-2 focus-visible:ring-1 dark:ring-offset-gray-dark">
         <span className="sr-only">My Account</span>
 
         <figure className="flex items-center gap-3">
@@ -39,7 +39,7 @@ export function UserInfo() {
             width={200}
             height={200}
           />
-          <figcaption className="flex items-center gap-1 font-medium text-dark dark:text-dark-6 max-[1024px]:sr-only">
+          <figcaption className="flex items-center gap-1 font-medium text-dark dark:text-white max-[1024px]:sr-only">
             <span>{USER.name}</span>
 
             <ChevronUpIcon
@@ -55,7 +55,7 @@ export function UserInfo() {
       </DropdownTrigger>
 
       <DropdownContent
-        className="border border-stroke bg-white dark:bg-[#122031] shadow-md dark:border-dark-3 min-[230px]:min-w-[17.5rem]"
+        className="border border-stroke bg-white  dark:bg-[#122031] shadow-md dark:border-dark-3 min-[230px]:min-w-[17.5rem]"
         align="end"
       >
         <h2 className="sr-only">User information</h2>
@@ -81,7 +81,7 @@ export function UserInfo() {
 
         <hr className="border-[#E8E8E8] dark:border-dark-3" />
 
-        <div className="p-2 text-base text-[#4B5563] dark:text-dark-6 [&>*]:cursor-pointer">
+        <div className="p-2 text-base text-[#4B5563] dark:text-white [&>*]:cursor-pointer">
           <Link
             href={"/profile"}
             onClick={() => setIsOpen(false)}
@@ -99,7 +99,7 @@ export function UserInfo() {
           >
             <SettingsIcon />
 
-            <span className="mr-auto text-base font-medium">
+            <span className="mr-auto text-base font-medium  ">
               Account Settings
             </span>
           </Link>
@@ -107,7 +107,7 @@ export function UserInfo() {
 
         <hr className="border-[#E8E8E8] dark:border-dark-3" />
 
-        <div className="p-2 text-base text-[#4B5563] dark:text-dark-6">
+        <div className="p-2 text-base text-[#4B5563] dark:text-white">
           <button
             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[9px] hover:bg-gray-2 hover:text-dark dark:hover:bg-dark-3 dark:hover:text-white"
             onClick={() => setIsOpen(false)}

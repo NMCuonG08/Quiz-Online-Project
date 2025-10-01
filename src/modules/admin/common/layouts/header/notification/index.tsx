@@ -55,7 +55,7 @@ export function Notification() {
       }}
     >
       <DropdownTrigger
-        className="grid size-12 place-items-center rounded-full border bg-gray-2 text-dark outline-none hover:text-primary focus-visible:border-primary focus-visible:text-primary dark:border-dark-4 dark:bg-dark-3 dark:text-white dark:focus-visible:border-primary"
+        className="grid size-12 place-items-center rounded-full border bg-gray-2 text-dark outline-none hover:text-primary focus-visible:border-primary focus-visible:text-primary dark:border-dark-4 dark:bg-[#122031] dark:text-white dark:focus-visible:border-primary"
         aria-label="View Notifications"
       >
         <span className="relative">
@@ -75,7 +75,7 @@ export function Notification() {
 
       <DropdownContent
         align={isMobile ? "end" : "center"}
-        className="border border-stroke bg-white px-3.5 py-3 shadow-md dark:border-dark-3 dark:bg-gray-dark min-[350px]:min-w-[20rem]"
+        className="border border-stroke bg-white px-3.5 py-3 shadow-md dark:border-dark-3 dark:bg-[#122031] min-[350px]:min-w-[20rem]"
       >
         <div className="mb-1 flex items-center justify-between px-2 py-1.5">
           <span className="text-lg font-medium text-dark dark:text-white">
@@ -107,7 +107,7 @@ export function Notification() {
                     {item.title}
                   </strong>
 
-                  <span className="truncate text-sm font-medium text-dark-5 dark:text-dark-6">
+                  <span className="truncate text-sm font-medium text-dark-5 dark:text-white">
                     {item.subTitle}
                   </span>
                 </div>
@@ -119,7 +119,7 @@ export function Notification() {
         <Link
           href="#"
           onClick={() => setIsOpen(false)}
-          className="block rounded-lg border border-primary p-2 text-center text-sm font-medium tracking-wide text-primary outline-none transition-colors hover:bg-blue-light-5 focus:bg-blue-light-5 focus:text-primary focus-visible:border-primary dark:border-dark-3 dark:text-dark-6 dark:hover:border-dark-5 dark:hover:bg-dark-3 dark:hover:text-dark-7 dark:focus-visible:border-dark-5 dark:focus-visible:bg-dark-3 dark:focus-visible:text-dark-7"
+          className="block rounded-lg border border-primary p-2 text-center text-sm font-medium tracking-wide text-primary outline-none transition-colors hover:bg-blue-light-5 focus:bg-blue-light-5 focus:text-primary focus-visible:border-primary dark:border-dark-3 dark:text-white dark:hover:border-dark-5 dark:hover:bg-dark-3 dark:hover:text-dark-7 dark:focus-visible:border-dark-5 dark:focus-visible:bg-dark-3 dark:focus-visible:text-dark-7"
         >
           See all notifications
         </Link>

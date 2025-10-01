@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSidebarContext } from "./sidebar-context";
 
 const menuItemBaseStyles = cva(
-  "rounded-lg px-3.5 font-medium text-dark-4 transition-all duration-200 dark:text-dark-6",
+  "rounded-lg px-3.5 font-medium text-dark-4 transition-all duration-200 dark:text-white",
   {
     variants: {
       isActive: {
@@ -16,7 +16,7 @@ const menuItemBaseStyles = cva(
     defaultVariants: {
       isActive: false,
     },
-  },
+  }
 );
 
 export function MenuItem(
@@ -24,7 +24,7 @@ export function MenuItem(
     className?: string;
     children: React.ReactNode;
     isActive: boolean;
-  } & ({ as?: "button"; onClick: () => void } | { as: "link"; href: string }),
+  } & ({ as?: "button"; onClick: () => void } | { as: "link"; href: string })
 ) {
   const { toggleSidebar, isMobile } = useSidebarContext();
 
@@ -39,7 +39,7 @@ export function MenuItem(
             isActive: props.isActive,
             className: "relative block py-2",
           }),
-          props.className,
+          props.className
         )}
       >
         {props.children}
