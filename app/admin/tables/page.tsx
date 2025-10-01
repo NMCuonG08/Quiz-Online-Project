@@ -1,7 +1,8 @@
+import TablesAdminPage from "@/modules/admin/pages/TablesAdminPage";
 import React from "react";
 
-const page = () => {
-  return <div>page</div>;
+const TablesPage = () => {
+  return <TablesAdminPage />;
 };
 
-export default page;
+export default TablesPage;
