@@ -110,8 +110,11 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.EC2_PATH }}
+            whoami
+            echo $PATH
+            ls -l $(which docker)
             docker --version
-            docker compose version || docker-compose version || true
+            docker compose version 
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
             export ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
             export ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
