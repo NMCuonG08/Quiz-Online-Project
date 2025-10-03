@@ -1,0 +1,120 @@
+name: CD (EC2)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'docker-compose.prod.yml'
+      - 'prisma/**'
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: meta
+        run: |
+          SHA_TAG=${GITHUB_SHA::12}
+          echo "sha=$SHA_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build image
+        run: |
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          docker build -t $IMAGE_URI:latest -t $IMAGE_URI:${{ steps.meta.outputs.sha }} .
+
+      - name: Push image
+        run: |
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          docker push $IMAGE_URI:latest
+          docker push $IMAGE_URI:${{ steps.meta.outputs.sha }}
+      - name: Copy compose file to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: 'docker-compose.prod.yml'
+          target: '${{ secrets.EC2_PATH }}'
+
+      - name: Create/Update .env.override on EC2 (individual keys)
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          IMMICH_LOG_LEVEL: ${{ secrets.IMMICH_LOG_LEVEL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_IGNORE_CERT: ${{ secrets.SMTP_IGNORE_CERT }}
+          EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
+          EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
+          EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.EC2_PATH }}
+            umask 177
+            touch .env.override
+            chmod 600 .env.override
+            add_line() { KEY="$1"; VAL="$2"; if [ -n "$VAL" ]; then grep -v "^$KEY=" .env.override > .env.tmp || true; mv .env.tmp .env.override; printf "%s=%s\n" "$KEY" "$VAL" >> .env.override; fi }
+            add_line GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
+            add_line GOOGLE_REDIRECT_URI "$GOOGLE_REDIRECT_URI"
+            add_line GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
+            add_line IMMICH_LOG_LEVEL "$IMMICH_LOG_LEVEL"
+            add_line SMTP_HOST "$SMTP_HOST"
+            add_line SMTP_PORT "$SMTP_PORT"
+            add_line SMTP_USERNAME "$SMTP_USERNAME"
+            add_line SMTP_PASSWORD "$SMTP_PASSWORD"
+            add_line SMTP_IGNORE_CERT "$SMTP_IGNORE_CERT"
+            add_line EMAIL_FROM_NAME "$EMAIL_FROM_NAME"
+            add_line EMAIL_FROM_ADDRESS "$EMAIL_FROM_ADDRESS"
+            add_line EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
+
+      - name: Deploy on EC2 via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.EC2_PATH }}
+            docker --version
+            docker compose version || docker-compose version || true
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+            export ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
+            export ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
+            export IMAGE_TAG=${{ steps.meta.outputs.sha }}
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
