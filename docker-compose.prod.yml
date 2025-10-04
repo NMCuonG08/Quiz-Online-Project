@@ -1,12 +1,9 @@
-version: '3.8'
+# Docker Compose version 3.8
 
 services:
   # Application Service
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ${APP_CONTAINER_NAME:-quiz-backend}
     restart: unless-stopped
     ports:
