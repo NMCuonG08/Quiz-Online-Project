@@ -1,137 +1,93 @@
-name: CD (EC2)
+- name: Deploy to EC2
+  uses: appleboy/ssh-action@v1.2.0
+  env:
+    # Map all secrets
+    POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+    POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+    POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+    REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+    JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+    DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    REDIS_URL: ${{ secrets.REDIS_URL }}
+    REDIS_KEY_PREFIX: dev:app
+    CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+    CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+    CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+    CLOUDINARY_FOLDER: ${{ secrets.CLOUDINARY_FOLDER }}
+    SMTP_HOST: ${{ secrets.SMTP_HOST }}
+    SMTP_PORT: ${{ secrets.SMTP_PORT }}
+    SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+    SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+    SMTP_IGNORE_CERT: false
+    EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
+    EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
+    EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
+    GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+    GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+    GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+    FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+    IMMICH_LOG_LEVEL: ${{ secrets.IMMICH_LOG_LEVEL }}
+    NODE_ENV: production
+    PORT: 5000
+    AWS_REGION: ${{ env.AWS_REGION }}
+    ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+    ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+    IMAGE_TAG: ${{ steps.meta.outputs.sha }}
+  with:
+    host: ${{ secrets.EC2_HOST }}
+    username: ${{ secrets.EC2_USER }}
+    key: ${{ secrets.EC2_SSH_KEY }}
+    envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,REDIS_PASSWORD,JWT_SECRET,JWT_REFRESH_SECRET,DATABASE_URL,REDIS_URL,REDIS_KEY_PREFIX,CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET,CLOUDINARY_FOLDER,SMTP_HOST,SMTP_PORT,SMTP_USERNAME,SMTP_PASSWORD,SMTP_IGNORE_CERT,EMAIL_FROM_NAME,EMAIL_FROM_ADDRESS,EMAIL_REPLY_TO,GOOGLE_CLIENT_ID,GOOGLE_REDIRECT_URI,GOOGLE_CLIENT_SECRET,FRONTEND_URL,IMMICH_LOG_LEVEL,NODE_ENV,PORT,AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG
+    script: |
+      set -e
+      cd ${{ secrets.EC2_PATH }}
 
-on:
-  repository_dispatch:
-    types: [ci-passed]
+      # Create .env with all secrets
+      cat > .env << EOF
+      DATABASE_URL=$DATABASE_URL
+      REDIS_URL=$REDIS_URL
+      REDIS_KEY_PREFIX=$REDIS_KEY_PREFIX
+      CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME
+      CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY
+      CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET
+      CLOUDINARY_FOLDER=$CLOUDINARY_FOLDER
+      PORT=$PORT
+      FRONTEND_URL=$FRONTEND_URL
+      JWT_SECRET=$JWT_SECRET
+      JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
+      GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+      GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+      GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+      IMMICH_LOG_LEVEL=$IMMICH_LOG_LEVEL
+      SMTP_HOST=$SMTP_HOST
+      SMTP_PORT=$SMTP_PORT
+      SMTP_USERNAME=$SMTP_USERNAME
+      SMTP_PASSWORD=$SMTP_PASSWORD
+      SMTP_IGNORE_CERT=$SMTP_IGNORE_CERT
+      EMAIL_FROM_NAME=$EMAIL_FROM_NAME
+      EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
+      EMAIL_REPLY_TO=$EMAIL_REPLY_TO
+      POSTGRES_USER=$POSTGRES_USER
+      POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+      POSTGRES_DB=$POSTGRES_DB
+      REDIS_PASSWORD=$REDIS_PASSWORD
+      EOF
 
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      chmod 600 .env
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      id-token: write
+      # Cleanup old containers & images
+      docker compose -f docker-compose.prod.yml down --remove-orphans || true
+      docker system prune -f || true
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # Login to ECR
+      aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+      # Pull latest image
+      docker compose -f docker-compose.prod.yml pull
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      # Start containers
+      docker compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
 
-      - name: Set image tag
-        id: meta
-        run: |
-          SHA_TAG=${GITHUB_SHA::12}
-          echo "sha=$SHA_TAG" >> $GITHUB_OUTPUT
-
-      - name: Build & Push Docker image
-        run: |
-          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
-          docker build -t $IMAGE_URI:latest -t $IMAGE_URI:${{ steps.meta.outputs.sha }} .
-          docker push $IMAGE_URI:latest
-          docker push $IMAGE_URI:${{ steps.meta.outputs.sha }}
-
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          # Map all secrets
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
-          REDIS_KEY_PREFIX: dev:app
-          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-          CLOUDINARY_FOLDER: ${{ secrets.CLOUDINARY_FOLDER }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          SMTP_IGNORE_CERT: false
-          EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
-          EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
-          EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-          IMMICH_LOG_LEVEL: ${{ secrets.IMMICH_LOG_LEVEL }}
-          NODE_ENV: production
-          PORT: 5000
-          AWS_REGION: ${{ env.AWS_REGION }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ steps.meta.outputs.sha }}
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            cd ${{ secrets.EC2_PATH }}
-
-            # Create .env with all secrets
-            cat > .env << EOF
-            DATABASE_URL=$DATABASE_URL
-            REDIS_URL=$REDIS_URL
-            REDIS_KEY_PREFIX=$REDIS_KEY_PREFIX
-            CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME
-            CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY
-            CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET
-            CLOUDINARY_FOLDER=$CLOUDINARY_FOLDER
-            PORT=$PORT
-            FRONTEND_URL=$FRONTEND_URL
-            JWT_SECRET=$JWT_SECRET
-            JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
-            GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
-            GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
-            GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
-            IMMICH_LOG_LEVEL=$IMMICH_LOG_LEVEL
-            SMTP_HOST=$SMTP_HOST
-            SMTP_PORT=$SMTP_PORT
-            SMTP_USERNAME=$SMTP_USERNAME
-            SMTP_PASSWORD=$SMTP_PASSWORD
-            SMTP_IGNORE_CERT=$SMTP_IGNORE_CERT
-            EMAIL_FROM_NAME=$EMAIL_FROM_NAME
-            EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
-            EMAIL_REPLY_TO=$EMAIL_REPLY_TO
-            POSTGRES_USER=$POSTGRES_USER
-            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-            POSTGRES_DB=$POSTGRES_DB
-            REDIS_PASSWORD=$REDIS_PASSWORD
-            EOF
-
-            chmod 600 .env
-
-            # Cleanup old containers & images
-            docker compose -f docker-compose.prod.yml down --remove-orphans || true
-            docker system prune -f || true
-
-            # Login to ECR
-            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-
-            # Pull latest image
-            docker compose -f docker-compose.prod.yml pull
-
-            # Start containers
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
-
-            # Verify deployment
-            docker compose -f docker-compose.prod.yml ps
+      # Verify deployment
+      docker compose -f docker-compose.prod.yml ps
