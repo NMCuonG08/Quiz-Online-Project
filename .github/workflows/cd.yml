@@ -61,7 +61,39 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           source: 'docker-compose.prod.yml'
           target: '${{ secrets.EC2_PATH }}'
+      - name: Create .env file on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ${{ secrets.EC2_PATH }}
+            if [ ! -f .env ]; then
+              cat > .env << 'EOF'
+            # Docker Compose sẽ tự động tạo DB và Redis containers
+            # Các giá trị này dành cho Docker internal networking
 
+            # Database - sẽ được container 'db' cung cấp
+            DATABASE_URL=postgresql://postgres:postgres@db:5432/mydb
+
+            # Redis - sẽ được container 'redis-cache' cung cấp  
+            REDIS_HOST=redis-cache
+            REDIS_PORT=6379
+            REDIS_PASSWORD=
+            REDIS_URL=redis://redis-cache:6379
+
+            # PostgreSQL defaults
+            POSTGRES_USER=postgres
+            POSTGRES_PASSWORD=postgres
+            POSTGRES_DB=mydb
+
+            # App defaults
+            NODE_ENV=production
+            PORT=5000
+            EOF
+              chmod 600 .env
+            fi
       - name: Create/Update .env.override on EC2 (individual keys)
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -103,10 +135,16 @@ jobs:
 
       - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.meta.outputs.sha }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG
           script: |
             set -e
             cd ${{ secrets.EC2_PATH }}
@@ -115,9 +153,9 @@ jobs:
             ls -l $(which docker)
             docker --version
             docker compose version
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
-            export ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
-            export ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
-            export IMAGE_TAG=${{ steps.meta.outputs.sha }}
+            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+            export ECR_REGISTRY=${ECR_REGISTRY}
+            export ECR_REPOSITORY=${ECR_REPOSITORY}
+            export IMAGE_TAG=${IMAGE_TAG}
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
