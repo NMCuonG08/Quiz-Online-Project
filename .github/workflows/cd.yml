@@ -1,16 +1,8 @@
 name: CD (EC2)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '**/*.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'Dockerfile'
-      - 'docker-compose.yml'
-      - 'docker-compose.prod.yml'
-      - 'prisma/**'
+  repository_dispatch:
+    types: [ci-passed]
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -53,6 +45,7 @@ jobs:
           IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
           docker push $IMAGE_URI:latest
           docker push $IMAGE_URI:${{ steps.meta.outputs.sha }}
+
       - name: Copy compose file to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -61,6 +54,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           source: 'docker-compose.prod.yml'
           target: '${{ secrets.EC2_PATH }}'
+
       - name: Create .env file on EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -91,9 +85,11 @@ jobs:
             # App defaults
             NODE_ENV=production
             PORT=5000
+
             EOF
               chmod 600 .env
             fi
+
       - name: Create/Update .env.override on EC2 (individual keys)
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -109,6 +105,8 @@ jobs:
           EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
           EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
           EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
@@ -132,6 +130,8 @@ jobs:
             add_line EMAIL_FROM_NAME "$EMAIL_FROM_NAME"
             add_line EMAIL_FROM_ADDRESS "$EMAIL_FROM_ADDRESS"
             add_line EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
+            add_line JWT_SECRET "$JWT_SECRET"
+            add_line JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET"
 
       - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v1.2.0
