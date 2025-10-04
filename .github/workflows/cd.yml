@@ -208,9 +208,6 @@ jobs:
                 add_header Referrer-Policy "no-referrer-when-downgrade" always;
                 add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
                 
-                # Rate limiting
-                limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-                
                 # Health check endpoint
                 location /health {
                     proxy_pass http://quiz_backend;
@@ -223,7 +220,6 @@ jobs:
                 
                 # API routes
                 location /api/ {
-                    limit_req zone=api burst=20 nodelay;
                     proxy_pass http://quiz_backend;
                     proxy_set_header Host $host;
                     proxy_set_header X-Real-IP $remote_addr;
