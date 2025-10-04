@@ -121,9 +121,40 @@ jobs:
 
             chmod 600 .env
 
-            # Cleanup old containers & images
+            # AGGRESSIVE CLEANUP - Disk space optimization
+            echo "Starting aggressive cleanup..."
+
+            # Stop and remove containers
             docker compose -f docker-compose.prod.yml down --remove-orphans || true
-            docker system prune -f || true
+
+            # Remove unused Docker resources (KEEP DATABASE VOLUMES)
+            docker system prune -af || true
+            docker image prune -af || true
+            docker container prune -f || true
+            docker network prune -f || true
+            # DO NOT prune volumes - they contain database data!
+            # docker volume prune -f || true  # ← COMMENTED OUT TO PROTECT DATABASE
+
+            # Clean Docker build cache
+            docker builder prune -af || true
+
+            # Clean old nginx configs (keep last 3 only)
+            sudo find /etc/nginx/sites-available/ -name "quiz-app.backup.*" -type f | sort -r | tail -n +4 | xargs sudo rm -f || true
+
+            # Clean system logs older than 3 days
+            sudo find /var/log -name "*.log.*" -mtime +3 -delete || true
+            sudo find /var/log -name "*.log" -size +100M -exec truncate -s 0 {} \; || true
+
+            # Clean Docker logs
+            sudo find /var/lib/docker/containers -name "*.log" -size +50M -exec truncate -s 0 {} \; || true
+
+            # Clean temporary files
+            sudo rm -rf /tmp/* || true
+            sudo rm -rf /var/tmp/* || true
+
+            # Show disk usage after cleanup
+            echo "Disk usage after cleanup:"
+            df -h
 
             # Login to ECR
             aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
@@ -137,8 +168,27 @@ jobs:
             # Setup Nginx Reverse Proxy
             echo "Setting up Nginx reverse proxy..."
 
-            # Install nginx if not exists
-            sudo apt update && sudo apt install -y nginx || true
+            # Install nginx if not exists (support multiple OS)
+            if command -v yum >/dev/null 2>&1; then
+                # Amazon Linux / CentOS / RHEL
+                sudo yum update -y
+                sudo yum install -y nginx || true
+                sudo systemctl enable nginx
+                sudo systemctl start nginx
+            elif command -v apt >/dev/null 2>&1; then
+                # Ubuntu / Debian
+                sudo apt update
+                sudo apt install -y nginx || true
+                sudo systemctl enable nginx
+                sudo systemctl start nginx
+            else
+                echo "Unsupported OS for nginx installation"
+                exit 1
+            fi
+
+            # Create nginx directories if they don't exist
+            sudo mkdir -p /etc/nginx/sites-available
+            sudo mkdir -p /etc/nginx/sites-enabled
 
             # Create nginx config for the application
             sudo tee /etc/nginx/sites-available/quiz-app << 'EOF'
@@ -209,6 +259,11 @@ jobs:
             # Enable the site and disable default
             sudo ln -sf /etc/nginx/sites-available/quiz-app /etc/nginx/sites-enabled/
             sudo rm -f /etc/nginx/sites-enabled/default
+
+            # Update nginx.conf to include sites-enabled
+            if ! grep -q "include /etc/nginx/sites-enabled" /etc/nginx/nginx.conf; then
+                sudo sed -i '/http {/a\    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
+            fi
 
             # Test nginx configuration
             sudo nginx -t
