@@ -191,9 +191,28 @@ jobs:
             cd ${{ secrets.EC2_PATH }}
             # Set secure file permissions
             umask 177
+
+            # Auto cleanup old containers and images
+            echo "🧹 Cleaning up old containers and images..."
+            docker compose -f docker-compose.prod.yml down --remove-orphans || true
+            docker system prune -f || true
+
+            # Login to ECR
+            echo "🔐 Logging into ECR..."
             aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
             export ECR_REGISTRY=${ECR_REGISTRY}
             export ECR_REPOSITORY=${ECR_REPOSITORY}
             export IMAGE_TAG=${IMAGE_TAG}
+
+            # Pull latest image
+            echo "📥 Pulling latest image..."
             docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Start services with fresh environment
+            echo "🚀 Starting services with fresh environment..."
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
+
+            # Verify deployment
+            echo "✅ Verifying deployment..."
+            sleep 10
+            docker compose -f docker-compose.prod.yml ps
