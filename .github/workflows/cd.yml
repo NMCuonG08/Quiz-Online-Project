@@ -266,8 +266,25 @@ jobs:
 
             # Reload nginx if config is valid
             if [ $? -eq 0 ]; then
-                sudo systemctl reload nginx
-                echo "Nginx configuration updated successfully"
+                # Check if nginx is already running
+                if sudo systemctl is-active --quiet nginx; then
+                    echo "Nginx is already running, reloading configuration..."
+                    sudo systemctl reload nginx
+                else
+                    echo "Starting nginx..."
+                    sudo systemctl start nginx
+                fi
+                
+                # Check if nginx is running successfully
+                if sudo systemctl is-active --quiet nginx; then
+                    echo "Nginx is running successfully"
+                else
+                    echo "Nginx failed to start/reload, checking status:"
+                    sudo systemctl status nginx
+                    echo "Nginx logs:"
+                    sudo journalctl -u nginx --no-pager -n 20
+                    exit 1
+                fi
             else
                 echo "Nginx configuration test failed"
                 exit 1
