@@ -56,7 +56,7 @@ jobs:
           source: 'docker-compose.prod.yml'
           target: '${{ secrets.EC2_PATH }}'
 
-      - name: Create .env file on EC2
+      - name: Create base .env file on EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -64,8 +64,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ${{ secrets.EC2_PATH }}
-            if [ ! -f .env ]; then
-              cat > .env << 'EOF'
+            cat > .env << 'EOF'
             # Docker Compose sẽ tự động tạo DB và Redis containers
             # Các giá trị này dành cho Docker internal networking
 
@@ -88,10 +87,9 @@ jobs:
             PORT=5000
 
             EOF
-              chmod 600 .env
-            fi
+            chmod 600 .env
 
-      - name: Create/Update .env.override on EC2 (individual keys)
+      - name: Update .env file with secrets on EC2
         uses: appleboy/ssh-action@v1.2.0
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
@@ -107,7 +105,28 @@ jobs:
           EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
           EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          REFRESH_TOKEN_SECRET: ${{ secrets.REFRESH_TOKEN_SECRET }}
+          REFRESH_TOKEN_EXPIRES_IN: ${{ secrets.REFRESH_TOKEN_EXPIRES_IN }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          REDIS_TLS: ${{ secrets.REDIS_TLS }}
+          REDIS_KEY_PREFIX: ${{ secrets.REDIS_KEY_PREFIX }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          APP_CONTAINER_NAME: ${{ secrets.APP_CONTAINER_NAME }}
+          DB_CONTAINER_NAME: ${{ secrets.DB_CONTAINER_NAME }}
+          REDIS_CONTAINER_NAME: ${{ secrets.REDIS_CONTAINER_NAME }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          REDIS_EXTERNAL_PORT: ${{ secrets.REDIS_EXTERNAL_PORT }}
+          POSTGRES_VERSION: ${{ secrets.POSTGRES_VERSION }}
+          REDIS_VERSION: ${{ secrets.REDIS_VERSION }}
+          REDIS_MAX_MEMORY: ${{ secrets.REDIS_MAX_MEMORY }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
@@ -116,9 +135,8 @@ jobs:
             set -e
             cd ${{ secrets.EC2_PATH }}
             umask 177
-            touch .env.override
-            chmod 600 .env.override
-            add_line() { KEY="$1"; VAL="$2"; if [ -n "$VAL" ]; then grep -v "^$KEY=" .env.override > .env.tmp || true; mv .env.tmp .env.override; printf "%s=%s\n" "$KEY" "$VAL" >> .env.override; fi }
+            # Update existing .env file with secrets
+            add_line() { KEY="$1"; VAL="$2"; if [ -n "$VAL" ]; then grep -v "^$KEY=" .env > .env.tmp || true; mv .env.tmp .env; printf "%s=%s\n" "$KEY" "$VAL" >> .env; fi }
             add_line GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
             add_line GOOGLE_REDIRECT_URI "$GOOGLE_REDIRECT_URI"
             add_line GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
@@ -132,7 +150,29 @@ jobs:
             add_line EMAIL_FROM_ADDRESS "$EMAIL_FROM_ADDRESS"
             add_line EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
             add_line JWT_SECRET "$JWT_SECRET"
+            add_line JWT_EXPIRES_IN "$JWT_EXPIRES_IN"
             add_line JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET"
+            add_line REFRESH_TOKEN_SECRET "$REFRESH_TOKEN_SECRET"
+            add_line REFRESH_TOKEN_EXPIRES_IN "$REFRESH_TOKEN_EXPIRES_IN"
+            add_line CLOUDINARY_CLOUD_NAME "$CLOUDINARY_CLOUD_NAME"
+            add_line CLOUDINARY_API_KEY "$CLOUDINARY_API_KEY"
+            add_line CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET"
+            add_line FRONTEND_URL "$FRONTEND_URL"
+            add_line REDIS_TLS "$REDIS_TLS"
+            add_line REDIS_KEY_PREFIX "$REDIS_KEY_PREFIX"
+            add_line POSTGRES_USER "$POSTGRES_USER"
+            add_line POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
+            add_line POSTGRES_DB "$POSTGRES_DB"
+            add_line REDIS_PASSWORD "$REDIS_PASSWORD"
+            add_line APP_CONTAINER_NAME "$APP_CONTAINER_NAME"
+            add_line DB_CONTAINER_NAME "$DB_CONTAINER_NAME"
+            add_line REDIS_CONTAINER_NAME "$REDIS_CONTAINER_NAME"
+            add_line DB_PORT "$DB_PORT"
+            add_line REDIS_EXTERNAL_PORT "$REDIS_EXTERNAL_PORT"
+            add_line POSTGRES_VERSION "$POSTGRES_VERSION"
+            add_line REDIS_VERSION "$REDIS_VERSION"
+            add_line REDIS_MAX_MEMORY "$REDIS_MAX_MEMORY"
+            chmod 600 .env
 
       - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -149,11 +189,8 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.EC2_PATH }}
-            whoami
-            echo $PATH
-            ls -l $(which docker)
-            docker --version
-            docker compose version
+            # Set secure file permissions
+            umask 177
             aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
             export ECR_REGISTRY=${ECR_REGISTRY}
             export ECR_REPOSITORY=${ECR_REPOSITORY}

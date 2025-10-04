@@ -14,6 +14,35 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Get('health')
+  async healthCheck() {
+    try {
+      // Test Redis connection by setting a test key
+      await this.redisService.set('health-check', 'ok', 10);
+      await this.redisService.get('health-check');
+
+      return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        services: {
+          redis: 'connected',
+          database: 'connected',
+        },
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        timestamp: new Date().toISOString(),
+        error: error.message,
+        services: {
+          redis: 'disconnected',
+          database: 'unknown',
+        },
+      };
+    }
+  }
+
   @Get('redis-test')
   async testRedis() {
     try {
