@@ -1,6 +1,7 @@
 name: CD (EC2)
 
 on:
+  # Chỉ chạy khi CI pass
   repository_dispatch:
     types: [ci-passed]
 
@@ -90,7 +91,7 @@ jobs:
               chmod 600 .env
             fi
 
-      - name: Create/Update .env.override on EC2
+      - name: Create/Update .env.override on EC2 (individual keys)
         uses: appleboy/ssh-action@v1.2.0
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
@@ -114,28 +115,24 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.EC2_PATH }}
-
-            # Tạo file .env.override trực tiếp (không dùng heredoc)
-            echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID" > .env.override
-            echo "GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI" >> .env.override
-            echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET" >> .env.override
-            echo "IMMICH_LOG_LEVEL=$IMMICH_LOG_LEVEL" >> .env.override
-            echo "SMTP_HOST=$SMTP_HOST" >> .env.override
-            echo "SMTP_PORT=$SMTP_PORT" >> .env.override
-            echo "SMTP_USERNAME=$SMTP_USERNAME" >> .env.override
-            echo "SMTP_PASSWORD=$SMTP_PASSWORD" >> .env.override
-            echo "SMTP_IGNORE_CERT=$SMTP_IGNORE_CERT" >> .env.override
-            echo "EMAIL_FROM_NAME=$EMAIL_FROM_NAME" >> .env.override
-            echo "EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS" >> .env.override
-            echo "EMAIL_REPLY_TO=$EMAIL_REPLY_TO" >> .env.override
-            echo "JWT_SECRET=$JWT_SECRET" >> .env.override
-            echo "JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET" >> .env.override
-
+            umask 177
+            touch .env.override
             chmod 600 .env.override
-
-            echo "✅ .env.override created with $(wc -l < .env.override) lines"
-            echo "First 3 lines (for verification):"
-            head -n 3 .env.override | sed 's/=.*/=***/'
+            add_line() { KEY="$1"; VAL="$2"; if [ -n "$VAL" ]; then grep -v "^$KEY=" .env.override > .env.tmp || true; mv .env.tmp .env.override; printf "%s=%s\n" "$KEY" "$VAL" >> .env.override; fi }
+            add_line GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
+            add_line GOOGLE_REDIRECT_URI "$GOOGLE_REDIRECT_URI"
+            add_line GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
+            add_line IMMICH_LOG_LEVEL "$IMMICH_LOG_LEVEL"
+            add_line SMTP_HOST "$SMTP_HOST"
+            add_line SMTP_PORT "$SMTP_PORT"
+            add_line SMTP_USERNAME "$SMTP_USERNAME"
+            add_line SMTP_PASSWORD "$SMTP_PASSWORD"
+            add_line SMTP_IGNORE_CERT "$SMTP_IGNORE_CERT"
+            add_line EMAIL_FROM_NAME "$EMAIL_FROM_NAME"
+            add_line EMAIL_FROM_ADDRESS "$EMAIL_FROM_ADDRESS"
+            add_line EMAIL_REPLY_TO "$EMAIL_REPLY_TO"
+            add_line JWT_SECRET "$JWT_SECRET"
+            add_line JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET"
 
       - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v1.2.0
