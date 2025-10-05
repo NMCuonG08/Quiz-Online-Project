@@ -104,8 +104,13 @@ export class AuthenticationService {
     }
   }
 
-  static async refreshToken() {
+  // Refresh token method - DISABLED
+  static async refreshToken(): Promise<
+    | { token?: string; user?: unknown }
+    | { error: { message: string; code: string } }
+  > {
     try {
+      // Expect backend to read refresh token from HttpOnly cookie
       const refreshResponse = await apiClient.post(
         "/api/auth/refresh-cookie",
         {},
@@ -113,12 +118,15 @@ export class AuthenticationService {
           headers: {
             "Content-Type": "application/json",
           },
+          withCredentials: true,
         }
       );
-      console.log("Token refresh response:", refreshResponse.data.data);
-      if (refreshResponse.data) {
-        return refreshResponse.data.data;
+
+      const data = refreshResponse?.data?.data || refreshResponse?.data;
+      if (data?.token || data?.accessToken) {
+        return { token: data.token || data.accessToken, user: data.user };
       }
+
       return {
         error: {
           message: "Token refresh failed",
@@ -127,9 +135,11 @@ export class AuthenticationService {
       };
     } catch (error) {
       console.error("Token refresh failed:", error);
-      // Trả về response từ backend thay vì throw error
+      // Normalize error shape
+      // @ts-expect-error Axios error dynamic
+      const resp = error?.response?.data;
       return (
-        error.response?.data || {
+        resp || {
           error: {
             message: "Token refresh failed",
             code: "REFRESH_ERROR",

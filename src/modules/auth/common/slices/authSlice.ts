@@ -109,20 +109,17 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-// Refresh token async thunk
-export const refreshToken = createAsyncThunk(
-  "auth/refreshToken",
-  async (_, { rejectWithValue }) => {
-    const response = await AuthenticationService.refreshToken();
-
-    // Kiểm tra nếu có error trong response
-    if (response.error) {
-      return rejectWithValue(response.error.message || "Token refresh failed");
-    }
-
-    return response;
-  }
-);
+// Refresh token async thunk - DISABLED
+// export const refreshToken = createAsyncThunk(
+//   "auth/refreshToken",
+//   async (_, { rejectWithValue }) => {
+//     const response = await AuthenticationService.refreshToken();
+//     if (response.error) {
+//       return rejectWithValue(response.error.message || "Token refresh failed");
+//     }
+//     return response;
+//   }
+// );
 
 export const logout = createAsyncThunk(
   "auth/logout",
@@ -306,45 +303,39 @@ const authSlice = createSlice({
         console.log("✅ Logout rejected but state cleared");
       })
 
-      .addCase(refreshToken.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(refreshToken.fulfilled, (state, action) => {
-        const response = action.payload;
-        const data = response.data || response;
-        const token = data?.token || data?.accessToken || null;
-
-        if (token) {
-          state.token = token;
-          state.isAuthenticated = true;
-          state.loading = false;
-          state.error = null;
-
-          // Store new token in localStorage
-          TokenStorage.set(token);
-          console.log("✅ Token refreshed successfully");
-        } else {
-          // If no token in response, treat as failed refresh
-          state.isAuthenticated = false;
-          state.token = null;
-          state.user = null;
-          state.loading = false;
-          state.error = "Session expired. Please login again.";
-          TokenStorage.remove();
-          console.log("❌ Token refresh failed - no token in response");
-        }
-      })
-      .addCase(refreshToken.rejected, (state) => {
-        // If refresh fails, logout user
-        state.isAuthenticated = false;
-        state.token = null;
-        state.user = null;
-        state.loading = false;
-        state.error = "Session expired. Please login again.";
-
-        // Remove token from storage
-        TokenStorage.remove();
-      })
+      // Refresh token reducers - DISABLED
+      // .addCase(refreshToken.pending, (state) => {
+      //   state.loading = true;
+      // })
+      // .addCase(refreshToken.fulfilled, (state, action) => {
+      //   const response = action.payload;
+      //   const data = response.data || response;
+      //   const token = data?.token || data?.accessToken || null;
+      //   if (token) {
+      //     state.token = token;
+      //     state.isAuthenticated = true;
+      //     state.loading = false;
+      //     state.error = null;
+      //     TokenStorage.set(token);
+      //     console.log("✅ Token refreshed successfully");
+      //   } else {
+      //     state.isAuthenticated = false;
+      //     state.token = null;
+      //     state.user = null;
+      //     state.loading = false;
+      //     state.error = "Session expired. Please login again.";
+      //     TokenStorage.remove();
+      //     console.log("❌ Token refresh failed - no token in response");
+      //   }
+      // })
+      // .addCase(refreshToken.rejected, (state) => {
+      //   state.isAuthenticated = false;
+      //   state.token = null;
+      //   state.user = null;
+      //   state.loading = false;
+      //   state.error = "Session expired. Please login again.";
+      //   TokenStorage.remove();
+      // })
       .addCase(getUserProfile.pending, (state) => {
         state.loading = true;
         state.error = null;

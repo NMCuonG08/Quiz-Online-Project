@@ -15,6 +15,26 @@ export const NAV_DATA = [
         ],
       },
       {
+        title: "Quizzes",
+        url: "/admin/quizzes",
+        icon: Icons.QuizzesIcon,
+        items: [],
+      },
+      {
+        title: "Categories",
+        icon: Icons.FourCircle,
+        items: [
+          {
+            title: "Quiz Categories",
+            url: "/admin/quiz-categories",
+          },
+          {
+            title: "Course Categories",
+            url: "/admin/course-categories",
+          },
+        ],
+      },
+      {
         title: "Calendar",
         url: "/admin/calendar",
         icon: Icons.Calendar,

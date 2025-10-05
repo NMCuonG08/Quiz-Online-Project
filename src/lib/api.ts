@@ -59,11 +59,7 @@ const ERROR_CONFIG = {
 
 // Professional logging utility
 class APILogger {
-  private static formatError(
-    status: number,
-    statusText: string,
-    data?: unknown
-  ): string {
+  private static formatError(status: number, statusText: string): string {
     const config = ERROR_CONFIG[status as keyof typeof ERROR_CONFIG];
     const severity = config?.severity || ErrorSeverity.MEDIUM;
     const defaultMessage = config?.message || statusText;
@@ -123,22 +119,10 @@ class APILogger {
       console.error("Error details:", error);
     }
   }
-
-  static logRefreshAttempt(attempt: number): void {
-    console.warn(`🔄 Token refresh attempt ${attempt}/3...`);
-  }
-
-  static logRefreshSuccess(): void {
-    console.info("✅ Token refreshed successfully");
-  }
-
-  static logRefreshFailure(): void {
-    console.error("❌ Token refresh failed - redirecting to login");
-  }
 }
 
 const apiClient = axios.create({
-  baseURL: "http://13.239.240.6:5000",
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
@@ -146,32 +130,19 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
-// Enhanced store access with proper typing
-interface AppStore {
-  getState: () => {
-    auth?: {
-      token?: string;
-      user?: unknown;
-    };
-  };
-  dispatch: (action: unknown) => void;
-}
+// Flag to prevent multiple logout calls
+let isLoggingOut = false;
 
-interface WindowWithStore extends Window {
-  __STORE__?: AppStore;
-}
+// Refresh token single-flight control
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
 
-const getStore = (): AppStore | null => {
-  try {
-    if (typeof window === "undefined") return null;
+// Removed unused store access helpers
 
-    const globalWindow = window as WindowWithStore;
-    return globalWindow.__STORE__ || null;
-  } catch (error) {
-    console.warn("Store access error:", error);
-    return null;
-  }
-};
+// Token expiration configuration (for future use if needed)
+// const TOKEN_EXPIRY_MINUTES = parseInt(
+//   process.env.NEXT_PUBLIC_TOKEN_EXPIRY_MINUTES || "15"
+// );
 
 // Enhanced token management
 const getAccessToken = (): string | null => {
@@ -192,9 +163,12 @@ const setAccessToken = (token: string | null): void => {
     if (token) {
       localStorage.setItem("auth_token", token);
       apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      isLoggingOut = false; // Reset logout flag when setting new token
+      console.log("✅ Token set");
     } else {
       localStorage.removeItem("auth_token");
       delete apiClient.defaults.headers.common["Authorization"];
+      console.log("🗑️ Token removed");
     }
   } catch (error) {
     console.error("Failed to set access token:", error);
@@ -217,16 +191,7 @@ const performLogout = async (): Promise<void> => {
     // Clear axios defaults
     delete apiClient.defaults.headers.common["Authorization"];
 
-    // Dispatch logout action if store is available
-    const store = getStore();
-    if (store?.dispatch) {
-      try {
-        const { handleLogout } = AuthenticationService;
-        store.dispatch(handleLogout());
-      } catch (error) {
-        console.warn("Failed to dispatch logout action:", error);
-      }
-    }
+    // No dispatch to avoid infinite loop - just clear local data
 
     // Only redirect to login if not already on auth pages
     const currentPath = window.location.pathname;
@@ -253,7 +218,7 @@ const performLogout = async (): Promise<void> => {
 
 // Enhanced request interceptor
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     APILogger.logRequest(config);
 
     // Auto-attach token if available
@@ -271,6 +236,35 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Helper: start a refresh single-flight
+const startTokenRefresh = async (): Promise<string | null> => {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      type RefreshResult =
+        | { token?: string; user?: unknown }
+        | { error: { message: string; code: string } };
+      const result: RefreshResult = await AuthenticationService.refreshToken();
+      if ("error" in result) {
+        return null;
+      }
+      const newToken = result.token || null;
+      if (newToken) {
+        setAccessToken(newToken);
+      }
+      return newToken;
+    } catch {
+      return null;
+    } finally {
+      isRefreshing = false;
+    }
+  })();
+  return refreshPromise;
+};
+
 // Enhanced response interceptor with comprehensive error handling
 apiClient.interceptors.response.use(
   (response) => {
@@ -278,108 +272,76 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const originalRequest = error.config as AxiosRequestConfig & {
-      _retry?: boolean;
-      _retryCount?: number;
-    };
-
     // Log the error with professional formatting
     APILogger.logError(error);
 
-    // Handle 401 Unauthorized with token refresh
-    if (
-      error.response?.status === 401 &&
-      originalRequest &&
-      !originalRequest._retry
-    ) {
-      // Check if this is a login/register request - don't try to refresh token
-      const isAuthRequest =
-        originalRequest.url?.includes("/auth/login") ||
-        originalRequest.url?.includes("/auth/signup") ||
-        originalRequest.url?.includes("/auth/register");
+    // Handle 401 Unauthorized - try refresh once, then retry request
+    if (error.response?.status === 401) {
+      const originalConfig = error.config as AxiosRequestConfig & {
+        _retry?: boolean;
+      };
 
-      if (isAuthRequest) {
-        // For auth requests, return the error response instead of rejecting
+      if (originalConfig && originalConfig._retry) {
+        // Already retried, prevent loops -> logout
+        if (!isLoggingOut) {
+          isLoggingOut = true;
+          await performLogout();
+          setTimeout(() => {
+            isLoggingOut = false;
+          }, 1000);
+        }
         return Promise.resolve({
           data: error.response?.data || {
-            error: {
-              message: "Authentication failed",
-              code: "AUTH_ERROR",
-            },
+            error: { message: "Unauthorized", code: "UNAUTHORIZED" },
           },
-          status: error.response?.status || 401,
-          statusText: error.response?.statusText || "Unauthorized",
+          status: 401,
+          statusText: "Unauthorized",
           headers: error.response?.headers || {},
           config: error.config,
         });
       }
 
-      originalRequest._retry = true;
-      originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
-
-      // Limit retry attempts
-      if (originalRequest._retryCount > 3) {
-        APILogger.logRefreshFailure();
-        await performLogout();
-        return Promise.resolve({
-          data: {
-            error: {
-              message: "Token refresh failed after multiple attempts",
-              code: "REFRESH_FAILED",
-            },
-          },
-          status: 401,
-          statusText: "Unauthorized",
-          headers: {},
-          config: error.config,
-        });
-      }
-
+      // Queue until refresh completes
       try {
-        APILogger.logRefreshAttempt(originalRequest._retryCount);
-
-        // Use existing AuthenticationService for token refresh
-        const refreshData = await AuthenticationService.refreshToken();
-
-        const newToken = refreshData?.token || refreshData?.accessToken;
-        console.log("New token received:", newToken);
-        if (newToken) {
-          setAccessToken(newToken);
-          APILogger.logRefreshSuccess();
-
-          // Retry original request with new token
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        const newToken: string | null = await startTokenRefresh();
+        if (!newToken) {
+          // Refresh failed -> logout
+          if (!isLoggingOut) {
+            isLoggingOut = true;
+            await performLogout();
+            setTimeout(() => {
+              isLoggingOut = false;
+            }, 1000);
           }
-
-          return apiClient(originalRequest);
-        } else {
           return Promise.resolve({
-            data: {
-              error: {
-                message: "No token received from refresh service",
-                code: "REFRESH_ERROR",
-              },
-            },
+            data: { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
             status: 401,
             statusText: "Unauthorized",
-            headers: {},
+            headers: error.response?.headers || {},
             config: error.config,
           });
         }
-      } catch (refreshError) {
-        APILogger.logRefreshFailure();
-        await performLogout();
+
+        // Retry once with new token
+        originalConfig._retry = true;
+        const hdrs: Record<string, unknown> =
+          (originalConfig.headers as Record<string, unknown>) || {};
+        hdrs["Authorization"] = `Bearer ${newToken}`;
+        originalConfig.headers = hdrs as AxiosRequestConfig["headers"];
+        return apiClient(originalConfig) as Promise<AxiosResponse>;
+      } catch {
+        if (!isLoggingOut) {
+          isLoggingOut = true;
+          await performLogout();
+          setTimeout(() => {
+            isLoggingOut = false;
+          }, 1000);
+        }
         return Promise.resolve({
-          data: {
-            error: {
-              message: "Token refresh failed",
-              code: "REFRESH_ERROR",
-            },
-          },
+          data: { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
           status: 401,
           statusText: "Unauthorized",
-          headers: {},
+          headers: error.response?.headers || {},
           config: error.config,
         });
       }

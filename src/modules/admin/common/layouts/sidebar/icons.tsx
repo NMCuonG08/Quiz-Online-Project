@@ -168,6 +168,25 @@ export function Authentication(props: PropsType) {
   );
 }
 
+export function QuizzesIcon(props: PropsType) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={24}
+      height={24}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      {...props}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 1.25c-5.93 0-10.75 4.82-10.75 10.75S6.07 22.75 12 22.75 22.75 17.93 22.75 12 17.93 1.25 12 1.25zm0 15.5a.875.875 0 110 1.75.875.875 0 010-1.75zM12 6.5c2.07 0 3.75 1.34 3.75 3.125 0 1.39-.99 2.315-2.09 2.985-.8.49-1.035.8-1.035 1.415v.225a.75.75 0 01-1.5 0v-.225c0-1.13.61-1.8 1.56-2.385.86-.53 1.565-1.06 1.565-1.99 0-.84-.88-1.375-2.25-1.375S9.75 8.41 9.75 9.25a.75.75 0 01-1.5 0C8.25 7.84 9.93 6.5 12 6.5z"
+      />
+    </svg>
+  );
+}
+
 export function ArrowLeftIcon(props: PropsType) {
   return (
     <svg
