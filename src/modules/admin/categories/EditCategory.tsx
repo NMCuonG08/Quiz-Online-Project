@@ -9,6 +9,7 @@ import { TextAreaGroup } from "@/modules/admin/common/components/InputGroup/text
 import { Switch } from "@/modules/admin/common/components/switch";
 import { UploadIcon } from "@/modules/admin/common/components/icons";
 import { ArrowLeftIcon } from "@/modules/admin/common/components/icons";
+import { Select } from "@/modules/admin/common/components/select";
 import { cn } from "@/lib/utils";
 import { useAdminCategory } from "./hooks/useAdminCategory";
 import type { Category as BaseCategory } from "./services/admin.category.service";
@@ -209,32 +210,23 @@ const EditCategory = () => {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="block text-body-sm font-medium text-dark dark:text-white">
-              Parent category (optional)
-            </label>
-            <div className="relative">
-              <select
-                value={form.parentId}
-                onChange={handleParentChange}
-                className={
-                  "w-full appearance-none rounded-lg border border-stroke bg-transparent px-5.5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-dark-3 dark:bg-dark-2 dark:focus:border-primary [&>option]:text-dark-5 dark:[&>option]:text-dark-6"
-                }
-              >
-                <option value="">No parent</option>
-                {categories
-                  .filter(
-                    (c) =>
-                      String(c.id) !== form.parentId && c.slug !== form.slug
-                  )
-                  .map((c) => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
+          <Select
+            label="Parent category (optional)"
+            placeholder="Select parent category"
+            items={[
+              { value: "", label: "No parent" },
+              ...categories
+                .filter(
+                  (c) => String(c.id) !== form.parentId && c.slug !== form.slug
+                )
+                .map((c) => ({
+                  value: String(c.id),
+                  label: c.name,
+                })),
+            ]}
+            value={form.parentId}
+            onChange={handleParentChange}
+          />
         </div>
 
         <div className="flex flex-col gap-5.5">

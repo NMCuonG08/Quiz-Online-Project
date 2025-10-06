@@ -37,16 +37,16 @@ export function RadioInput({
               "mr-2 flex size-5 items-center justify-center rounded-full border peer-checked:[&>*]:block",
               {
                 "border-primary peer-checked:border-6": variant === "circle",
-                "border-dark-5 peer-checked:border-primary peer-checked:bg-gray-2 dark:border-dark-6 dark:peer-checked:bg-dark-2":
+                "border-dark-5 peer-checked:border-primary peer-checked:bg-gray-2 dark:border-dark-6 dark:peer-checked:bg-[#122031]":
                   variant === "dot",
               },
-              minimal && "border-stroke dark:border-dark-3",
+              minimal && "border-stroke dark:border-dark-3"
             )}
           >
             <span
               className={cn(
                 "hidden size-2.5 rounded-full bg-primary",
-                variant === "circle" && "bg-transparent",
+                variant === "circle" && "bg-transparent"
               )}
             />
           </div>

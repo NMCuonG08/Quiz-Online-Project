@@ -37,7 +37,7 @@ export function ThemeToggleSwitch() {
 
       <span aria-hidden className="relative flex gap-2.5">
         {/* Indicator */}
-        <span className="absolute size-[38px] rounded-full border border-gray-200 bg-white transition-all dark:translate-x-[48px] dark:border-none dark:bg-[#122031] dark:group-hover:bg-dark-3" />
+        <span className="absolute size-[38px] rounded-full border border-gray-200 bg-white transition-all dark:translate-x-[48px] dark:border-none dark:bg-[#122031] dark:group-hover:bg-[#122031] " />
 
         {THEMES.map(({ name, Icon }) => (
           <span

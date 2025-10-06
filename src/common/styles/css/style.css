@@ -93,12 +93,12 @@
 }
 
 .apexcharts-tooltip.apexcharts-theme-light .apexcharts-tooltip-title {
-  @apply dark: !border-dark-3 dark: !bg-dark-2;
+  @apply dark: !border-dark-3 dark: !bg-[#122031];
 }
 
 .apexcharts-xaxistooltip,
 .apexcharts-yaxistooltip {
-  @apply dark: !border-dark-2 dark: !bg-dark-2 dark: !text-dark-3;
+  @apply dark: !border-dark-2 dark: !bg-[#122031] dark: !text-dark-3;
 }
 
 .apexcharts-xaxistooltip-bottom:after {
@@ -110,7 +110,7 @@
 }
 
 .apexcharts-xaxistooltip-bottom {
-  @apply !rounded !border-none !bg-gray !text-sm !font-medium !text-dark dark: !bg-dark dark: !text-white;
+  @apply !rounded !border-none !bg-gray !text-sm !font-medium !text-dark dark: !bg-[#122031] dark: !text-white;
 }
 
 .apexcharts-tooltip-series-group {
@@ -151,7 +151,7 @@
 }
 
 .flatpickr-day {
-  @apply dark: !text-dark-6 dark:hover: !border-dark-2 dark:hover: !bg-dark-2;
+  @apply dark: !text-dark-6 dark:hover: !border-dark-2 dark:hover: !bg-[#122031];
 }
 
 .flatpickr-months .flatpickr-prev-month,
@@ -193,7 +193,7 @@ span.flatpickr-weekday,
 .flatpickr-day:focus,
 .flatpickr-day.prevMonthDay:focus,
 .flatpickr-day.nextMonthDay:focus {
-  @apply !border-gray-2 !bg-gray-2 dark: !border-dark-2 dark: !bg-dark-2;
+  @apply !border-gray-2 !bg-gray-2 dark: !border-dark-2 dark: !bg-[#122031];
 }
 
 .flatpickr-day.selected,
@@ -204,7 +204,7 @@ span.flatpickr-weekday,
 }
 
 .flatpickr-day.today {
-  @apply !border-none hover: !bg-gray-2 hover: !text-dark dark:hover: !bg-dark-2 dark:hover: !text-white;
+  @apply !border-none hover: !bg-gray-2 hover: !text-dark dark:hover: !bg-[#122031] dark:hover: !text-white;
 }
 
 .flatpickr-day.selected,
