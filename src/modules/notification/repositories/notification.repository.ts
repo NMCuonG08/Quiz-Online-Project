@@ -22,17 +22,33 @@ export class NotificationRepository extends BaseRepository<Notification> {
   }
 
   async findByStatus(status: NotificationStatus) {
+    const isRead =
+      status === NotificationStatus.READ
+        ? true
+        : status === NotificationStatus.UNREAD
+          ? false
+          : undefined;
+
     return this.model.findMany({
-      where: { status },
+      where: {
+        ...(isRead !== undefined ? { is_read: isRead } : {}),
+      },
       orderBy: { created_at: 'desc' },
     });
   }
 
   async findByUserIdAndStatus(userId: string, status: NotificationStatus) {
+    const isRead =
+      status === NotificationStatus.READ
+        ? true
+        : status === NotificationStatus.UNREAD
+          ? false
+          : undefined;
+
     return this.model.findMany({
       where: {
         user_id: userId,
-        status,
+        ...(isRead !== undefined ? { is_read: isRead } : {}),
       },
       orderBy: { created_at: 'desc' },
     });
@@ -41,14 +57,15 @@ export class NotificationRepository extends BaseRepository<Notification> {
   async markAsRead(id: string) {
     return this.model.update({
       where: { id },
-      data: { status: NotificationStatus.READ },
+      data: { is_read: true, read_at: new Date() },
     });
   }
 
   async markAsArchived(id: string) {
+    // Archive not modeled separately in DB; treat as read
     return this.model.update({
       where: { id },
-      data: { status: NotificationStatus.ARCHIVED },
+      data: { is_read: true, read_at: new Date() },
     });
   }
 
@@ -56,9 +73,9 @@ export class NotificationRepository extends BaseRepository<Notification> {
     return this.model.updateMany({
       where: {
         user_id: userId,
-        status: NotificationStatus.UNREAD,
+        is_read: false,
       },
-      data: { status: NotificationStatus.READ },
+      data: { is_read: true, read_at: new Date() },
     });
   }
 
@@ -66,7 +83,7 @@ export class NotificationRepository extends BaseRepository<Notification> {
     return this.model.count({
       where: {
         user_id: userId,
-        status: NotificationStatus.UNREAD,
+        is_read: false,
       },
     });
   }

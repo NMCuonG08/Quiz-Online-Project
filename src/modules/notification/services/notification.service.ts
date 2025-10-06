@@ -234,8 +234,12 @@ export class NotificationService extends BaseService {
     return { count };
   }
 
-  @OnEvent('UserLogin')
-  handleUserLogin(userId: string): ArgOf<'UserLogin'> {
-    this.eventRepository.clientSend('UserLogin', userId);
+  @OnEvent({ name: 'UserLogin' })
+  handleUserLogin(payload: ArgOf<'UserLogin'>) {
+    this.eventRepository.clientSend(
+      'on_user_delete',
+      payload.userId,
+      payload.userId,
+    );
   }
 }
