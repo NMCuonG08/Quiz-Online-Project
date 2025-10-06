@@ -26,7 +26,6 @@ services:
       # JWT
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      JWT_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-30d}
       
       # Cloudinary
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}

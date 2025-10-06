@@ -15,6 +15,7 @@ import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
 import { GuardsModule } from '../guards/guards.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { EmailRepository } from '../repositories/email.repository';
+import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { EmailRepository } from '../repositories/email.repository';
     LoggingRepository,
     EmailRepository,
     RedisService,
+    NotificationRepository,
   ],
   exports: [
     PrismaModule,
@@ -55,6 +57,7 @@ import { EmailRepository } from '../repositories/email.repository';
     EventRepository,
     LoggingRepository,
     EmailRepository,
+    NotificationRepository,
   ],
 })
 export class BaseModule {}
