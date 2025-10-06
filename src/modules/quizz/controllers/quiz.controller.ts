@@ -16,7 +16,7 @@ import { ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { Permission } from '@/common/enums/permisson';
 import { Authenticated, AuthGuard } from '@/common/guards/auth.guard';
 
-@Controller('/api/quiz')
+@Controller('/api/quizzes')
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 

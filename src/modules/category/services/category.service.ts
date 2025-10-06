@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { BaseService } from '@/common/base/base.service';
 import { CreateCategoryDto } from '../dtos/category.dto';
 
@@ -37,5 +41,13 @@ export class CategoryService extends BaseService {
     await this.redisService.set(cacheKey, categories, 300);
 
     return categories;
+  }
+
+  async getCategoryBySlug(slug: string) {
+    const category = await this.categoryRepository.findFirst({ slug });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+    return category;
   }
 }

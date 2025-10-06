@@ -15,6 +15,7 @@ import { QueueName } from './common/enums';
 import { RedisModule } from './infrastructure/cache/redis/redis.module';
 import { JobRepository } from './common/repositories/job.repository';
 import configuration from './config/configuration';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -160,6 +161,7 @@ import configuration from './config/configuration';
     UserModule,
     QuizModule,
     CategoryModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, JobRepository],

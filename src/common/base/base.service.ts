@@ -13,6 +13,8 @@ import { JobRepository } from '@/common/repositories/job.repository';
 import { RedisService } from '@/infrastructure/cache/redis/redis.service';
 import { AuthCacheService } from '@/modules/auth/services/auth-cache.service';
 import { EmailRepository } from '../repositories/email.repository';
+import { EventRepository } from '../repositories/event.repository';
+import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
 
 @Injectable()
 export abstract class BaseService {
@@ -30,6 +32,8 @@ export abstract class BaseService {
     protected readonly redisService: RedisService,
     protected readonly authCacheService: AuthCacheService,
     protected readonly emailRepository: EmailRepository,
+    protected readonly eventRepository: EventRepository,
+    protected readonly notificationRepository: NotificationRepository,
   ) {}
 
   async findAll(paginationDto: PaginationQueryDto) {

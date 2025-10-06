@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CategoryService } from '../services/category.service';
 import { CreateCategoryDto } from '../dtos/category.dto';
 import { Authenticated } from '@/common/guards/auth.guard';
@@ -19,5 +19,10 @@ export class CategoryController {
   @Authenticated({ permission: Permission.ActivityRead })
   findAllCategories() {
     return this.categoryService.findAllCategories();
+  }
+
+  @Get('slug/:slug')
+  getCategoryBySlug(@Param('slug') slug: string) {
+    return this.categoryService.getCategoryBySlug(slug);
   }
 }

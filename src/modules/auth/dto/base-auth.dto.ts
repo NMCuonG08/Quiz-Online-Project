@@ -3,7 +3,7 @@ export class AuthDto {
 
   apiKey?: AuthApiKey;
   sharedLink?: AuthSharedLink;
-  session?: AuthSession;
+  // session?: AuthSession; // Không cần khi dùng JWT
 }
 export type AuthApiKey = {
   id: string;
@@ -27,7 +27,7 @@ export type AuthSharedLink = {
   allowDownload: boolean;
   password: string | null;
 };
-export type AuthSession = {
-  id: string;
-  hasElevatedPermission: boolean;
-};
+// export type AuthSession = {
+//   id: string;
+//   hasElevatedPermission: boolean;
+// }; // Không cần khi dùng JWT

@@ -41,6 +41,7 @@ type EventMap = {
       oldConfig: SystemConfig;
     },
   ];
+  UserLogin: [{ userId: string }];
   ConfigValidate: [{ newConfig: SystemConfig; oldConfig: SystemConfig }];
 
   JobStart: [QueueName, JobItem];
@@ -173,9 +174,7 @@ export class EventRepository
       this.logger.log(`Websocket Connect:    ${client.id}`);
       const auth = await this.authenticate(client);
       await client.join(auth.user.id);
-      if (auth.session) {
-        await client.join(auth.session.id);
-      }
+      // Không cần session khi dùng JWT - user đã được xác thực qua token
       await this.onEvent({
         name: 'WebsocketConnect',
         args: [{ userId: auth.user.id }],

@@ -209,6 +209,7 @@ export class AuthService extends BaseService {
 
     // Get user roles for client payload
     const roles = await this.getUserRoles(user.id);
+    await this.eventRepository.emit('UserLogin', { userId: user.id });
 
     return {
       user: {
@@ -514,7 +515,7 @@ export class AuthService extends BaseService {
 
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: '15m',
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),
     });
   }
 
