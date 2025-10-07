@@ -167,7 +167,7 @@ jobs:
             docker compose -f docker-compose.prod.yml ps
 
             # Test application accessibility
-            sleep 10
+            sleep 100
             curl -f http://localhost:5000/health || {
                 echo "Application health check failed"
                 exit 1
