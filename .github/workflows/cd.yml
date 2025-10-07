@@ -115,6 +115,7 @@ jobs:
             REDIS_HOST=$REDIS_HOST
             REDIS_PORT=$REDIS_PORT
             REDIS_TLS=$REDIS_TLS
+            NODE_ENV=$NODE_ENV
             EOF
 
             chmod 600 .env
