@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
@@ -20,14 +20,18 @@ import {
   TrashIcon,
 } from "@/modules/admin/common/components/icons";
 import { useAdminQuiz } from "../hooks/useAdminQuiz";
+import { showDeleteConfirm, showError, showSuccess } from "@/lib/Notification";
 
 const ListQuizTable = () => {
-  const { quizzes, loading, error, getQuizzes } = useAdminQuiz();
+  const { quizzes, pagination, loading, error, getQuizzes, deleteQuiz } =
+    useAdminQuiz();
   const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
 
   useEffect(() => {
-    getQuizzes();
-  }, [getQuizzes]);
+    getQuizzes({ page: currentPage, limit: pageSize });
+  }, [getQuizzes, currentPage, pageSize]);
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -47,10 +51,14 @@ const ListQuizTable = () => {
         <Table>
           <TableHeader>
             <TableRow className="border-none bg-[#F7F9FC] dark:bg-[#122031] [&>th]:py-4 [&>th]:text-base [&>th]:text-dark [&>th]:dark:text-white">
-              <TableHead className="min-w-[155px] xl:pl-7.5">Icon</TableHead>
+              <TableHead className="min-w-[155px] xl:pl-7.5">
+                Thumbnail
+              </TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Questions</TableHead>
+              <TableHead>Attempts</TableHead>
               <TableHead>Created At</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right xl:pr-7.5">Actions</TableHead>
@@ -66,16 +74,16 @@ const ListQuizTable = () => {
                 <TableCell className="min-w-[155px] xl:pl-7.5">
                   <Image
                     src={
-                      item.icon_url ||
+                      item.thumbnail_url ||
                       "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
                     }
-                    alt={item.name}
-                    width={50}
-                    height={50}
+                    alt={item.title}
+                    width={80}
+                    height={80}
                   />
                 </TableCell>
                 <TableCell className="min-w-[155px] xl:pl-7.5">
-                  <h5 className="text-dark dark:text-white">{item.name}</h5>
+                  <h5 className="text-dark dark:text-white">{item.title}</h5>
                   <p className="mt-[3px] text-body-sm font-medium">
                     {item.slug}
                   </p>
@@ -87,10 +95,17 @@ const ListQuizTable = () => {
                 </TableCell>
                 <TableCell>
                   <p className="text-dark dark:text-white">
-                    {item.category_name ||
-                      (item as unknown as { category?: { name?: string } })
-                        .category?.name ||
-                      "—"}
+                    {item.category_name || "—"}
+                  </p>
+                </TableCell>
+                <TableCell>
+                  <p className="text-dark dark:text-white">
+                    {item.questions_count || 0}
+                  </p>
+                </TableCell>
+                <TableCell>
+                  <p className="text-dark dark:text-white">
+                    {item.attempts_count || 0}
                   </p>
                 </TableCell>
                 <TableCell>
@@ -128,16 +143,27 @@ const ListQuizTable = () => {
                       onClick={() => router.push(`/admin/quizzes/${item.slug}`)}
                     >
                       <span className="sr-only">View Quiz</span>
-                      <PreviewIcon />
+                      <PreviewIcon width={24} height={24} />
                     </button>
 
                     <button
                       className="hover:text-primary hover:cursor-pointer"
                       title="Delete quiz"
                       aria-label="Delete quiz"
+                      onClick={async () => {
+                        const res = await showDeleteConfirm(item.title);
+                        if (res.isConfirmed) {
+                          const result = await deleteQuiz(item.id);
+                          if (result.success) {
+                            showSuccess("Deleted successfully");
+                          } else {
+                            showError(String(result.error || "Delete failed"));
+                          }
+                        }
+                      }}
                     >
                       <span className="sr-only">Delete Quiz</span>
-                      <TrashIcon />
+                      <TrashIcon width={24} height={24} />
                     </button>
 
                     <button
@@ -149,7 +175,7 @@ const ListQuizTable = () => {
                       }
                     >
                       <span className="sr-only">Edit Quiz</span>
-                      <PencilSquareIcon />
+                      <PencilSquareIcon width={24} height={24} />
                     </button>
                   </div>
                 </TableCell>
@@ -157,6 +183,41 @@ const ListQuizTable = () => {
             ))}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {pagination && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+              {Math.min(
+                pagination.page * pagination.limit,
+                pagination.totalItems
+              )}{" "}
+              of {pagination.totalItems} results
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={!pagination.hasPrev}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={!pagination.hasNext}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

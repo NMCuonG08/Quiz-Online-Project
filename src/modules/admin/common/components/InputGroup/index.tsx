@@ -17,6 +17,7 @@ type InputGroupProps = {
   iconPosition?: "left" | "right";
   height?: "sm" | "default";
   defaultValue?: string;
+  error?: string;
 };
 
 const InputGroup: React.FC<InputGroupProps> = ({
@@ -60,7 +61,10 @@ const InputGroup: React.FC<InputGroupProps> = ({
           value={props.value}
           defaultValue={props.defaultValue}
           className={cn(
-            "w-full rounded-lg border-[1.5px] border-stroke bg-transparent outline-none transition focus:border-primary disabled:cursor-default disabled:bg-gray-2 data-[active=true]:border-primary dark:border-dark-3 dark:bg-[#122031] dark:focus:border-primary dark:disabled:bg-[#122031] dark:data-[active=true]:border-primary",
+            "w-full rounded-lg border-[1.5px] bg-transparent outline-none transition disabled:cursor-default disabled:bg-gray-2 data-[active=true]:border-primary dark:bg-[#122031] dark:disabled:bg-[#122031] dark:data-[active=true]:border-primary",
+            props.error
+              ? "border-destructive focus:border-destructive dark:border-destructive"
+              : "border-stroke focus:border-primary dark:border-dark-3 dark:focus:border-primary",
             type === "file"
               ? getFileStyles(props.fileStyleVariant!)
               : "px-5.5 py-3 text-dark placeholder:text-dark-6 dark:text-white",
@@ -70,10 +74,15 @@ const InputGroup: React.FC<InputGroupProps> = ({
           required={required}
           disabled={disabled}
           data-active={active}
+          aria-invalid={!!props.error}
         />
 
         {icon}
       </div>
+
+      {props.error && (
+        <p className="mt-1 text-xs text-red-500">{props.error}</p>
+      )}
     </div>
   );
 };

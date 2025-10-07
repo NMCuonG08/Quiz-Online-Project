@@ -2,6 +2,8 @@
 
 import React, { useCallback, useRef, useState } from "react";
 import Image from "next/image";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/common/components/ui/button";
 import InputGroup from "@/modules/admin/common/components/InputGroup";
 import { TextAreaGroup } from "@/modules/admin/common/components/InputGroup/text-area";
@@ -12,63 +14,48 @@ import { Select } from "@/modules/admin/common/components/select";
 import { cn } from "@/lib/utils";
 import { useAdminCategory } from "./hooks/useAdminCategory";
 import { useRouter } from "next/navigation";
-
-type FormState = {
-  name: string;
-  slug: string;
-  description: string;
-  isActive: boolean;
-  iconFile: File | null;
-  iconPreview: string | null;
-  parentId: string;
-};
-
-const initialState: FormState = {
-  name: "",
-  slug: "",
-  description: "",
-  isActive: true,
-  iconFile: null,
-  iconPreview: null,
-  parentId: "",
-};
+import { categorySchema, type CategoryFormData } from "./schema/category";
 
 const AddCategories = () => {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { categories, getCategories } = useAdminCategory();
+
+  const form = useForm<CategoryFormData>({
+    resolver: zodResolver(categorySchema),
+    defaultValues: {
+      name: "",
+      slug: "",
+      description: "",
+      isActive: true,
+      iconFile: null,
+      iconPreview: null,
+      parentId: "",
+    },
+  });
+
+  const { watch, setValue, handleSubmit, formState: { errors } } = form;
+  const watchedValues = watch();
 
   React.useEffect(() => {
     getCategories();
   }, [getCategories]);
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setForm((prev) => ({ ...prev, description: e.target.value }));
-  };
-
-  const handleParentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setForm((prev) => ({ ...prev, parentId: e.target.value }));
-  };
-
   const handleToggleActive = () => {
-    setForm((prev) => ({ ...prev, isActive: !prev.isActive }));
+    setValue("isActive", !watchedValues.isActive);
   };
 
   const setIconFile = useCallback((file: File | null) => {
     if (!file) {
-      setForm((prev) => ({ ...prev, iconFile: null, iconPreview: null }));
+      setValue("iconFile", null);
+      setValue("iconPreview", null);
       return;
     }
     const url = URL.createObjectURL(file);
-    setForm((prev) => ({ ...prev, iconFile: file, iconPreview: url }));
-  }, []);
+    setValue("iconFile", file);
+    setValue("iconPreview", url);
+  }, [setValue]);
 
   const onDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
@@ -104,11 +91,9 @@ const AddCategories = () => {
 
   const clearIcon = () => setIconFile(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = (data: CategoryFormData) => {
     // Submit handler placeholder: integrate with service when ready
-    // Fields ready: form.name, form.slug, form.description, form.isActive, form.iconFile
-    console.log("Submitting category:", form);
+    console.log("Submitting category:", data);
   };
 
   return (
@@ -128,7 +113,7 @@ const AddCategories = () => {
         </button>
       </div>
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit(onSubmit)}
         className="grid grid-cols-1 gap-7.5 md:grid-cols-2"
       >
         <div className="flex flex-col gap-5.5">
@@ -138,8 +123,9 @@ const AddCategories = () => {
             type="text"
             name="name"
             required
-            handleChange={handleTextChange}
-            value={form.name}
+            handleChange={(e) => setValue("name", e.target.value)}
+            value={watchedValues.name}
+            error={errors.name?.message}
           />
 
           <InputGroup
@@ -147,8 +133,9 @@ const AddCategories = () => {
             placeholder="auto-generated or enter manually"
             type="text"
             name="slug"
-            handleChange={handleTextChange}
-            value={form.slug}
+            handleChange={(e) => setValue("slug", e.target.value)}
+            value={watchedValues.slug}
+            error={errors.slug?.message}
           />
 
           <div className="space-y-3">
@@ -157,11 +144,11 @@ const AddCategories = () => {
             </span>
             <div className="flex items-center gap-3">
               <Switch
-                checked={form.isActive}
+                checked={watchedValues.isActive}
                 onCheckedChange={handleToggleActive}
               />
               <span className="text-body-sm text-dark-6 dark:text-white/70">
-                {form.isActive ? "Active" : "Inactive"}
+                {watchedValues.isActive ? "Active" : "Inactive"}
               </span>
             </div>
           </div>
@@ -172,14 +159,15 @@ const AddCategories = () => {
             items={[
               { value: "", label: "No parent" },
               ...categories
-                .filter((c) => String(c.id) !== form.parentId)
+                .filter((c) => String(c.id) !== watchedValues.parentId)
                 .map((c) => ({
                   value: String(c.id),
                   label: c.name,
                 })),
             ]}
-            value={form.parentId}
-            onChange={handleParentChange}
+            value={watchedValues.parentId}
+            onChange={(e) => setValue("parentId", e.target.value)}
+            error={errors.parentId?.message}
           />
         </div>
 
@@ -187,8 +175,9 @@ const AddCategories = () => {
           <TextAreaGroup
             label="Description"
             placeholder="Short description about this category"
-            value={form.description}
-            onChange={handleDescChange}
+            value={watchedValues.description}
+            onChange={(e) => setValue("description", e.target.value)}
+            error={errors.description?.message}
           />
 
           <div>
@@ -212,11 +201,11 @@ const AddCategories = () => {
                 onChange={onFilePick}
               />
 
-              {form.iconPreview ? (
+              {watchedValues.iconPreview ? (
                 <div className="flex w-full flex-col items-center gap-3">
                   <div className="relative h-16 w-16 overflow-hidden rounded-md">
                     <Image
-                      src={form.iconPreview}
+                      src={watchedValues.iconPreview}
                       alt="Icon preview"
                       fill
                       className="object-cover"
@@ -265,7 +254,7 @@ const AddCategories = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setForm(initialState)}
+            onClick={() => form.reset()}
           >
             Reset
           </Button>

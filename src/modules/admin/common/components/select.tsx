@@ -11,6 +11,7 @@ type PropsType = {
   className?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  error?: string;
 } & (
   | { placeholder?: string; defaultValue: string }
   | { placeholder: string; defaultValue?: string }
@@ -25,6 +26,7 @@ export function Select({
   className,
   value,
   onChange,
+  error,
 }: PropsType) {
   const id = useId();
 
@@ -56,10 +58,14 @@ export function Select({
           value={value !== undefined ? value : defaultValue || ""}
           onChange={handleChange}
           className={cn(
-            "w-full appearance-none rounded-lg border border-stroke bg-transparent px-5.5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-dark-3 dark:bg-[#122031] dark:focus:border-primary [&>option]:text-dark-5 dark:[&>option]:text-dark-6",
+            "w-full appearance-none rounded-lg border bg-transparent px-5.5 py-3 outline-none transition active:border-primary [&>option]:text-dark-5 dark:[&>option]:text-dark-6 dark:bg-[#122031]",
+            error
+              ? "border-destructive focus:border-destructive dark:border-destructive"
+              : "border-stroke focus:border-primary dark:border-dark-3 dark:focus:border-primary",
             isOptionSelected && "text-dark dark:text-white",
             prefixIcon && "pl-11.5"
           )}
+          aria-invalid={!!error}
         >
           {placeholder && (
             <option value="" disabled hidden>
@@ -76,6 +82,8 @@ export function Select({
 
         <ChevronUpIcon className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rotate-180" />
       </div>
+
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }

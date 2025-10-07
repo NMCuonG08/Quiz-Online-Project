@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/common/components/ui/button";
 import InputGroup from "@/modules/admin/common/components/InputGroup";
 import { TextAreaGroup } from "@/modules/admin/common/components/InputGroup/text-area";
@@ -12,36 +14,8 @@ import { ArrowLeftIcon } from "@/modules/admin/common/components/icons";
 import { Select } from "@/modules/admin/common/components/select";
 import { cn } from "@/lib/utils";
 import { useAdminCategory } from "./hooks/useAdminCategory";
+import { categorySchema, type CategoryFormData } from "./schema/category";
 import type { Category as BaseCategory } from "./services/admin.category.service";
-
-type AdminCategory = BaseCategory & {
-  description?: string;
-  is_active?: boolean | null;
-  created_at?: string;
-  parent_id?: number | null;
-  parent?: { name: string } | null;
-  parent_name?: string;
-};
-
-type FormState = {
-  name: string;
-  slug: string;
-  description: string;
-  isActive: boolean;
-  iconFile: File | null;
-  iconPreview: string | null;
-  parentId: string;
-};
-
-const emptyState: FormState = {
-  name: "",
-  slug: "",
-  description: "",
-  isActive: true,
-  iconFile: null,
-  iconPreview: null,
-  parentId: "",
-};
 
 const EditCategory = () => {
   const params = useParams();
@@ -55,9 +29,30 @@ const EditCategory = () => {
     getCategories,
   } = useAdminCategory();
 
-  const [form, setForm] = useState<FormState>(emptyState);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const form = useForm<CategoryFormData>({
+    resolver: zodResolver(categorySchema),
+    defaultValues: {
+      name: "",
+      slug: "",
+      description: "",
+      isActive: true,
+      iconFile: null,
+      iconPreview: null,
+      parentId: "",
+    },
+  });
+
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = form;
+  const watchedValues = watch();
 
   useEffect(() => {
     if (slugParam) {
@@ -71,9 +66,12 @@ const EditCategory = () => {
 
   useEffect(() => {
     if (!currentCategory) return;
-    const cat = currentCategory as AdminCategory;
-    setForm((prev) => ({
-      ...prev,
+    const cat = currentCategory as BaseCategory & {
+      description?: string;
+      is_active?: boolean | null;
+      parent_id?: number | null;
+    };
+    reset({
       name: currentCategory.name || "",
       slug: currentCategory.slug || "",
       description: cat.description || "",
@@ -81,34 +79,26 @@ const EditCategory = () => {
       iconFile: null,
       iconPreview: currentCategory.icon_url || null,
       parentId: String(cat.parent_id ?? ""),
-    }));
-  }, [currentCategory]);
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setForm((prev) => ({ ...prev, description: e.target.value }));
-  };
-
-  const handleParentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setForm((prev) => ({ ...prev, parentId: e.target.value }));
-  };
+    });
+  }, [currentCategory, reset]);
 
   const handleToggleActive = () => {
-    setForm((prev) => ({ ...prev, isActive: !prev.isActive }));
+    setValue("isActive", !watchedValues.isActive);
   };
 
-  const setIconFile = useCallback((file: File | null) => {
-    if (!file) {
-      setForm((prev) => ({ ...prev, iconFile: null, iconPreview: null }));
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setForm((prev) => ({ ...prev, iconFile: file, iconPreview: url }));
-  }, []);
+  const setIconFile = useCallback(
+    (file: File | null) => {
+      if (!file) {
+        setValue("iconFile", null);
+        setValue("iconPreview", null);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      setValue("iconFile", file);
+      setValue("iconPreview", url);
+    },
+    [setValue]
+  );
 
   const onDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
@@ -144,10 +134,9 @@ const EditCategory = () => {
 
   const clearIcon = () => setIconFile(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = (data: CategoryFormData) => {
     // Placeholder for update integration
-    console.log("Updating category (", slugParam, "):", form);
+    console.log("Updating category (", slugParam, "):", data);
   };
 
   if (loading && !currentCategory) {
@@ -172,7 +161,7 @@ const EditCategory = () => {
         </button>
       </div>
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit(onSubmit)}
         className="grid grid-cols-1 gap-7.5 md:grid-cols-2"
       >
         <div className="flex flex-col gap-5.5">
@@ -182,8 +171,9 @@ const EditCategory = () => {
             type="text"
             name="name"
             required
-            handleChange={handleTextChange}
-            value={form.name}
+            handleChange={(e) => setValue("name", e.target.value)}
+            value={watchedValues.name}
+            error={errors.name?.message}
           />
 
           <InputGroup
@@ -191,8 +181,9 @@ const EditCategory = () => {
             placeholder="category-slug"
             type="text"
             name="slug"
-            handleChange={handleTextChange}
-            value={form.slug}
+            handleChange={(e) => setValue("slug", e.target.value)}
+            value={watchedValues.slug}
+            error={errors.slug?.message}
           />
 
           <div className="space-y-3">
@@ -201,11 +192,11 @@ const EditCategory = () => {
             </span>
             <div className="flex items-center gap-3">
               <Switch
-                checked={form.isActive}
+                checked={watchedValues.isActive}
                 onCheckedChange={handleToggleActive}
               />
               <span className="text-body-sm text-dark-6 dark:text-white/70">
-                {form.isActive ? "Active" : "Inactive"}
+                {watchedValues.isActive ? "Active" : "Inactive"}
               </span>
             </div>
           </div>
@@ -217,15 +208,18 @@ const EditCategory = () => {
               { value: "", label: "No parent" },
               ...categories
                 .filter(
-                  (c) => String(c.id) !== form.parentId && c.slug !== form.slug
+                  (c) =>
+                    String(c.id) !== watchedValues.parentId &&
+                    c.slug !== watchedValues.slug
                 )
                 .map((c) => ({
                   value: String(c.id),
                   label: c.name,
                 })),
             ]}
-            value={form.parentId}
-            onChange={handleParentChange}
+            value={watchedValues.parentId}
+            onChange={(e) => setValue("parentId", e.target.value)}
+            error={errors.parentId?.message}
           />
         </div>
 
@@ -233,8 +227,9 @@ const EditCategory = () => {
           <TextAreaGroup
             label="Description"
             placeholder="Short description about this category"
-            value={form.description}
-            onChange={handleDescChange}
+            value={watchedValues.description}
+            onChange={(e) => setValue("description", e.target.value)}
+            error={errors.description?.message}
           />
 
           <div>
@@ -258,11 +253,11 @@ const EditCategory = () => {
                 onChange={onFilePick}
               />
 
-              {form.iconPreview ? (
+              {watchedValues.iconPreview ? (
                 <div className="flex w-full flex-col items-center gap-3">
                   <div className="relative h-16 w-16 overflow-hidden rounded-md">
                     <Image
-                      src={form.iconPreview}
+                      src={watchedValues.iconPreview}
                       alt="Icon preview"
                       fill
                       className="object-cover"
@@ -311,23 +306,24 @@ const EditCategory = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              currentCategory &&
-              setForm({
-                name: currentCategory.name || "",
-                slug: currentCategory.slug || "",
-                description:
-                  (currentCategory as AdminCategory).description || "",
-                isActive:
-                  ((currentCategory as AdminCategory).is_active ?? true) ===
-                  true,
-                iconFile: null,
-                iconPreview: currentCategory.icon_url || null,
-                parentId: String(
-                  (currentCategory as AdminCategory).parent_id ?? ""
-                ),
-              })
-            }
+            onClick={() => {
+              if (currentCategory) {
+                const cat = currentCategory as BaseCategory & {
+                  description?: string;
+                  is_active?: boolean | null;
+                  parent_id?: number | null;
+                };
+                reset({
+                  name: currentCategory.name || "",
+                  slug: currentCategory.slug || "",
+                  description: cat.description || "",
+                  isActive: (cat.is_active ?? true) === true,
+                  iconFile: null,
+                  iconPreview: currentCategory.icon_url || null,
+                  parentId: String(cat.parent_id ?? ""),
+                });
+              }
+            }}
           >
             Reset
           </Button>

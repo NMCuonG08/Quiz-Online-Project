@@ -8,5 +8,8 @@ export const apiRoutes = {
     BASE: "/api/quizzes",
     GET_ALL: "/api/quizzes",
     GET_BY_SLUG: (slug: string) => `/api/quizzes/slug/${slug}`,
+    CREATE: "/api/quizzes",
+    UPDATE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
+    DELETE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
   },
 };
