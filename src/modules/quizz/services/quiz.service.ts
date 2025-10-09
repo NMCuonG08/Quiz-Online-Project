@@ -130,8 +130,18 @@ export class QuizService extends BaseService {
     return await this.quizRepository.updateQuiz(id, dataToUpdate);
   }
 
-  async remove(id: string) {
-    return await this.quizRepository.delete({ id });
+  async remove(id: string, creatorId: string) {
+    const existingQuiz = await this.quizRepository.findByIdRaw(id);
+    if (!existingQuiz) {
+      throw new NotFoundException('Quiz not found');
+    }
+    if (existingQuiz.creator_id !== creatorId) {
+      throw new ForbiddenException(
+        'You are not authorized to delete this quiz',
+      );
+    }
+    await this.quizRepository.delete({ id });
+    return 'Quiz deleted successfully';
   }
 
   // Minimal no-op handlers to satisfy JobRepository validation

@@ -123,7 +123,8 @@ export class QuizController {
     status: 200,
     description: 'Successfully deleted quiz',
   })
-  async deleteQuiz(@Param('id') id: string) {
-    return this.quizService.remove(id);
+  async deleteQuiz(@Param('id') id: string, @Auth() auth: AuthDto) {
+    const creatorId = auth.user.id;
+    return this.quizService.remove(id, creatorId);
   }
 }

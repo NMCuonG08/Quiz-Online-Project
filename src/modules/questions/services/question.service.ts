@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { BaseService } from '@/common/base/base.service';
-import { BaseRepository } from '@/common/base/base.repository';
 import { CreateQuestionDto } from '../dtos/create-question.dto';
 import { UpdateQuestionDto } from '../dtos/update-question.dto';
 import { PaginatedResponseDto } from '@/common/dtos/responses/base.response';
@@ -167,18 +166,13 @@ export class QuestionService extends BaseService {
       mediaId = uploadResult?.id;
     }
 
-    // Prepare question data
-    const { options, ...questionWithoutOptions } = question;
-    const questionData = {
-      ...questionWithoutOptions,
+    // Prepare question data without options (options handled via separate API)
+    const questionData: Record<string, any> = {
+      ...question,
       media_id: mediaId || null,
     };
 
-    // Create question with options
-    return await this.questionRepository.createWithOptions(
-      questionData,
-      options,
-    );
+    return await this.questionRepository.createWithOptions(questionData);
   }
 
   async updateQuestion(
@@ -209,19 +203,13 @@ export class QuestionService extends BaseService {
       mediaId = uploadResult?.id;
     }
 
-    // Prepare update data
-    const { options, ...questionWithoutOptions } = updateData;
+    // Prepare update data without options (options handled via separate API)
     const dataToUpdate: Record<string, any> = {
-      ...questionWithoutOptions,
+      ...updateData,
       ...(mediaId ? { media_id: mediaId } : {}),
     };
 
-    // Update question with options
-    return await this.questionRepository.updateQuestion(
-      id,
-      dataToUpdate,
-      options,
-    );
+    return await this.questionRepository.updateQuestion(id, dataToUpdate);
   }
 
   async deleteQuestion(id: string): Promise<void> {
@@ -297,13 +285,6 @@ export class QuestionService extends BaseService {
       sort_order: existingQuestion.sort_order + 1,
       is_required: existingQuestion.is_required,
       settings: existingQuestion.settings,
-      options: existingQuestion.options?.map((option) => ({
-        option_text: option.option_text,
-        is_correct: option.is_correct,
-        sort_order: option.sort_order,
-        explanation: option.explanation,
-        media_url: option.media_url,
-      })),
     };
 
     return await this.createQuestion(duplicateData);

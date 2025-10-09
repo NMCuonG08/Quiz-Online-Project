@@ -55,6 +55,9 @@ export class QuizResponseDto {
   @ApiProperty({ description: 'Published date', required: false })
   published_at?: Date;
 
+  @ApiProperty({ description: 'Instructions', required: false })
+  instructions?: string;
+
   // Flattened fields
   @ApiProperty({ description: 'Category name' })
   category_name: string | null;

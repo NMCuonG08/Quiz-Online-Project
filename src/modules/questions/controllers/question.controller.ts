@@ -33,8 +33,6 @@ export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
 
   @Get()
-  @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizRead })
   @ApiOperation({ summary: 'Get all questions with pagination' })
   @ApiResponse({
     status: 200,
@@ -107,8 +105,8 @@ export class QuestionController {
   }
 
   @Post()
-  @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizCreate })
+  // @UseGuards(AuthGuard)
+  // @Authenticated({ permission: Permission.QuizCreate })
   @ApiOperation({ summary: 'Create a new question with optional media upload' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('media'))

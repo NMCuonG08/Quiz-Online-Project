@@ -17,6 +17,7 @@ interface QuizWithRelations {
   created_at: Date;
   updated_at: Date;
   published_at?: Date | null;
+  instructions?: string | null;
   category?: { name: string } | null;
   creator?: { id: string } | null;
   thumbnail?: { url: string } | null;
@@ -42,7 +43,7 @@ export function mapQuizToResponseDto(quiz: QuizWithRelations): QuizResponseDto {
     created_at: quiz.created_at,
     updated_at: quiz.updated_at,
     published_at: quiz.published_at || undefined,
-
+    instructions: quiz.instructions || undefined,
     // Flattened fields
     category_name: quiz.category?.name || null,
     thumbnail_url: quiz.thumbnail?.url || null,
