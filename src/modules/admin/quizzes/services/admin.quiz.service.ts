@@ -68,6 +68,10 @@ export class QuizService {
       // If there is a thumbnail file, send as multipart/form-data
       let body: FormData | Record<string, unknown>;
       if (payload.thumbnailFile) {
+        console.log(
+          "Creating FormData with thumbnail file:",
+          payload.thumbnailFile
+        );
         const form = new FormData();
         Object.entries(payload as Record<string, unknown>).forEach(
           ([key, value]) => {
@@ -86,7 +90,14 @@ export class QuizService {
         );
         form.append("thumbnail", payload.thumbnailFile);
         body = form;
+
+        // Debug: Log FormData contents
+        console.log("FormData contents:");
+        for (const [key, value] of form.entries()) {
+          console.log(`${key}:`, value);
+        }
       } else {
+        console.log("Creating JSON body without thumbnail");
         const jsonBody: Record<string, unknown> = {
           ...(payload as Record<string, unknown>),
         };
@@ -152,7 +163,7 @@ export class QuizService {
         }
         body = jsonBody;
       }
-      const response = await apiClient.put(
+      const response = await apiClient.patch(
         apiRoutes.QUIZZES.UPDATE_BY_ID(id),
         body
       );

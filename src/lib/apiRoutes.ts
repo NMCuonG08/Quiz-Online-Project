@@ -3,6 +3,9 @@ export const apiRoutes = {
     BASE: "/api/categories",
     GET_ALL: "/api/categories",
     GET_BY_SLUG: (slug: string) => `/api/categories/slug/${slug}`,
+    CREATE: "/api/categories",
+    UPDATE_BY_ID: (id: string | number) => `/api/categories/${id}`,
+    DELETE_BY_ID: (id: string | number) => `/api/categories/${id}`,
   },
   QUIZZES: {
     BASE: "/api/quizzes",
@@ -11,5 +14,13 @@ export const apiRoutes = {
     CREATE: "/api/quizzes",
     UPDATE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
     DELETE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
+  },
+  QUESTIONS: {
+    BASE: "/api/questions",
+    GET_ALL: "/api/questions",
+    GET_BY_ID: (id: string) => `/api/questions/quiz/${id}`,
+    CREATE: "/api/questions",
+    UPDATE_BY_ID: (id: string) => `/api/questions/${id}`,
+    DELETE_BY_ID: (id: string) => `/api/questions/${id}`,
   },
 };

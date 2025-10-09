@@ -12,10 +12,13 @@ import { Switch } from "@/modules/admin/common/components/switch";
 import { UploadIcon } from "@/modules/admin/common/components/icons";
 import { ArrowLeftIcon } from "@/modules/admin/common/components/icons";
 import { Select } from "@/modules/admin/common/components/select";
+import TagInput from "@/modules/admin/common/components/TagInput";
 import { cn } from "@/lib/utils";
 import { useAdminQuiz } from "./hooks/useAdminQuiz";
+import { useAdminCategory } from "@/modules/admin/categories/hooks/useAdminCategory";
 import { quizSchema, type QuizFormData } from "./schema/quiz";
 import type { Quiz } from "./types";
+import type { Category } from "@/modules/admin/categories/services/admin.category.service";
 import {
   showError,
   showLoading,
@@ -29,6 +32,7 @@ const EditQuiz = () => {
   const router = useRouter();
   const { currentQuiz, getQuizBySlug, loading, error, updateQuiz } =
     useAdminQuiz();
+  const { categories, getCategories } = useAdminCategory();
 
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -49,6 +53,7 @@ const EditQuiz = () => {
       passing_score: 60,
       is_active: true,
       quiz_type: "MULTIPLE_CHOICE",
+      tags: [],
       thumbnailFile: null,
       thumbnailPreview: null,
     },
@@ -70,6 +75,12 @@ const EditQuiz = () => {
   }, [slugParam, getQuizBySlug]);
 
   useEffect(() => {
+    if (!categories || categories.length === 0) {
+      void getCategories();
+    }
+  }, [categories, getCategories]);
+
+  useEffect(() => {
     if (!currentQuiz) return;
     const quiz = currentQuiz as Quiz;
     reset({
@@ -84,6 +95,7 @@ const EditQuiz = () => {
       passing_score: quiz.passing_score || 60,
       is_active: quiz.is_active ?? true,
       quiz_type: quiz.quiz_type || "MULTIPLE_CHOICE",
+      tags: quiz.tags || [],
       thumbnailFile: null,
       thumbnailPreview: quiz.thumbnail_url || null,
     });
@@ -101,13 +113,25 @@ const EditQuiz = () => {
   const setThumbnailFile = useCallback(
     (file: File | null) => {
       if (!file) {
-        setValue("thumbnailFile", null);
-        setValue("thumbnailPreview", null);
+        setValue("thumbnailFile", null, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+        setValue("thumbnailPreview", null, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
         return;
       }
       const url = URL.createObjectURL(file);
-      setValue("thumbnailFile", file);
-      setValue("thumbnailPreview", url);
+      setValue("thumbnailFile", file, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      setValue("thumbnailPreview", url, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     },
     [setValue]
   );
@@ -166,8 +190,14 @@ const EditQuiz = () => {
         passing_score: data.passing_score,
         is_active: data.is_active,
         quiz_type: data.quiz_type,
+        tags: data.tags || [],
         thumbnailFile: data.thumbnailFile ?? undefined,
       };
+
+      // Debug logging
+      console.log("Edit quiz payload:", payload);
+      console.log("Thumbnail file:", data.thumbnailFile);
+
       const res = await updateQuiz(id, payload);
       closeLoading();
       if (res.success) {
@@ -244,10 +274,10 @@ const EditQuiz = () => {
             placeholder="Select category"
             items={[
               { value: "", label: "Select a category" },
-              { value: "1", label: "General Knowledge" },
-              { value: "2", label: "Science" },
-              { value: "3", label: "History" },
-              { value: "4", label: "Technology" },
+              ...(categories || []).map((c: Category) => ({
+                value: String(c.id),
+                label: c.name,
+              })),
             ]}
             value={watchedValues.category_id}
             onChange={(e) =>
@@ -284,8 +314,8 @@ const EditQuiz = () => {
             items={[
               { value: "MULTIPLE_CHOICE", label: "Multiple Choice" },
               { value: "TRUE_FALSE", label: "True/False" },
-              { value: "FILL_BLANK", label: "Fill in the Blank" },
-              { value: "MIXED", label: "Mixed" },
+              { value: "FILL_IN_THE_BLANK", label: "Fill in the Blank" },
+              { value: "ESSAY", label: "ESSAY" },
             ]}
             value={watchedValues.quiz_type}
             onChange={(e) =>
@@ -294,8 +324,8 @@ const EditQuiz = () => {
                 e.target.value as
                   | "MULTIPLE_CHOICE"
                   | "TRUE_FALSE"
-                  | "FILL_BLANK"
-                  | "MIXED",
+                  | "FILL_IN_THE_BLANK"
+                  | "ESSAY",
                 { shouldDirty: true, shouldValidate: true }
               )
             }
@@ -390,18 +420,16 @@ const EditQuiz = () => {
             error={errors.passing_score?.message}
           />
 
-          <InputGroup
+          <TagInput
             label="Tags"
-            placeholder="Enter tags separated by commas"
-            type="text"
-            name="tags"
-            handleChange={(e) =>
-              setValue("tags", e.target.value, {
+            placeholder="Type a tag and press Enter"
+            value={watchedValues.tags || []}
+            onChange={(tags) =>
+              setValue("tags", tags, {
                 shouldDirty: true,
                 shouldValidate: true,
               })
             }
-            value={watchedValues.tags}
             error={errors.tags?.message}
           />
 
@@ -494,10 +522,9 @@ const EditQuiz = () => {
                   time_limit: quiz.time_limit || 30,
                   max_attempts: quiz.max_attempts || 3,
                   passing_score: quiz.passing_score || 60,
-                  is_public: quiz.is_public ?? true,
                   is_active: quiz.is_active ?? true,
                   quiz_type: quiz.quiz_type || "MULTIPLE_CHOICE",
-                  tags: quiz.tags?.join(", ") || "",
+                  tags: quiz.tags || [],
                   thumbnailFile: null,
                   thumbnailPreview: quiz.thumbnail_url || null,
                 });

@@ -3,6 +3,7 @@ import authReducer from "@/modules/auth/common/slices/authSlice";
 import categoryReducer from "@/modules/client/category/slices/category.slice";
 import adminCategoryReducer from "@/modules/admin/categories/slices/admin.category.slice";
 import adminQuizReducer from "@/modules/admin/quizzes/slices/admin.quiz.slice";
+import adminQuestionReducer from "@/modules/admin/questions/slices/admin.question.slice";
 
 // Temporarily disable persistence for auth slice to test logout
 // const authPersistConfig = {
@@ -20,6 +21,7 @@ const rootReducer = combineReducers({
   category: categoryReducer,
   adminCategory: adminCategoryReducer,
   adminQuiz: adminQuizReducer,
+  adminQuestion: adminQuestionReducer,
 });
 
 export default rootReducer;

@@ -50,13 +50,13 @@ const ListCategoriesTable = () => {
         <Table>
           <TableHeader>
             <TableRow className="border-none bg-[#F7F9FC] dark:bg-[#122031] [&>th]:py-4 [&>th]:text-base [&>th]:text-dark [&>th]:dark:text-white">
-              <TableHead className="min-w-[155px] xl:pl-7.5">Icon</TableHead>
+              <TableHead className="min-w-[120px] xl:pl-7.5">Actions</TableHead>
+              <TableHead className="min-w-[155px]">Icon</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Parent</TableHead>
               <TableHead>Created At</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right xl:pr-7.5">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -66,7 +66,42 @@ const ListCategoriesTable = () => {
                 key={index}
                 className="border-[#eee] dark:border-dark-3"
               >
-                <TableCell className="min-w-[155px] xl:pl-7.5">
+                {/* Actions first */}
+                <TableCell className="min-w-[120px] xl:pl-7.5">
+                  <div className="flex items-center gap-x-3.5">
+                    <button
+                      className="hover:text-primary hover:cursor-pointer"
+                      title="View quiz category"
+                      aria-label="View quiz category"
+                    >
+                      <span className="sr-only">View Category</span>
+                      <PreviewIcon />
+                    </button>
+
+                    <button
+                      className="hover:text-primary hover:cursor-pointer"
+                      title="Edit quiz category"
+                      aria-label="Edit quiz category"
+                      onClick={() =>
+                        router.push(`/admin/quiz-categories/edit/${item.slug}`)
+                      }
+                    >
+                      <span className="sr-only">Edit Category</span>
+                      <PencilSquareIcon />
+                    </button>
+
+                    <button
+                      className="hover:text-primary hover:cursor-pointer"
+                      title="Delete quiz category"
+                      aria-label="Delete quiz category"
+                    >
+                      <span className="sr-only">Delete Category</span>
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </TableCell>
+
+                <TableCell className="min-w-[155px]">
                   <Image
                     src={
                       item.icon_url ||

@@ -5,6 +5,9 @@ import { useAppDispatch, useAppSelector } from "@/hooks/useRedux";
 import {
   fetchCategories,
   fetchCategoryBySlug,
+  createCategory as createCategoryThunk,
+  updateCategory as updateCategoryThunk,
+  deleteCategory as deleteCategoryThunk,
   clearError,
   clearCurrentCategory,
   clearCategories,
@@ -42,6 +45,64 @@ export const useAdminCategory = () => {
     [dispatch]
   );
 
+  // Tạo category
+  const createCategory = useCallback(
+    async (data: {
+      name: string;
+      slug: string;
+      description?: string;
+      isActive?: boolean;
+      parentId?: string | number | null;
+      iconFile?: File | null;
+    }) => {
+      try {
+        const result = await dispatch(createCategoryThunk(data)).unwrap();
+        return { success: true, data: result };
+      } catch (error) {
+        return { success: false, error } as { success: false; error: unknown };
+      }
+    },
+    [dispatch]
+  );
+
+  // Cập nhật category
+  const updateCategory = useCallback(
+    async (
+      id: string | number,
+      data: {
+        name?: string;
+        slug?: string;
+        description?: string;
+        isActive?: boolean;
+        parentId?: string | number | null;
+        iconFile?: File | null;
+      }
+    ) => {
+      try {
+        const result = await dispatch(
+          updateCategoryThunk({ id, data })
+        ).unwrap();
+        return { success: true, data: result };
+      } catch (error) {
+        return { success: false, error: error as string };
+      }
+    },
+    [dispatch]
+  );
+
+  // Xoá category
+  const deleteCategory = useCallback(
+    async (id: string | number) => {
+      try {
+        await dispatch(deleteCategoryThunk(id)).unwrap();
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error as string };
+      }
+    },
+    [dispatch]
+  );
+
   // Clear error
   const clearCategoryError = useCallback(() => {
     dispatch(clearError());
@@ -67,6 +128,9 @@ export const useAdminCategory = () => {
     // Actions
     getCategories,
     getCategoryBySlug,
+    createCategory,
+    updateCategory,
+    deleteCategory,
     clearCategoryError,
     clearCurrent,
     clearAll,

@@ -11,6 +11,7 @@ import { Switch } from "@/modules/admin/common/components/switch";
 import { UploadIcon } from "@/modules/admin/common/components/icons";
 import { ArrowLeftIcon } from "@/modules/admin/common/components/icons";
 import { Select } from "@/modules/admin/common/components/select";
+import TagInput from "@/modules/admin/common/components/TagInput";
 import { cn } from "@/lib/utils";
 import { useAdminQuiz } from "./hooks/useAdminQuiz";
 import { useAdminCategory } from "@/modules/admin/categories/hooks/useAdminCategory";
@@ -45,6 +46,7 @@ const AddQuiz = () => {
       passing_score: 60,
       is_active: true,
       quiz_type: "MULTIPLE_CHOICE",
+      tags: [],
       thumbnailFile: null,
       thumbnailPreview: null,
     },
@@ -159,8 +161,14 @@ const AddQuiz = () => {
         passing_score: data.passing_score,
         is_active: data.is_active,
         quiz_type: data.quiz_type,
-        thumbnailFile: watchedValues.thumbnailFile ?? undefined,
+        tags: data.tags || [],
+        thumbnailFile: data.thumbnailFile ?? undefined,
       };
+
+      // Debug logging
+      console.log("Quiz payload:", payload);
+      console.log("Thumbnail file:", data.thumbnailFile);
+
       const res = await createQuiz(payload);
       closeLoading();
       if (res.success) {
@@ -471,6 +479,19 @@ const AddQuiz = () => {
             }
             value={watchedValues.passing_score}
             error={errors.passing_score?.message}
+          />
+
+          <TagInput
+            label="Tags"
+            placeholder="Type a tag and press Enter"
+            value={watchedValues.tags || []}
+            onChange={(tags) =>
+              setValue("tags", tags, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+            error={errors.tags?.message}
           />
 
           <div>

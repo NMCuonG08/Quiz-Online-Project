@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/common/components/ui/button";
@@ -16,9 +16,21 @@ import { cn } from "@/lib/utils";
 import { useAdminCategory } from "./hooks/useAdminCategory";
 import { categorySchema, type CategoryFormData } from "./schema/category";
 import type { Category as BaseCategory } from "./services/admin.category.service";
+import {
+  showError,
+  showLoading,
+  closeLoading,
+  showSuccess,
+} from "@/lib/Notification";
+import {
+  extractFieldErrors,
+  mapServerFieldToForm,
+  formatErrorMessageWithDetails,
+} from "@/lib/apiError";
 
 const EditCategory = () => {
   const params = useParams();
+  const router = useRouter();
   const slugParam = (params?.slug as string) || "";
   const {
     currentCategory,
@@ -27,6 +39,7 @@ const EditCategory = () => {
     error,
     categories,
     getCategories,
+    updateCategory,
   } = useAdminCategory();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -50,6 +63,7 @@ const EditCategory = () => {
     setValue,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = form;
   const watchedValues = watch();
@@ -134,9 +148,51 @@ const EditCategory = () => {
 
   const clearIcon = () => setIconFile(null);
 
-  const onSubmit = (data: CategoryFormData) => {
-    // Placeholder for update integration
-    console.log("Updating category (", slugParam, "):", data);
+  const onSubmit = async (data: CategoryFormData) => {
+    try {
+      console.log("[EditCategory] slug:", slugParam);
+      console.log("[EditCategory] form values:", data);
+      const id = (currentCategory as BaseCategory | null)?.id;
+      if (!id) {
+        showError("Category is not loaded yet. Please try again.");
+        return;
+      }
+      const payload = {
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        isActive: data.isActive,
+        parentId: data.parentId ? Number(data.parentId) : null,
+        iconFile: data.iconFile ?? null,
+      };
+      console.log("[EditCategory] payload:", payload);
+      showLoading("Saving changes...", "Please wait");
+      const res = await updateCategory(id, payload);
+      closeLoading();
+      console.log("[EditCategory] update response:", res);
+      if (res.success) {
+        showSuccess("Category updated successfully");
+        router.push("/admin/quiz-categories");
+      } else {
+        const errObj = (res as { error?: unknown }).error;
+        const msg = formatErrorMessageWithDetails(
+          errObj,
+          "Failed to update category"
+        );
+        const fieldErrs = extractFieldErrors(errObj);
+        Object.entries(fieldErrs).forEach(([field, message]) => {
+          const mapped = mapServerFieldToForm(field) as keyof CategoryFormData;
+          setError(mapped, {
+            type: "server",
+            message,
+          });
+        });
+        showError(msg);
+      }
+    } catch {
+      closeLoading();
+      showError("Failed to update category");
+    }
   };
 
   if (loading && !currentCategory) {

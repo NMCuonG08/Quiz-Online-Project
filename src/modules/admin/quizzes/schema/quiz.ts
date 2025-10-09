@@ -44,6 +44,7 @@ export const quizSchema = z.object({
       required_error: "Quiz type is required",
     }
   ),
+  tags: z.array(z.string()).optional().default([]),
   thumbnailFile: z.instanceof(File).optional().nullable(),
   thumbnailPreview: z.string().optional().nullable(),
 });

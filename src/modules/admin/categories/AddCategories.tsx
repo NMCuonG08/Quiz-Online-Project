@@ -15,12 +15,23 @@ import { cn } from "@/lib/utils";
 import { useAdminCategory } from "./hooks/useAdminCategory";
 import { useRouter } from "next/navigation";
 import { categorySchema, type CategoryFormData } from "./schema/category";
+import {
+  showError,
+  showLoading,
+  closeLoading,
+  showSuccess,
+} from "@/lib/Notification";
+import {
+  extractFieldErrors,
+  mapServerFieldToForm,
+  formatErrorMessageWithDetails,
+} from "@/lib/apiError";
 
 const AddCategories = () => {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { categories, getCategories } = useAdminCategory();
+  const { categories, getCategories, createCategory } = useAdminCategory();
 
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -35,7 +46,13 @@ const AddCategories = () => {
     },
   });
 
-  const { watch, setValue, handleSubmit, formState: { errors } } = form;
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = form;
   const watchedValues = watch();
 
   React.useEffect(() => {
@@ -46,16 +63,19 @@ const AddCategories = () => {
     setValue("isActive", !watchedValues.isActive);
   };
 
-  const setIconFile = useCallback((file: File | null) => {
-    if (!file) {
-      setValue("iconFile", null);
-      setValue("iconPreview", null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setValue("iconFile", file);
-    setValue("iconPreview", url);
-  }, [setValue]);
+  const setIconFile = useCallback(
+    (file: File | null) => {
+      if (!file) {
+        setValue("iconFile", null);
+        setValue("iconPreview", null);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      setValue("iconFile", file);
+      setValue("iconPreview", url);
+    },
+    [setValue]
+  );
 
   const onDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
@@ -91,9 +111,45 @@ const AddCategories = () => {
 
   const clearIcon = () => setIconFile(null);
 
-  const onSubmit = (data: CategoryFormData) => {
-    // Submit handler placeholder: integrate with service when ready
-    console.log("Submitting category:", data);
+  const onSubmit = async (data: CategoryFormData) => {
+    try {
+      console.log("[AddCategory] form values:", data);
+      const payload = {
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        isActive: data.isActive,
+        parentId: data.parentId ? Number(data.parentId) : null,
+        iconFile: data.iconFile ?? null,
+      };
+      console.log("[AddCategory] payload:", payload);
+      showLoading("Creating category...", "Please wait");
+      const res = await createCategory(payload);
+      closeLoading();
+      console.log("[AddCategory] create response:", res);
+      if (res.success) {
+        showSuccess("Category created successfully");
+        router.push("/admin/quiz-categories");
+      } else {
+        const errObj = (res as { error?: unknown }).error;
+        const msg = formatErrorMessageWithDetails(
+          errObj,
+          "Failed to create category"
+        );
+        const fieldErrs = extractFieldErrors(errObj);
+        Object.entries(fieldErrs).forEach(([field, message]) => {
+          const mapped = mapServerFieldToForm(field) as keyof CategoryFormData;
+          setError(mapped, {
+            type: "server",
+            message,
+          });
+        });
+        showError(msg);
+      }
+    } catch {
+      closeLoading();
+      showError("Failed to create category");
+    }
   };
 
   return (
@@ -251,11 +307,7 @@ const AddCategories = () => {
         </div>
 
         <div className="col-span-1 md:col-span-2 flex items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => form.reset()}
-          >
+          <Button type="button" variant="outline" onClick={() => form.reset()}>
             Reset
           </Button>
           <Button type="submit">Create Category</Button>
