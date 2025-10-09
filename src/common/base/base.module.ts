@@ -16,12 +16,16 @@ import { GuardsModule } from '../guards/guards.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { EmailRepository } from '../repositories/email.repository';
 import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
+import { QuestionModule } from '@/modules/questions/question.module';
+import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
+import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
 
 @Module({
   imports: [
     PrismaModule,
     CloudinaryModule,
     RedisModule,
+    forwardRef(() => QuestionModule),
     GuardsModule,
     forwardRef(() => AuthModule),
     JwtModule.registerAsync({
@@ -44,6 +48,8 @@ import { NotificationRepository } from '@/modules/notification/repositories/noti
     EmailRepository,
     RedisService,
     NotificationRepository,
+    QuestionRepository,
+    QuestionOptionRepository,
   ],
   exports: [
     PrismaModule,
@@ -58,6 +64,8 @@ import { NotificationRepository } from '@/modules/notification/repositories/noti
     LoggingRepository,
     EmailRepository,
     NotificationRepository,
+    QuestionRepository,
+    QuestionOptionRepository,
   ],
 })
 export class BaseModule {}

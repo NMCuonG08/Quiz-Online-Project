@@ -10,6 +10,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { GuardsModule } from './common/guards/guards.module';
 import { QuizModule } from './modules/quizz/quiz.module';
 import { CategoryModule } from './modules/category/category.module';
+import { QuestionModule } from './modules/questions/question.module';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from './common/enums';
 import { RedisModule } from './infrastructure/cache/redis/redis.module';
@@ -161,6 +162,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     UserModule,
     QuizModule,
     CategoryModule,
+    QuestionModule,
     NotificationModule,
   ],
   controllers: [AppController],

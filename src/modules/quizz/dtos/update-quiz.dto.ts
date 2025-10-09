@@ -1,9 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
-  IsNotEmpty,
-  IsUUID,
   IsOptional,
+  IsUUID,
   IsNumber,
   IsEnum,
   IsBoolean,
@@ -12,70 +11,69 @@ import {
 import { Transform } from 'class-transformer';
 import { DifficultyLevelEnum, QuizTypeEnumEnum } from '@/common/enums';
 
-export class CreateQuizDto {
-  @ApiProperty({ example: 'Quiz 1' })
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @ApiProperty({ example: 'quiz-1' })
-  @IsString()
-  @IsNotEmpty()
-  slug: string;
-
-  @ApiProperty({ example: '2a639f98-cf28-4afb-8924-17d4a92c1517' })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
-  category_id: string;
-
-  @ApiProperty({ example: 'Chao' })
+export class UpdateQuizDto {
+  @ApiPropertyOptional({ example: 'Updated Quiz Title' })
   @IsString()
   @IsOptional()
-  description: string;
+  title?: string;
+
+  @ApiPropertyOptional({ example: 'updated-quiz-slug' })
+  @IsString()
+  @IsOptional()
+  slug?: string;
+
+  @ApiPropertyOptional({ example: '2a639f98-cf28-4afb-8924-17d4a92c1517' })
+  @IsString()
+  @IsOptional()
+  @IsUUID()
+  category_id?: string;
+
+  @ApiPropertyOptional({ example: 'Updated description' })
+  @IsString()
+  @IsOptional()
+  description?: string;
 
   @ApiPropertyOptional({
-    description: 'Populated from authenticated user token',
-  })
-  @ApiProperty({
-    example: DifficultyLevelEnum.EASY,
+    example: DifficultyLevelEnum.MEDIUM,
     enum: DifficultyLevelEnum,
     description: 'Difficulty level of the quiz',
   })
   @IsEnum(DifficultyLevelEnum)
   @IsOptional()
-  difficulty_level: DifficultyLevelEnum = DifficultyLevelEnum.EASY;
+  difficulty_level?: DifficultyLevelEnum;
 
-  @ApiProperty({ example: 600 })
+  @ApiPropertyOptional({ example: 900 })
   @IsNumber()
-  time_limit: number;
-
-  @ApiProperty({ example: 1 })
   @IsOptional()
-  @IsNumber()
-  max_attempts: number = 0;
+  time_limit?: number;
 
-  @ApiProperty({ example: 0 })
-  @IsOptional()
+  @ApiPropertyOptional({ example: 3 })
   @IsNumber()
+  @IsOptional()
+  max_attempts?: number;
+
+  @ApiPropertyOptional({ example: 70 })
+  @IsNumber()
+  @IsOptional()
   passing_score?: number;
 
-  @ApiProperty({ example: true })
+  @ApiPropertyOptional({ example: true })
   @IsBoolean()
   @IsOptional()
-  is_active: boolean = false;
+  is_active?: boolean;
 
-  @ApiProperty({
-    example: QuizTypeEnumEnum.MULTIPLE_CHOICE,
+  @ApiPropertyOptional({
+    example: QuizTypeEnumEnum.TRUE_FALSE,
     enum: QuizTypeEnumEnum,
     description: 'Type of quiz',
   })
   @IsEnum(QuizTypeEnumEnum)
-  quiz_type: QuizTypeEnumEnum = QuizTypeEnumEnum.MULTIPLE_CHOICE;
-
-  @ApiProperty({ example: 'hello welcome' })
   @IsOptional()
+  quiz_type?: QuizTypeEnumEnum;
+
+  @ApiPropertyOptional({ example: 'Updated instructions' })
   @IsString()
+  @IsOptional()
   instructions?: string;
 
   @ApiPropertyOptional({
@@ -86,8 +84,8 @@ export class CreateQuizDto {
   @IsOptional()
   thumbnail?: Express.Multer.File;
 
-  @ApiProperty({
-    example: '2024-01-15T10:30:00.000Z',
+  @ApiPropertyOptional({
+    example: '2024-02-15T10:30:00.000Z',
     description: 'Publication date of the quiz (ISO 8601 format)',
   })
   @IsOptional()
@@ -97,11 +95,11 @@ export class CreateQuizDto {
   )
   @Transform(({ value }: { value: any }) => {
     if (!value) {
-      return new Date().toISOString();
+      return undefined;
     }
     // Ensure the value is a valid ISO 8601 string
     const date = new Date(value as string);
     return date.toISOString();
   })
-  published_at: string;
+  published_at?: string;
 }
