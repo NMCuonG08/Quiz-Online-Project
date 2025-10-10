@@ -27,24 +27,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <ThemeProvider>
-          <ReduxProvider>
-            <AuthRestorer>
-              <ClientLayout>{children}</ClientLayout>
-            </AuthRestorer>
-          </ReduxProvider>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ThemeProvider>
+      <ReduxProvider>
+        <AuthRestorer>
+          <ClientLayout>{children}</ClientLayout>
+        </AuthRestorer>
+      </ReduxProvider>
+    </ThemeProvider>
   );
 }

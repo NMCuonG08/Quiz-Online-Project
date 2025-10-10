@@ -5,7 +5,7 @@ export type QuestionOption = {
   is_correct: boolean;
   sort_order: number;
   explanation?: string | null;
-  media_url?: string | null;
+  media_url?: string | File | null;
 };
 
 export type QuestionItem = {
@@ -18,6 +18,7 @@ export type QuestionItem = {
   time_limit: number;
   explanation?: string | null;
   media_type?: string | null;
+  media_url?: string | File | null;
   difficulty_level?: string | null;
   sort_order?: number | null;
   is_required?: boolean | null;

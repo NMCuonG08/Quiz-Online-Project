@@ -20,9 +20,11 @@ import {
 import { useAdminCategory } from "../hooks/useAdminCategory";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { showDeleteConfirm, showError, showSuccess } from "@/lib/Notification";
 
 const ListCategoriesTable = () => {
-  const { categories, loading, error, getCategories } = useAdminCategory();
+  const { categories, loading, error, getCategories, deleteCategory } =
+    useAdminCategory();
   const router = useRouter();
   useEffect(() => {
     getCategories();
@@ -94,6 +96,17 @@ const ListCategoriesTable = () => {
                       className="hover:text-primary hover:cursor-pointer"
                       title="Delete quiz category"
                       aria-label="Delete quiz category"
+                      onClick={async () => {
+                        const res = await showDeleteConfirm(item.name);
+                        if (res.isConfirmed) {
+                          const result = await deleteCategory(item.id);
+                          if (result.success) {
+                            showSuccess("Deleted successfully");
+                          } else {
+                            showError(String(result.error || "Delete failed"));
+                          }
+                        }
+                      }}
                     >
                       <span className="sr-only">Delete Category</span>
                       <TrashIcon />
@@ -153,40 +166,6 @@ const ListCategoriesTable = () => {
                     )}
                   >
                     {item.is_active === true ? "Active" : "Inactive"}
-                  </div>
-                </TableCell>
-
-                <TableCell className="xl:pr-7.5">
-                  <div className="flex items-center justify-end hover:cursor-pointer gap-x-3.5">
-                    <button
-                      className="hover:text-primary hover:cursor-pointer"
-                      title="View quiz category"
-                      aria-label="View quiz category"
-                    >
-                      <span className="sr-only">View Category</span>
-                      <PreviewIcon />
-                    </button>
-
-                    <button
-                      className="hover:text-primary hover:cursor-pointer"
-                      title="Delete quiz category"
-                      aria-label="Delete quiz category"
-                    >
-                      <span className="sr-only">Delete Category</span>
-                      <TrashIcon />
-                    </button>
-
-                    <button
-                      className="hover:text-primary hover:cursor-pointer"
-                      title="Edit quiz category"
-                      aria-label="Edit quiz category"
-                      onClick={() =>
-                        router.push(`/admin/quiz-categories/edit/${item.slug}`)
-                      }
-                    >
-                      <span className="sr-only">Edit Category</span>
-                      <PencilSquareIcon />
-                    </button>
                   </div>
                 </TableCell>
               </TableRow>

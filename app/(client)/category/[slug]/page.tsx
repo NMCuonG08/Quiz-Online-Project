@@ -1,13 +1,15 @@
+"use client";
 import React from "react";
-import ListQuizByCategory from "@/modules/client/category/ListQuizByCategory";
-import ClientLayout from "@/modules/client/common/layouts/ClientLayout";
 
-const page = () => {
+import ListQuizByCategory from "@/modules/client/category/ListQuizByCategory";
+
+const Page = () => {
   return (
-    <ClientLayout>
+    <div className="min-h-screen bg-background">
+      {/* Nội dung chính */}
       <ListQuizByCategory />
-    </ClientLayout>
+    </div>
   );
 };
 
-export default page;
+export default Page;

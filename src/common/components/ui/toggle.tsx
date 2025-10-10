@@ -11,9 +11,9 @@ const toggleVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-white dark:bg-black",
+        default: "bg-white dark:bg-gray-dark",
         outline:
-          "border border-input bg-white dark:bg-black shadow-xs hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-white dark:bg-gray-dark shadow-xs hover:bg-accent hover:text-accent-foreground",
       },
       size: {
         default: "h-9 px-2 min-w-9",

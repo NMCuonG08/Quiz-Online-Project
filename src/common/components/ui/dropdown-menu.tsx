@@ -42,7 +42,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "bg-white dark:bg-black text-popover-foreground border border-border rounded-md p-2 z-50 min-w-[8rem] overflow-hidden shadow-md",
+          "bg-white dark:bg-gray-dark text-popover-foreground border border-border rounded-md p-2 z-50 min-w-[8rem] overflow-hidden shadow-md",
           className
         )}
         {...props}

@@ -10,17 +10,17 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground border-2 border-primary hover:bg-primary/90 active:translate-x-0.5 active:translate-y-0.5",
+          "bg-primary text-primary-foreground border-1 border-primary hover:bg-primary/90 active:translate-x-0.5 active:translate-y-0.5",
         destructive:
-          "bg-destructive text-destructive-foreground border-2 border-destructive hover:bg-destructive/90 active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+          "bg-destructive text-destructive-foreground border-1 border-destructive hover:bg-destructive/90 active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         outline:
-          "border-2 border-input bg-background hover:bg-accent hover:text-accent-foreground active:translate-x-0.5 active:translate-y-0.5",
+          "border-1 border-input bg-background hover:bg-accent hover:text-accent-foreground active:translate-x-0.5 active:translate-y-0.5",
         secondary:
-          "bg-secondary text-secondary-foreground border-2 border-secondary hover:bg-secondary/80 active:translate-x-0.5 active:translate-y-0.5",
+          "bg-secondary text-secondary-foreground border-1 border-secondary hover:bg-secondary/80 active:translate-x-0.5 active:translate-y-0.5",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         shadowBorder:
-          "bg-background border-2 border-border active:translate-x-0.5 active:translate-y-0.5",
+          "bg-background border-1 border-border active:translate-x-0.5 active:translate-y-0.5",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -69,7 +69,7 @@ function Button({
         data-slot="button"
         className={cn(
           buttonVariants({ variant, size, className }),
-          "relative bg-white dark:bg-black z-10 hover:cursor-pointer transition-all duration-200"
+          "relative bg-white dark:bg-gray-dark z-10 hover:cursor-pointer transition-all duration-200"
         )}
         {...props}
       />

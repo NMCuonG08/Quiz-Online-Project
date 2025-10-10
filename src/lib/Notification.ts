@@ -12,6 +12,16 @@ export const Toast = Swal.mixin({
   timerProgressBar: true,
   color: "black",
   background: "#CFFCDF",
+  customClass: {
+    container: 'swal2-top-layer'
+  },
+  didOpen: () => {
+    // Set highest z-index for the container
+    const container = document.querySelector('.swal2-container') as HTMLElement;
+    if (container) {
+      container.style.setProperty('z-index', '999999', 'important');
+    }
+  },
 });
 
 export const showSuccess = (message: string) => {
@@ -74,7 +84,16 @@ export const showConfirm = (options: {
     cancelButtonText,
     reverseButtons: true,
     focusCancel: true,
+    customClass: {
+      container: 'swal2-top-layer'
+    },
     didOpen: () => {
+      // Set highest z-index for the container
+      const container = document.querySelector('.swal2-container') as HTMLElement;
+      if (container) {
+        container.style.setProperty('z-index', '999999', 'important');
+      }
+
       const confirmBtn = document.querySelector(
         ".swal2-confirm"
       ) as HTMLElement;
@@ -104,6 +123,34 @@ export const showConfirm = (options: {
           cancelButtonColor,
           "important"
         );
+      }
+    },
+  });
+};
+
+// Error Confirm (single OK button)
+export const showErrorConfirm = (message: string, title = "Error") => {
+  return Swal.fire({
+    title,
+    text: message,
+    icon: "error",
+    showConfirmButton: false,
+    showCancelButton: true,
+    cancelButtonText: "OK",
+    cancelButtonColor: "#d33",
+    buttonsStyling: true,
+    focusCancel: true,
+    reverseButtons: false,
+    allowEscapeKey: true,
+    allowOutsideClick: true,
+    customClass: {
+      container: 'swal2-top-layer'
+    },
+    didOpen: () => {
+      // Set highest z-index for the container
+      const container = document.querySelector('.swal2-container') as HTMLElement;
+      if (container) {
+        container.style.setProperty('z-index', '999999', 'important');
       }
     },
   });
@@ -145,7 +192,15 @@ export const showLoading = (title = "Processing...", text = "Please wait") => {
     allowOutsideClick: false,
     allowEscapeKey: false,
     showConfirmButton: false,
+    customClass: {
+      container: 'swal2-top-layer'
+    },
     didOpen: () => {
+      // Set highest z-index for the container
+      const container = document.querySelector('.swal2-container') as HTMLElement;
+      if (container) {
+        container.style.setProperty('z-index', '999999', 'important');
+      }
       Swal.showLoading();
     },
   });
@@ -187,6 +242,16 @@ export const showInputConfirm = (options: {
     showCancelButton: true,
     confirmButtonText,
     cancelButtonText,
+    customClass: {
+      container: 'swal2-top-layer'
+    },
+    didOpen: () => {
+      // Set highest z-index for the container
+      const container = document.querySelector('.swal2-container') as HTMLElement;
+      if (container) {
+        container.style.setProperty('z-index', '999999', 'important');
+      }
+    },
     inputValidator:
       inputValidator ||
       ((value) => {

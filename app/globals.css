@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@variant dark (.dark &);
 
 @theme inline {
   --font-comfortaa: Comfortaa, -apple-system, Roboto, Helvetica, sans-serif;
@@ -9,6 +9,17 @@
   --font-lato: Lato, -apple-system, Roboto, Helvetica, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* Tailwind v4 global gray palette */
+  --color-gray: #EFF4FB;
+  --color-gray-dark: #122031;
+  --color-gray-1: #F9FAFB;
+  --color-gray-2: #F3F4F6;
+  --color-gray-3: #E5E7EB;
+  --color-gray-4: #D1D5DB;
+  --color-gray-5: #9CA3AF;
+  --color-gray-6: #6B7280;
+  --color-gray-7: #374151;
+  --color-green-light: #d4ffcd;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -83,6 +94,8 @@
 }
 
 .dark {
+  /* Override tokens for dark mode so bg-gray auto-switches */
+  --color-gray: #122031;
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;
@@ -263,6 +276,24 @@ body {
   /* Internet Explorer 10+ */
   scrollbar-width: none;
   /* Firefox */
+}
+
+/* SweetAlert2 z-index fix */
+.swal2-container {
+  z-index: 999999 !important;
+}
+
+.swal2-top-layer {
+  z-index: 999999 !important;
+}
+
+/* Ensure dialogs stay below SweetAlert2 */
+[data-slot="dialog-overlay"] {
+  z-index: 40 !important;
+}
+
+[data-slot="dialog-content"] {
+  z-index: 40 !important;
 }
 
 .scrollbar-hide::-webkit-scrollbar {

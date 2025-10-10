@@ -86,7 +86,7 @@ const Div = React.forwardRef<HTMLDivElement, DivProps>(
           ref={ref}
           className={cn(
             divVariants({ variant, size, rounded }),
-            "relative z-10 bg-white dark:bg-black border-2 border-border transition-all duration-300 group-hover:scale-105",
+            "relative z-10 bg-white dark:bg-gray-dark border-1 border-border transition-all duration-300 group-hover:scale-105",
             className
           )}
           {...props}
