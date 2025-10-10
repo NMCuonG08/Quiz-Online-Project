@@ -96,4 +96,12 @@ export class CreateQuestionDto {
   })
   @IsOptional()
   settings?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Media file to upload (image, video, audio, etc.)',
+  })
+  @IsOptional()
+  media?: any;
 }

@@ -8,13 +8,14 @@ import {
   Patch,
   UseInterceptors,
   UploadedFile,
+  Delete,
 } from '@nestjs/common';
 import { CategoryService } from '../services/category.service';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dtos/category.dto';
 import { Authenticated } from '@/common/guards/auth.guard';
 import { Permission } from '@/common/enums';
 import { AuthGuard } from '@/common/guards/auth.guard';
-import { ApiConsumes, ApiOperation } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Category } from '@prisma/client';
 
@@ -62,5 +63,21 @@ export class CategoryController {
         iconFile?: Express.Multer.File,
       ) => Promise<Category>
     )(id, updateDto, icon);
+  }
+
+  @Delete(':id')
+  // @UseGuards(AuthGuard)
+  // @Authenticated({ permission: Permission.AdminUserDelete })
+  @ApiOperation({ summary: 'Delete a category by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully deleted category',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Category not found',
+  })
+  deleteCategory(@Param('id') id: string): Promise<string> {
+    return this.categoryService.deleteCategory(id);
   }
 }
