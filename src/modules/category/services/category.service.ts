@@ -54,7 +54,9 @@ export class CategoryService extends BaseService {
     (Category & { parent_name: string | null })[]
   > {
     const cacheKey = 'categories:all';
-
+    console.log('Fetching categories...');
+    const message = "Ban da thanh cong";
+    await this.eventRepository.emit('Notification', { userId: 'efb4349f-ac94-4950-b198-8cf7b4f661e3', message });
     // Thử lấy từ cache trước
     const cachedCategories = await this.redisService.get(cacheKey);
     if (cachedCategories) {

@@ -37,6 +37,8 @@ export class CategoryController {
     ) as unknown as Promise<Category>;
   }
 
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.ActivityRead })
   @Get()
   findAllCategories() {
     return this.categoryService.findAllCategories();

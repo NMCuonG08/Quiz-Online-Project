@@ -1,3 +1,4 @@
+import { Notification } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { BaseService } from '@/common/base/base.service';
 import {
@@ -241,5 +242,11 @@ export class NotificationService extends BaseService {
       payload.userId,
       payload.userId,
     );
+  }
+
+  @OnEvent({ name: 'Notification' })
+  notificationForUser({ userId, message }: ArgOf<'Notification'>) {
+    console.log('Sending notification to user:', userId, message);
+    this.eventRepository.clientSend('notification', userId, message);
   }
 }

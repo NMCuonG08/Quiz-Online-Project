@@ -3,7 +3,7 @@ import { UsersService } from './user.service';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ResourceNotFoundException } from '@/common/exceptions';
+import { ResourceNotFoundException } from '@/common/middlewares';
 import { createTestUser } from '../../../test/setup';
 
 describe('UsersService', () => {

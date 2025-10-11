@@ -1,3 +1,4 @@
+import { Notification } from '@prisma/client';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -43,7 +44,7 @@ type EventMap = {
   ];
   UserLogin: [{ userId: string }];
   ConfigValidate: [{ newConfig: SystemConfig; oldConfig: SystemConfig }];
-
+  Notification: [{ userId: string; message: string }];
   JobStart: [QueueName, JobItem];
   JobFailed: [{ job: JobItem; error: Error | any }];
   WebsocketConnect: [{ userId: string }];
@@ -69,6 +70,7 @@ export type AuthFn = (client: Socket) => Promise<AuthDto>;
 export interface ClientEventMap {
   on_user_delete: [string];
   on_asset_delete: [string];
+  notification: [string];
   //   on_asset_trash: [string[]];
   //   on_asset_hidden: [string];
   //   on_asset_restore: [string[]];
@@ -90,7 +92,7 @@ export class EventRepository
   implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
 {
   private emitHandlers: EmitHandlers = {};
-  private authFn?: AuthFn;
+  private static authFn?: AuthFn;
 
   @WebSocketServer()
   private server?: Server;
@@ -102,29 +104,38 @@ export class EventRepository
   ) {
     this.logger.setContext(EventRepository.name);
   }
-  setup({ services }: { services: ClassConstructor<unknown>[] }) {
-    const reflector = this.moduleRef.get(Reflector, { strict: false });
+  setup({
+    services,
+    moduleRef, // moduleRef từ bên ngoài truyền vào
+  }: {
+    services: ClassConstructor<unknown>[];
+    moduleRef?: ModuleRef;
+  }) {
+    // ✅ Ưu tiên dùng moduleRef từ ngoài, nếu không có thì dùng this.moduleRef
+    const targetModuleRef = moduleRef || this.moduleRef;
+
+    const reflector = targetModuleRef.get(Reflector, { strict: false });
     const items: Item<EmitEvent>[] = [];
     const worker = this.configRepository.getWorker();
+
     if (!worker) {
       throw new Error('Unable to determine worker type');
     }
 
-    // discovery
     for (const Service of services) {
-      const instance = this.moduleRef.get<any>(Service);
+      // ✅ Dùng targetModuleRef đã chọn ở trên
+      const instance = targetModuleRef.get<any>(Service, { strict: false });
+
       const ctx = Object.getPrototypeOf(instance);
       for (const property of Object.getOwnPropertyNames(ctx)) {
         const descriptor = Object.getOwnPropertyDescriptor(ctx, property);
         if (!descriptor || descriptor.get || descriptor.set) {
           continue;
         }
-
         const handler = instance[property];
         if (typeof handler !== 'function') {
           continue;
         }
-
         const event = reflector.get<EventConfig>(
           MetadataKey.EventConfig,
           handler,
@@ -132,12 +143,10 @@ export class EventRepository
         if (!event) {
           continue;
         }
-
         const workers = event.workers ?? Object.values(projectWorker);
         if (!workers.includes(worker)) {
           continue;
         }
-
         items.push({
           event: event.name,
           priority: event.priority || 0,
@@ -149,8 +158,6 @@ export class EventRepository
     }
 
     const handlers = _.orderBy(items, ['priority'], ['asc']);
-
-    // register by priority
     for (const handler of handlers) {
       this.addHandler(handler);
     }
@@ -242,15 +249,14 @@ export class EventRepository
     this.server?.serverSideEmit(event, ...args);
   }
 
-  setAuthFn(fn: (client: Socket) => Promise<AuthDto>) {
-    this.authFn = fn;
+  static setAuthFn(fn: AuthFn) {
+    EventRepository.authFn = fn;
   }
 
   private async authenticate(client: Socket) {
-    if (!this.authFn) {
+    if (!EventRepository.authFn) {
       throw new Error('Auth function not set');
     }
-
-    return this.authFn(client);
+    return EventRepository.authFn(client);
   }
 }

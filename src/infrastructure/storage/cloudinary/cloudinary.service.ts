@@ -7,7 +7,7 @@ import {
   NoFileProvidedException,
   InvalidFileTypeException,
   ExternalServiceException,
-} from '@/common/exceptions';
+} from '@/common/middlewares';
 
 @Injectable()
 export class CloudinaryService {

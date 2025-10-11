@@ -19,7 +19,6 @@ import { NotificationRepository } from '@/modules/notification/repositories/noti
 import { QuestionModule } from '@/modules/questions/question.module';
 import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
 import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
-
 @Module({
   imports: [
     PrismaModule,
@@ -27,6 +26,7 @@ import { QuestionOptionRepository } from '@/modules/questions/repositories/quest
     RedisModule,
     forwardRef(() => QuestionModule),
     GuardsModule,
+
     forwardRef(() => AuthModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
