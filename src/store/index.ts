@@ -2,7 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { persistStore, persistReducer } from "redux-persist";
 import storage from "@/lib/storage";
 import rootReducer from "./rootReducer";
-
+import { websocketMiddleware } from "@/common/middlewares/websocket.middleware";
 // Main persist config - auth persistence is handled in rootReducer
 const persistConfig = {
   key: "root",
@@ -19,7 +19,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: ["persist/PERSIST", "persist/REHYDRATE"],
       },
-    }),
+    }).concat(websocketMiddleware.middleware),
 });
 
 // Register store globally for API client access

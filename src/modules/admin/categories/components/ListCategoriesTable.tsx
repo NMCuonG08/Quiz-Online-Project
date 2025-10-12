@@ -33,7 +33,7 @@ const ListCategoriesTable = () => {
     return <div>Loading...</div>;
   }
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>Error: {String(error)}</div>;
   }
   if (categories.length === 0) {
     return <div>No categories found</div>;

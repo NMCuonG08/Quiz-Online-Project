@@ -63,7 +63,7 @@ export function TextAreaGroup({
         {icon}
       </div>
 
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-500">{String(error)}</p>}
     </div>
   );
 }

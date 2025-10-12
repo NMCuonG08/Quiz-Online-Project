@@ -6,6 +6,7 @@ import {
   restoreAuth,
   forceLogout,
 } from "@/modules/auth/common/slices/authSlice";
+import { initWebSocket } from "@/common/middlewares/websocket.middleware";
 
 /**
  * Component to restore auth state from localStorage on app startup
@@ -23,6 +24,11 @@ export default function AuthRestorer({
     // Always try to restore auth state on mount
     // This ensures we have the latest state from sessionStorage
     dispatch(restoreAuth());
+
+    // Trigger WebSocket initialization after auth restore
+    setTimeout(() => {
+      dispatch(initWebSocket());
+    }, 100);
   }, [dispatch]);
 
   // Force logout if isAuthenticated but no token

@@ -51,7 +51,7 @@ const AddQuestionModal: React.FC<Props> = ({
 
   const handleAddOption = () => {
     const newOption: QuestionOption = {
-      id: `temp-${Date.now()}`,
+      id: `temp-${Math.random().toString(36).substr(2, 9)}`,
       question_id: "",
       option_text: "",
       is_correct: false,

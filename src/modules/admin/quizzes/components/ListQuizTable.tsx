@@ -34,7 +34,7 @@ const ListQuizTable = () => {
   }, [getQuizzes, currentPage, pageSize]);
 
   if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (error) return <div>Error: {String(error)}</div>;
   if (!quizzes || quizzes.length === 0) return <div>No quizzes found</div>;
 
   return (

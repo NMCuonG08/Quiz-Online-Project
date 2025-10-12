@@ -103,7 +103,7 @@ const CategoryCarousel = () => {
         )}
         {error && (
           <p className="text-center text-sm text-red-600 dark:text-red-400">
-            Lỗi: {error}
+            Lỗi: {String(error)}
           </p>
         )}
       </div>

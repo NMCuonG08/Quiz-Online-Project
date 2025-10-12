@@ -4,6 +4,9 @@ import "./globals.css";
 import { ThemeProvider } from "@/common/contexts/ThemeContext";
 import ReduxProvider from "@/common/contexts/ReduxProvider";
 import AuthRestorer from "@/common/contexts/AuthRestorer";
+import { NotificationContainer } from "@/common/components/NotificationContainer";
+import ClientOnly from "@/common/contexts/ClientOnly";
+import { WebSocketDebugger } from "@/components/WebSocketDebugger";
 
 const comfortaa = Comfortaa({
   variable: "--font-comfortaa",
@@ -38,11 +41,13 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${comfortaa.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
           <ReduxProvider>
             <AuthRestorer>{children}</AuthRestorer>
+            <NotificationContainer />
+            <ClientOnly>{/* <WebSocketDebugger /> */}</ClientOnly>
           </ReduxProvider>
         </ThemeProvider>
       </body>
