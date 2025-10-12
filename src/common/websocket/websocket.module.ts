@@ -4,17 +4,16 @@ import { EventRepository } from '@/common/repositories/event.repository';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { CommonRepositoriesModule } from '@/common/repositories/common-repositories.module';
 import { NotificationModule } from '@/modules/notification/notification.module';
+import { CategoryModule } from '@/modules/category/category.module';
 
 @Module({
-  imports: [CommonRepositoriesModule, AuthModule, NotificationModule],
-  providers: [
-    WebSocketSetupService,
-    {
-      provide: 'EVENT_REPOSITORY',
-      useExisting: EventRepository,
-    },
-    EventRepository,
+  imports: [
+    CommonRepositoriesModule,
+    AuthModule,
+    NotificationModule,
+    CategoryModule,
   ],
-  exports: ['EVENT_REPOSITORY'],
+  providers: [WebSocketSetupService],
+  exports: [],
 })
 export class WebSocketModule {}

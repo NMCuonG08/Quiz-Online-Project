@@ -103,6 +103,9 @@ export class EventRepository
     private logger: LoggingRepository,
   ) {
     this.logger.setContext(EventRepository.name);
+    console.log(
+      `🏗️ EventRepository constructor called, instance ID: ${Math.random().toString(36).substr(2, 9)}`,
+    );
   }
   setup({
     services,
@@ -111,6 +114,11 @@ export class EventRepository
     services: ClassConstructor<unknown>[];
     moduleRef?: ModuleRef;
   }) {
+    console.log(
+      '🔧 EventRepository.setup called with services:',
+      services.map((s) => s.name),
+    );
+
     // ✅ Ưu tiên dùng moduleRef từ ngoài, nếu không có thì dùng this.moduleRef
     const targetModuleRef = moduleRef || this.moduleRef;
 
@@ -123,10 +131,18 @@ export class EventRepository
     }
 
     for (const Service of services) {
+      console.log(`🔍 Processing service: ${Service.name}`);
+
       // ✅ Dùng targetModuleRef đã chọn ở trên
       const instance = targetModuleRef.get<any>(Service, { strict: false });
+      console.log(`📦 Service instance:`, !!instance);
 
       const ctx = Object.getPrototypeOf(instance);
+      console.log(
+        `🔍 Service prototype methods:`,
+        Object.getOwnPropertyNames(ctx),
+      );
+
       for (const property of Object.getOwnPropertyNames(ctx)) {
         const descriptor = Object.getOwnPropertyDescriptor(ctx, property);
         if (!descriptor || descriptor.get || descriptor.set) {
@@ -136,15 +152,26 @@ export class EventRepository
         if (typeof handler !== 'function') {
           continue;
         }
+        console.log(`🔍 Checking method: ${Service.name}.${property}`);
+
         const event = reflector.get<EventConfig>(
           MetadataKey.EventConfig,
           handler,
         );
+        console.log(`🔍 Metadata for ${Service.name}.${property}:`, !!event);
+
         if (!event) {
           continue;
         }
+        console.log(
+          `🎯 Found event handler: ${Service.name}.${property} for event: ${event.name}`,
+        );
+
         const workers = event.workers ?? Object.values(projectWorker);
         if (!workers.includes(worker)) {
+          console.log(
+            `⏭️ Skipping handler ${Service.name}.${property} - worker mismatch`,
+          );
           continue;
         }
         items.push({
@@ -157,10 +184,14 @@ export class EventRepository
       }
     }
 
+    console.log(`📊 Total handlers found: ${items.length}`);
     const handlers = _.orderBy(items, ['priority'], ['asc']);
     for (const handler of handlers) {
       this.addHandler(handler);
     }
+
+    console.log('✅ EventRepository setup completed');
+    console.log('📋 All registered handlers:', Object.keys(this.emitHandlers));
   }
   afterInit(server: Server) {
     this.logger.log('Initialized websocket server');
@@ -207,9 +238,16 @@ export class EventRepository
     }
 
     this.emitHandlers[event].push(item);
+    console.log(
+      `📝 Added handler for event: ${event}, total handlers: ${this.emitHandlers[event].length}`,
+    );
   }
 
   emit<T extends EmitEvent>(event: T, ...args: ArgsOf<T>): Promise<void> {
+    console.log(
+      `🚀 EventRepository.emit called for: ${event}, instance handlers:`,
+      Object.keys(this.emitHandlers),
+    );
     return this.onEvent({ name: event, args, server: false });
   }
 
@@ -218,14 +256,29 @@ export class EventRepository
     args: ArgsOf<T>;
     server: boolean;
   }): Promise<void> {
+    console.log(
+      `🔍 EventRepository.onEvent called for: ${event.name}`,
+      event.args,
+    );
     const handlers = this.emitHandlers[event.name] || [];
+    console.log(`📊 Found ${handlers.length} handlers for event ${event.name}`);
+
     for (const { handler, server } of handlers) {
+      console.log(
+        `🎯 Executing handler, server: ${server}, event.server: ${event.server}`,
+      );
       // exclude handlers that ignore server events
       if (!server && event.server) {
+        console.log(`⏭️ Skipping handler because it's not a server handler`);
         continue;
       }
 
-      await handler(...event.args);
+      try {
+        await handler(...event.args);
+        console.log(`✅ Handler executed successfully`);
+      } catch (error) {
+        console.error(`❌ Handler failed:`, error);
+      }
     }
   }
 
@@ -234,6 +287,10 @@ export class EventRepository
     room: string,
     ...data: ClientEventMap[T]
   ) {
+    console.log(`🔍 EventRepository.clientSend called for: ${event}`);
+    console.log(`🔍 Data:`, data);
+    console.log(`🔍 Room:`, room);
+    console.log(`🔍 Event:`, event);
     this.server?.to(room).emit(event, ...data);
   }
 
@@ -241,6 +298,8 @@ export class EventRepository
     event: T,
     ...data: ClientEventMap[T]
   ) {
+    console.log(`🔍 EventRepository.clientBroadcast called for: ${event}`);
+    console.log(`🔍 Data:`, data);
     this.server?.emit(event, ...data);
   }
 

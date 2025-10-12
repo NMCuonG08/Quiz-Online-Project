@@ -4,6 +4,7 @@ import { LoggingRepository } from './logging.repository';
 import { CryptoRepository } from './crypto.repository';
 import { ConfigRepository } from './config.repository';
 import { MockEventRepository } from './mock-event.repository';
+import { EventRepository } from './event.repository';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { IWorker } from '@/common/constants';
 import { projectWorker } from '@/common/enums';
@@ -29,12 +30,14 @@ import { projectWorker } from '@/common/enums';
     CryptoRepository,
     ConfigRepository,
     MockEventRepository,
+    EventRepository,
   ],
   exports: [
     LoggingRepository,
     CryptoRepository,
     ConfigRepository,
     MockEventRepository,
+    EventRepository,
   ],
 })
 export class CommonRepositoriesModule {}

@@ -11,8 +11,7 @@ import { Socket } from 'socket.io';
 import { AuthDto } from '@/modules/auth/dto';
 import { LazyModuleLoader, ModuleRef } from '@nestjs/core';
 import { NotificationService } from '@/modules/notification/services/notification.service';
-import { ClassConstructor } from 'class-transformer';
-import { NotificationModule } from '@/modules/notification/notification.module';
+import { CategoryService } from '@/modules/category/services/category.service';
 
 @Injectable()
 export class WebSocketSetupService
@@ -35,19 +34,33 @@ export class WebSocketSetupService
   }
 
   onModuleInit(): void {
+    this.logger.log('🔧 WebSocketSetupService onModuleInit called');
     // Setup EventRepository after module initialization
     this.setupEventRepository();
   }
 
   private setupEventRepository(): void {
     try {
-      // ✅ Chỉ cần pass class
+      console.log('🔧 WebSocketSetupService.setupEventRepository called');
+      console.log('🔧 Setting up EventRepository with services:', [
+        NotificationService.name,
+        CategoryService.name,
+      ]);
+
+      // ✅ Pass class và moduleRef để EventRepository có thể tìm thấy service instances
       this.eventRepository.setup({
-        services: [NotificationService],
+        services: [NotificationService, CategoryService],
+        moduleRef: this.moduleRef,
       });
+
+      console.log('✅ WebSocket EventRepository setup completed');
       this.logger.log('✅ WebSocket EventRepository setup completed');
     } catch (error) {
-      this.logger.error('❌ Failed to setup EventRepository:', error.message);
+      console.error('❌ Failed to setup EventRepository:', error);
+      this.logger.error(
+        '❌ Failed to setup EventRepository:',
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 

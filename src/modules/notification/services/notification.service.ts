@@ -246,7 +246,9 @@ export class NotificationService extends BaseService {
 
   @OnEvent({ name: 'Notification' })
   notificationForUser({ userId, message }: ArgOf<'Notification'>) {
+    console.log('🎯 NotificationService.notificationForUser called!');
     console.log('Sending notification to user:', userId, message);
-    this.eventRepository.clientSend('notification', userId, message);
+    // this.eventRepository.clientSend('notification', userId, message);
+    this.eventRepository.clientBroadcast('notification', message);
   }
 }
