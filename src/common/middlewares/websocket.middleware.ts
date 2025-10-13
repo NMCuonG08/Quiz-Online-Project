@@ -109,7 +109,7 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
 
     // Auto-reconnect với exponential backoff
     setTimeout(() => {
-      const token = localStorage.getItem("accessToken");
+      const token = localStorage.getItem("auth_token");
       if (token) {
         connectWebSocketWithRetry(dispatch, token);
       }

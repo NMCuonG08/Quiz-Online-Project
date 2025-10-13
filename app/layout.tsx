@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Comfortaa } from "next/font/google";
 import "./globals.css";
+import "@/styles/input-selection.css";
 import { ThemeProvider } from "@/common/contexts/ThemeContext";
 import ReduxProvider from "@/common/contexts/ReduxProvider";
 import AuthRestorer from "@/common/contexts/AuthRestorer";

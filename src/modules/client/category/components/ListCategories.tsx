@@ -126,14 +126,22 @@ const CategoryCarousel = () => {
                 className="block text-center"
               >
                 <div className="relative mx-auto mb-2 w-14 h-14 rounded-full overflow-hidden ring-1 ring-gray-200 dark:ring-gray-700 bg-white dark:bg-gray-800 flex items-center justify-center">
-                  <Image
-                    src={category.icon_url}
-                    alt={category.name}
-                    fill
-                    className="object-cover"
-                    sizes="56px"
-                    onError={handleImageError}
-                  />
+                  {category.icon_url ? (
+                    <Image
+                      src={category.icon_url}
+                      alt={category.name}
+                      fill
+                      className="object-cover"
+                      sizes="56px"
+                      onError={handleImageError}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-600">
+                      <div className="text-gray-500 dark:text-gray-400 text-lg">
+                        📚
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <h3 className="font-medium text-sm text-center">
                   {category.name}

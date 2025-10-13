@@ -1,0 +1,95 @@
+/* Global text selection styles for client modules */
+
+/* Input fields - all types */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+input[type="text"] {
+
+    /* Text selection styles */
+    &::selection {
+        background-color: #f59e0b !important;
+        /* Blue color */
+        color: white !important;
+    }
+
+    &::-moz-selection {
+        background-color: #f59e0b !important;
+        /* Blue color */
+        color: white !important;
+    }
+}
+
+/* Textarea fields */
+textarea {
+    &::selection {
+        background-color: #f59e0b !important;
+        /* Blue color */
+        color: white !important;
+    }
+
+    &::-moz-selection {
+        background-color: #f59e0b !important;
+        /* Blue color */
+        color: white !important;
+    }
+}
+
+/* ContentEditable elements */
+[contenteditable="true"] {
+    &::selection {
+        background-color: #f59e0b !important;
+        /* Blue color */
+        color: white !important;
+    }
+
+    &::-moz-selection {
+        background-color: #f59e0b !important;
+        /* Blue color */
+        color: white !important;
+    }
+}
+
+/* Universal fallback for any input-like elements */
+input,
+textarea,
+[contenteditable="true"] {
+
+    /* Ensure selection is visible with high specificity */
+    &::selection {
+        background-color: #f59e0b !important;
+        /* Blue fallback */
+        color: white !important;
+    }
+
+    &::-moz-selection {
+        background-color: #f59e0b !important;
+        /* Blue fallback */
+        color: white !important;
+    }
+}
+
+/* Additional specificity for form elements */
+form input,
+form textarea,
+.input,
+.textarea {
+    &::selection {
+        background-color: #f59e0b !important;
+        color: white !important;
+    }
+
+    &::-moz-selection {
+        background-color: #f59e0b !important;
+        color: white !important;
+    }
+}

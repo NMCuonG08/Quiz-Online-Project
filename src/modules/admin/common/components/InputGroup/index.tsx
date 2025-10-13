@@ -62,6 +62,8 @@ const InputGroup: React.FC<InputGroupProps> = ({
           defaultValue={props.defaultValue}
           className={cn(
             "w-full rounded-lg border-[1.5px] bg-transparent outline-none transition disabled:cursor-default disabled:bg-gray-2 data-[active=true]:border-primary dark:bg-[#122031] dark:disabled:bg-[#122031] dark:data-[active=true]:border-primary",
+            // Text selection styles
+            "selection:bg-orange-500 selection:text-white",
             props.error
               ? "border-destructive focus:border-destructive dark:border-destructive"
               : "border-stroke focus:border-primary dark:border-dark-3 dark:focus:border-primary",

@@ -4,6 +4,7 @@ import categoryReducer from "@/modules/client/category/slices/category.slice";
 import adminCategoryReducer from "@/modules/admin/categories/slices/admin.category.slice";
 import adminQuizReducer from "@/modules/admin/quizzes/slices/admin.quiz.slice";
 import adminQuestionReducer from "@/modules/admin/questions/slices/admin.question.slice";
+import clientQuizReducer from "@/modules/client/category/slices/client.quiz.slice";
 import websocketReducer from "@/common/slices/websocket.slice";
 import notificationReducer from "@/common/slices/notification.slice";
 // Temporarily disable persistence for auth slice to test logout
@@ -23,6 +24,7 @@ const rootReducer = combineReducers({
   adminCategory: adminCategoryReducer,
   adminQuiz: adminQuizReducer,
   adminQuestion: adminQuestionReducer,
+  clientQuiz: clientQuizReducer,
   websocket: websocketReducer,
   notifications: notificationReducer,
 });

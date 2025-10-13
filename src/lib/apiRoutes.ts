@@ -14,6 +14,14 @@ export const apiRoutes = {
     CREATE: "/api/quizzes",
     UPDATE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
     DELETE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
+    // Client quiz endpoints
+    BEST_RATED: "/api/quizzes/best-rated",
+    RECENTLY_PUBLISHED: "/api/quizzes/recently-published",
+    POPULAR: "/api/quizzes/popular",
+    EASY: "/api/quizzes/easy",
+    HARD: "/api/quizzes/hard",
+    BY_DIFFICULTY: (difficulty: string) =>
+      `/api/quizzes/difficulty/${difficulty}`,
   },
   QUESTIONS: {
     BASE: "/api/questions",
