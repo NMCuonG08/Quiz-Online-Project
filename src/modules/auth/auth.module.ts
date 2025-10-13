@@ -8,7 +8,7 @@ import { AuthCacheService } from './services/auth-cache.service';
 import { GuardsModule } from '@/common/guards/guards.module';
 
 @Module({
-  imports: [BaseModule, forwardRef(() => GuardsModule)],
+  imports: [forwardRef(() => BaseModule), GuardsModule],
   controllers: [AuthController],
   providers: [
     AuthService,

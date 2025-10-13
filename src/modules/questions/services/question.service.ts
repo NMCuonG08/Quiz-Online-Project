@@ -14,65 +14,9 @@ import {
   DifficultyLevelEnum,
   MediaTypeEnum,
 } from '@/common/enums';
-import { QuestionRepository } from '../repositories/question.repository';
-import { QuestionOptionRepository } from '../repositories/question-option.repository';
-import { QuizRepository } from '@/modules/quizz/repositories/quiz.repository';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { LoggingRepository } from '@/common/repositories/logging.repository';
-import { UserRepository } from '@/modules/user/repositories/user.repository';
-import { CryptoRepository } from '@/common/repositories/crypto.repository';
-import { CategoryRepository } from '@/modules/category/repositories/category.repository';
-import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
-import { JobRepository } from '@/common/repositories/job.repository';
-import { RedisService } from '@/infrastructure/cache/redis/redis.service';
-import { AuthCacheService } from '@/modules/auth/services/auth-cache.service';
-import { EmailRepository } from '@/common/repositories/email.repository';
-import { EventRepository } from '@/common/repositories/event.repository';
-import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
-import { PrismaService } from '@/infrastructure/database/prisma.service';
 
 @Injectable()
 export class QuestionService extends BaseService {
-  constructor(
-    jwtService: JwtService,
-    configService: ConfigService,
-    logger: LoggingRepository,
-    userRepository: UserRepository,
-    quizRepository: QuizRepository,
-    cryptoRepository: CryptoRepository,
-    categoryRepository: CategoryRepository,
-    cloudinaryService: CloudinaryService,
-    jobRepository: JobRepository,
-    redisService: RedisService,
-    authCacheService: AuthCacheService,
-    emailRepository: EmailRepository,
-    eventRepository: EventRepository,
-    notificationRepository: NotificationRepository,
-    prisma: PrismaService,
-    questionRepository: QuestionRepository,
-    questionOptionRepository: QuestionOptionRepository,
-  ) {
-    super(
-      jwtService,
-      configService,
-      logger,
-      userRepository,
-      quizRepository,
-      cryptoRepository,
-      categoryRepository,
-      cloudinaryService,
-      jobRepository,
-      redisService,
-      authCacheService,
-      emailRepository,
-      eventRepository,
-      notificationRepository,
-      prisma,
-      questionRepository,
-      questionOptionRepository,
-    );
-  }
   async getQuestions(
     paginationQuery: QuestionPaginationQueryDto,
   ): Promise<PaginatedResponseDto<QuestionResponseDto>> {

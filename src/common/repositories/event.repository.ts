@@ -269,6 +269,21 @@ export class EventRepository
     this.server?.emit(event, ...data);
   }
 
+  async joinUserToRoom(userId: string, room: string): Promise<void> {
+    // Fetch all sockets currently in the user's personal room (userId)
+    const sockets = await this.server?.in(userId).fetchSockets();
+    if (!sockets || sockets.length === 0) return;
+    for (const socket of sockets) {
+      await socket.join(room);
+    }
+  }
+
+  async listSocketsInRoom(room: string): Promise<string[]> {
+    const sockets = await this.server?.in(room).fetchSockets();
+    if (!sockets) return [];
+    return sockets.map((s) => s.id);
+  }
+
   serverSend<T extends ServerEvents>(event: T, ...args: ArgsOf<T>): void {
     this.logger.debug(`Server event: ${event} (send)`);
     this.server?.serverSideEmit(event, ...args);

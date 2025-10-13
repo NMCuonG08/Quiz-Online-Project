@@ -16,6 +16,7 @@ import { NotificationRepository } from '@/modules/notification/repositories/noti
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
 import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
+import { RoomRepository } from '@/modules/room-play/repositories/room.repository';
 
 @Injectable()
 export abstract class BaseService {
@@ -34,6 +35,7 @@ export abstract class BaseService {
     protected readonly emailRepository: EmailRepository,
     protected readonly eventRepository: EventRepository,
     protected readonly notificationRepository: NotificationRepository,
+    protected readonly roomRepository: RoomRepository,
     protected readonly prisma: PrismaService,
     protected readonly questionRepository: QuestionRepository,
     protected readonly questionOptionRepository: QuestionOptionRepository,
