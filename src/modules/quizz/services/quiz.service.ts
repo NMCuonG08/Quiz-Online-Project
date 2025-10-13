@@ -47,6 +47,97 @@ export class QuizService extends BaseService {
     );
   }
 
+  // Search methods by different criteria
+  async getRecentlyPublishedQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result =
+      await this.quizRepository.getRecentlyPublishedQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getBestRatedQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result =
+      await this.quizRepository.getBestRatedQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getPopularQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.getPopularQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getEasyQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.getEasyQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getHardQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.getHardQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async searchQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.searchQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getQuizzesByDifficulty(
+    difficulty: 'easy' | 'medium' | 'hard',
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.paginateWithRelations({
+      ...paginationQuery,
+      difficulty,
+    });
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
   async getQuizBySlug(slug: string): Promise<QuizResponseDto> {
     const result = await this.quizRepository.findBySlug(slug);
     if (!result) {
@@ -86,7 +177,7 @@ export class QuizService extends BaseService {
 
   async updateQuiz(
     id: string,
-    updateData: any,
+    updateData: Record<string, any>,
     creatorId: string,
     thumbnail?: Express.Multer.File,
   ): Promise<QuizResponseDto> {
@@ -101,7 +192,7 @@ export class QuizService extends BaseService {
     }
 
     // Check slug availability if slug is being updated
-    if (updateData.slug) {
+    if (updateData.slug && typeof updateData.slug === 'string') {
       const isSlugAvailable = await this.quizRepository.isSlugAvailable(
         updateData.slug,
         id,

@@ -94,9 +94,9 @@ export class WebSocketSetupService
         );
       }
     }
-    // If token invalid, try refreshToken from cookie
+    // If token invalid, try __refreshToken from cookie
     const cookie = client.handshake.headers.cookie || '';
-    const refreshMatch = cookie.match(/refreshToken=([^;]+)/);
+    const refreshMatch = cookie.match(/__refreshToken=([^;]+)/);
     const refreshToken = refreshMatch ? refreshMatch[1] : null;
     if (refreshToken) {
       try {

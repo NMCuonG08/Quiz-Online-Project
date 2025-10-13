@@ -34,6 +34,7 @@ model User {
   feedback            Feedback[]
   leaderboards        Leaderboard[]
   userStatistics      UserStatistics?
+  quizRatings         QuizRating[]
 
   // relations
   // consolidated user role relations handled by `userRoles`
@@ -153,6 +154,9 @@ model Quiz {
   thumbnail_id     String?         @db.Uuid
   tags             String[]        @default([])
   settings         Json            @default("{}")
+  // Rating fields
+  average_rating   Float           @default(0.0)
+  total_ratings    Int             @default(0)
   created_at       DateTime        @default(now())
   updated_at       DateTime        @updatedAt
   published_at     DateTime?
@@ -167,6 +171,7 @@ model Quiz {
   cache        QuizCache[]
   leaderboards Leaderboard[]
   Feedback     Feedback[]
+  ratings      QuizRating[]
 
   @@index([category_id])
   @@index([creator_id])
@@ -569,6 +574,25 @@ model Leaderboard {
   @@index([quiz_id, rank_position])
   @@index([category_id, rank_position])
   @@map("leaderboards")
+}
+
+model QuizRating {
+  id         String   @id @default(uuid()) @db.Uuid
+  quiz_id    String   @db.Uuid
+  user_id    String   @db.Uuid
+  rating     Int      @db.SmallInt // 1-5 stars
+  comment    String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  quiz Quiz @relation(fields: [quiz_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([quiz_id, user_id])
+  @@index([quiz_id])
+  @@index([user_id])
+  @@index([rating])
+  @@map("quiz_ratings")
 }
 
 // Enums

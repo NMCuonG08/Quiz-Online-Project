@@ -29,8 +29,8 @@ export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
   @Get()
-  @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizRead })
+  // @UseGuards(AuthGuard)
+  // @Authenticated({ permission: Permission.QuizRead })
   @ApiOperation({ summary: 'Get all quizzes with pagination' })
   @ApiResponse({
     status: 200,
@@ -88,6 +88,91 @@ export class QuizController {
   ): Promise<PaginatedResponseDto<QuizResponseDto>> {
     console.log(categoryId);
     return this.quizService.getQuizzesByCategory(categoryId, paginationQuery);
+  }
+
+  @Get('recently-published')
+  @ApiOperation({ summary: 'Get recently published quizzes' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved recently published quizzes',
+  })
+  async getRecentlyPublishedQuizzes(
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    return this.quizService.getRecentlyPublishedQuizzes(paginationQuery);
+  }
+
+  @Get('best-rated')
+  @ApiOperation({ summary: 'Get best rated quizzes' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved best rated quizzes',
+  })
+  async getBestRatedQuizzes(
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    return this.quizService.getBestRatedQuizzes(paginationQuery);
+  }
+
+  @Get('popular')
+  @ApiOperation({ summary: 'Get popular quizzes' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved popular quizzes',
+  })
+  async getPopularQuizzes(
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    return this.quizService.getPopularQuizzes(paginationQuery);
+  }
+
+  @Get('easy')
+  @ApiOperation({ summary: 'Get easy quizzes' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved easy quizzes',
+  })
+  async getEasyQuizzes(
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    return this.quizService.getEasyQuizzes(paginationQuery);
+  }
+
+  @Get('hard')
+  @ApiOperation({ summary: 'Get hard quizzes' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved hard quizzes',
+  })
+  async getHardQuizzes(
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    return this.quizService.getHardQuizzes(paginationQuery);
+  }
+
+  @Get('difficulty/:difficulty')
+  @ApiOperation({ summary: 'Get quizzes by difficulty level' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved quizzes by difficulty',
+  })
+  async getQuizzesByDifficulty(
+    @Param('difficulty') difficulty: 'easy' | 'medium' | 'hard',
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    return this.quizService.getQuizzesByDifficulty(difficulty, paginationQuery);
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search quizzes with filters' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully searched quizzes',
+  })
+  async searchQuizzes(
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    return this.quizService.searchQuizzes(paginationQuery);
   }
 
   @ApiOperation({

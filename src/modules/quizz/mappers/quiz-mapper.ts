@@ -14,12 +14,18 @@ interface QuizWithRelations {
   is_active: boolean;
   quiz_type: string;
   tags: string[];
+  average_rating: number;
+  total_ratings: number;
   created_at: Date;
   updated_at: Date;
   published_at?: Date | null;
   instructions?: string | null;
   category?: { name: string } | null;
-  creator?: { id: string } | null;
+  creator?: {
+    id: string;
+    username?: string | null;
+    full_name?: string | null;
+  } | null;
   thumbnail?: { url: string } | null;
   _count?: { questions: number; attempts: number } | null;
 }
@@ -30,22 +36,22 @@ export function mapQuizToResponseDto(quiz: QuizWithRelations): QuizResponseDto {
     title: quiz.title,
     slug: quiz.slug,
     description: quiz.description || undefined,
-    category_id: quiz.category_id,
-    creator_id: quiz.creator_id,
     difficulty_level: quiz.difficulty_level,
     time_limit: quiz.time_limit || undefined,
     max_attempts: quiz.max_attempts,
     passing_score: quiz.passing_score,
-
     is_active: quiz.is_active,
     quiz_type: quiz.quiz_type,
     tags: quiz.tags,
+    average_rating: quiz.average_rating,
+    total_ratings: quiz.total_ratings,
     created_at: quiz.created_at,
     updated_at: quiz.updated_at,
     published_at: quiz.published_at || undefined,
     instructions: quiz.instructions || undefined,
     // Flattened fields
     category_name: quiz.category?.name || null,
+    creator_name: quiz.creator?.full_name || quiz.creator?.username || null,
     thumbnail_url: quiz.thumbnail?.url || null,
     questions_count: quiz._count?.questions || 0,
     attempts_count: quiz._count?.attempts || 0,

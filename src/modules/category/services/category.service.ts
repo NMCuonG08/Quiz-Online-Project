@@ -50,15 +50,15 @@ export class CategoryService extends BaseService {
     } as unknown as Category;
   }
 
-  async findAllCategories(): Promise<
-    (Category & { parent_name: string | null })[]
-  > {
+  async findAllCategories(
+    userId: string,
+  ): Promise<(Category & { parent_name: string | null })[]> {
     const cacheKey = 'categories:all';
     console.log('Fetching categories...');
     const message = 'Lấy toàn bộ categories thành công';
 
     await this.eventRepository.emit('Notification', {
-      userId: 'efb4349f-ac94-4950-b198-8cf7b4f661e3',
+      userId,
       message,
     });
     // Thử lấy từ cache trước
