@@ -212,7 +212,7 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 lg:p-8 bg-background">
+    <div className="flex-1 flex items-start justify-start lg:items-center lg:justify-center p-4 lg:p-8 bg-background">
       <div className="w-full max-w-md">
         {/* Top Section */}
         <div className="mb-10">

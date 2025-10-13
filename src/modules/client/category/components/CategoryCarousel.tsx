@@ -73,12 +73,15 @@ const QuizCard: React.FC<QuizCardProps> = ({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer">
       <div className="relative">
         {imageError ? (
-          <div className="w-full h-40 sm:h-44 md:h-48 bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-            <div className="text-center text-gray-500 dark:text-gray-400">
-              <div className="text-4xl mb-2">📚</div>
-              <div className="text-xs">No Image</div>
-            </div>
-          </div>
+          <Image
+            src="/404not-found.jpg"
+            alt="Not Found"
+            width={300}
+            height={200}
+            className="w-full h-40 sm:h-44 md:h-48 object-cover"
+            // Avoid infinite loop if /404not-found is also broken
+            onError={undefined}
+          />
         ) : (
           <Image
             src={thumbnail_url}
@@ -100,7 +103,7 @@ const QuizCard: React.FC<QuizCardProps> = ({
         {/* Difficulty badge */}
         {(difficulty || difficulty_level) && (
           <div
-            className={`absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-semibold text-white border border-black ${getDifficultyColor(
+            className={`absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-semibold text-white border border-black whitespace-nowrap ${getDifficultyColor(
               difficulty || difficulty_level
             )}`}
           >
@@ -110,14 +113,16 @@ const QuizCard: React.FC<QuizCardProps> = ({
 
         {/* Quiz type badge */}
         {quiz_type && (
-          <div className="absolute bottom-2 right-2 px-2 py-1 rounded text-xs font-semibold text-white bg-purple-500/80 backdrop-blur-sm">
+          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-semibold text-white bg-purple-500/80 backdrop-blur-sm whitespace-nowrap">
             {quiz_type}
           </div>
         )}
       </div>
       <div className="p-3 sm:p-4">
-        <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-xs sm:text-sm mb-2 h-8 sm:h-10 flex items-center overflow-hidden">
-          <span className="line-clamp-2 leading-4 sm:leading-5">{title}</span>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-xs sm:text-sm mb-2 h-6 sm:h-9 flex items-center overflow-hidden">
+          <span className="line-clamp-1 truncate whitespace-nowrap leading-5 sm:leading-5">
+            {title}
+          </span>
         </h3>
 
         {/* Time ago */}
@@ -128,14 +133,14 @@ const QuizCard: React.FC<QuizCardProps> = ({
           </div>
         )}
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-1">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center space-x-1 flex-shrink-0">
             <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            <span className="text-[11px] sm:text-xs font-medium text-gray-700 dark:text-gray-300">
               {formatRating(average_rating, total_ratings)}
             </span>
           </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400 truncate ml-2">
+          <span className="flex-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 truncate text-right ml-2 min-w-0">
             By {creator_name}
           </span>
         </div>

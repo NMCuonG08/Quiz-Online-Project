@@ -19,7 +19,9 @@ import {
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/modules/auth/common/hooks/useAuth";
-import { showError } from "@/lib/Notification";
+import { showError, showSuccess } from "@/lib/Notification";
+import { useAppDispatch } from "@/hooks/useRedux";
+import { loginWithGoogleCode } from "@/modules/auth/common/slices/authSlice";
 
 const RegisterForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -27,6 +29,7 @@ const RegisterForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { register } = useAuth();
+  const dispatch = useAppDispatch();
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -57,12 +60,138 @@ const RegisterForm = () => {
   };
 
   const handleGoogleRegister = () => {
-    console.log("Google register clicked");
-    // Implement Google OAuth here
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const baseAuthUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+    const redirectUri =
+      process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
+      `${window.location.origin}/auth/google/callback`;
+
+    if (!clientId) {
+      showError("Thiếu NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+      return;
+    }
+
+    const state = self.crypto?.randomUUID?.() || `${Date.now()}`;
+    try {
+      sessionStorage.setItem("google_oauth_state", state);
+    } catch {}
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      prompt: "consent",
+      access_type: "offline",
+      include_granted_scopes: "true",
+      state,
+    });
+
+    const url = `${baseAuthUrl}?${params.toString()}`;
+
+    const width = 520;
+    const height = 620;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const popup = window.open(
+      url,
+      "google_oauth_popup",
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,status=no,resizable=yes,scrollbars=yes`
+    );
+
+    if (!popup) {
+      window.location.href = url;
+      return;
+    }
+
+    const messageHandler = (event: MessageEvent) => {
+      try {
+        const allowedOrigin = window.location.origin;
+        if (event.origin !== allowedOrigin) return;
+
+        const {
+          type,
+          code,
+          error,
+          state: returnedState,
+        } = (event.data || {}) as {
+          type?: string;
+          code?: string;
+          error?: string;
+          state?: string;
+        };
+
+        if (type !== "google_oauth_code") return;
+
+        try {
+          const savedState = sessionStorage.getItem("google_oauth_state");
+          if (!savedState || savedState !== returnedState) {
+            showError("Xác thực không hợp lệ (state)");
+            return;
+          }
+        } catch {}
+
+        window.removeEventListener("message", messageHandler);
+        try {
+          popup.close();
+        } catch {}
+
+        if (error) {
+          showError(error);
+          return;
+        }
+        if (!code) {
+          showError("Không nhận được mã từ Google");
+          return;
+        }
+
+        setIsLoading(true);
+        const redirectUri =
+          process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
+          `${window.location.origin}/auth/google/callback`;
+        const payload = { code, state: returnedState, redirectUri };
+        dispatch(loginWithGoogleCode(payload))
+          .unwrap()
+          .then((result) => {
+            const hasError = !!(
+              result &&
+              (result.error || result?.data?.error)
+            );
+            if (hasError) {
+              const msg =
+                result?.error?.message ||
+                result?.data?.error?.message ||
+                "Đăng nhập Google thất bại";
+              showError(msg);
+            } else {
+              showSuccess("Đăng nhập Google thành công!");
+              router.push("/");
+            }
+          })
+          .catch(() => showError("Đăng nhập Google thất bại"))
+          .finally(() => setIsLoading(false));
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener("message", messageHandler);
+
+    const timeout = setTimeout(() => {
+      try {
+        window.removeEventListener("message", messageHandler);
+        if (!popup.closed) popup.close();
+      } catch {}
+      showError("Hết thời gian đăng nhập Google, thử lại nhé");
+    }, 120000);
+
+    const clear = () => clearTimeout(timeout);
+    window.addEventListener("beforeunload", clear, { once: true });
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 lg:p-8 bg-background">
+    <div className="flex-1 flex items-start justify-start lg:items-center lg:justify-center p-4 lg:p-8 bg-background">
       <div className="w-full max-w-md">
         {/* Top Section */}
         <div className="mb-10">
