@@ -6,7 +6,6 @@ import { PrismaModule } from './infrastructure/database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { CommonRepositoriesModule } from './common/repositories/common-repositories.module';
-import { APP_GUARD } from '@nestjs/core';
 import { GuardsModule } from './common/guards/guards.module';
 import { QuizModule } from './modules/quizz/quiz.module';
 import { CategoryModule } from './modules/category/category.module';
@@ -17,7 +16,8 @@ import { RedisModule } from './infrastructure/cache/redis/redis.module';
 import { JobRepository } from './common/repositories/job.repository';
 import configuration from './config/configuration';
 import { NotificationModule } from './modules/notification/notification.module';
-
+import { WebSocketModule } from './common/websocket/websocket.module';
+import { NotificationService } from './modules/notification/services/notification.service';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -156,6 +156,7 @@ import { NotificationModule } from './modules/notification/notification.module';
       }),
     ),
     CommonRepositoriesModule,
+    NotificationModule,
     PrismaModule,
     GuardsModule,
     AuthModule,
@@ -163,7 +164,8 @@ import { NotificationModule } from './modules/notification/notification.module';
     QuizModule,
     CategoryModule,
     QuestionModule,
-    NotificationModule,
+
+    WebSocketModule,
   ],
   controllers: [AppController],
   providers: [AppService, JobRepository],

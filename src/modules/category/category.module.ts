@@ -13,5 +13,6 @@ import { CategoryRepository } from './repositories/category.repository';
     CategoryService,
     { provide: BaseRepository, useExisting: CategoryRepository },
   ],
+  exports: [CategoryService],
 })
 export class CategoryModule {}

@@ -4,7 +4,7 @@ import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
 } from '@prisma/client/runtime/library';
-import { ErrorCode } from '@/common/exceptions/error-codes.enum';
+import { ErrorCode } from '@/common/middlewares/error-codes.enum';
 
 @Catch(PrismaClientKnownRequestError, PrismaClientValidationError)
 export class PrismaExceptionFilter implements ExceptionFilter {

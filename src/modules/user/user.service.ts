@@ -3,7 +3,7 @@ import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '@prisma/client';
-import { ResourceNotFoundException } from '@/common/exceptions';
+import { ResourceNotFoundException } from '@/common/middlewares';
 
 @Injectable()
 export class UserService {

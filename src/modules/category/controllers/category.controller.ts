@@ -18,6 +18,8 @@ import { AuthGuard } from '@/common/guards/auth.guard';
 import { ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Category } from '@prisma/client';
+import { Auth } from '@/common/guards/auth.guard';
+import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
 
 @Controller('/api/categories')
 export class CategoryController {
@@ -37,9 +39,13 @@ export class CategoryController {
     ) as unknown as Promise<Category>;
   }
 
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.ActivityRead })
   @Get()
-  findAllCategories() {
-    return this.categoryService.findAllCategories();
+  findAllCategories(
+    @Auth() auth: AuthDto,
+  ) {
+    return this.categoryService.findAllCategories(auth.user.id);
   }
 
   @Get('slug/:slug')

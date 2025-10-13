@@ -8,7 +8,6 @@ import { CategoryRepository } from '@/modules/category/repositories/category.rep
 import { CloudinaryModule } from '@/infrastructure/storage/cloudinary/cloudinary.module';
 import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
 import { JobRepository } from '@/common/repositories/job.repository';
-import { EventRepository } from '@/common/repositories/event.repository';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
 import { RedisService } from '@/infrastructure/cache/redis/redis.service';
 import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
@@ -19,7 +18,6 @@ import { NotificationRepository } from '@/modules/notification/repositories/noti
 import { QuestionModule } from '@/modules/questions/question.module';
 import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
 import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
-
 @Module({
   imports: [
     PrismaModule,
@@ -27,6 +25,7 @@ import { QuestionOptionRepository } from '@/modules/questions/repositories/quest
     RedisModule,
     forwardRef(() => QuestionModule),
     GuardsModule,
+
     forwardRef(() => AuthModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -43,7 +42,6 @@ import { QuestionOptionRepository } from '@/modules/questions/repositories/quest
     CategoryRepository,
     CloudinaryService,
     JobRepository,
-    EventRepository,
     LoggingRepository,
     EmailRepository,
     RedisService,
@@ -60,7 +58,6 @@ import { QuestionOptionRepository } from '@/modules/questions/repositories/quest
     CategoryRepository,
     CloudinaryService,
     JobRepository,
-    EventRepository,
     LoggingRepository,
     EmailRepository,
     NotificationRepository,

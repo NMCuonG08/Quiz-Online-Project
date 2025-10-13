@@ -17,7 +17,6 @@ import type { AuthLoginResult } from '../services/auth.service';
 interface RequestWithCookies extends Request {
   cookies: {
     __refreshToken?: string;
-    refreshToken?: string;
   };
 }
 import { AuthService } from '../services/auth.service';
@@ -269,8 +268,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refreshTokenFromCookie(@Req() req: RequestWithCookies) {
-    const refreshToken =
-      req.cookies?.__refreshToken || req.cookies?.refreshToken;
+    const refreshToken = req.cookies?.__refreshToken;
 
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found in cookies');

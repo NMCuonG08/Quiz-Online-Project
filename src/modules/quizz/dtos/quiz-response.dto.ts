@@ -13,12 +13,6 @@ export class QuizResponseDto {
   @ApiProperty({ description: 'Quiz description', required: false })
   description?: string;
 
-  @ApiProperty({ description: 'Category ID' })
-  category_id: string;
-
-  @ApiProperty({ description: 'Creator ID' })
-  creator_id: string;
-
   @ApiProperty({
     description: 'Difficulty level',
     enum: ['EASY', 'MEDIUM', 'HARD'],
@@ -46,6 +40,12 @@ export class QuizResponseDto {
   @ApiProperty({ description: 'Quiz tags', type: [String] })
   tags: string[];
 
+  @ApiProperty({ description: 'Average rating (1-5)', example: 4.5 })
+  average_rating: number;
+
+  @ApiProperty({ description: 'Total number of ratings', example: 25 })
+  total_ratings: number;
+
   @ApiProperty({ description: 'Created date' })
   created_at: Date;
 
@@ -61,6 +61,9 @@ export class QuizResponseDto {
   // Flattened fields
   @ApiProperty({ description: 'Category name' })
   category_name: string | null;
+
+  @ApiProperty({ description: 'Creator name' })
+  creator_name: string | null;
 
   @ApiProperty({ description: 'Thumbnail URL', required: false })
   thumbnail_url?: string | null;
