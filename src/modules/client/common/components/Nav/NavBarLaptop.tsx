@@ -50,7 +50,7 @@ const NavBarLaptop = () => {
           <Link
             href="/"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("/") ? "active" : "hover:text-yellow-500"
+              isActive("/") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
             Home
@@ -58,7 +58,7 @@ const NavBarLaptop = () => {
           <Link
             href="/category"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("/category") ? "active" : "hover:text-yellow-500"
+              isActive("/category") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
             Quizzes
@@ -66,7 +66,7 @@ const NavBarLaptop = () => {
           <Link
             href="#courses"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("#courses") ? "active" : "hover:text-yellow-500"
+              isActive("#courses") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
             Courses
@@ -74,7 +74,7 @@ const NavBarLaptop = () => {
           <Link
             href="#community"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("#community") ? "active" : "hover:text-yellow-500"
+              isActive("#community") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
             Community
@@ -82,7 +82,7 @@ const NavBarLaptop = () => {
           <Link
             href="#about"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("#about") ? "active" : "hover:text-yellow-500"
+              isActive("#about") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
             About
@@ -122,7 +122,7 @@ const NavBarLaptop = () => {
             </DropdownMenu>
           ) : (
             <Link href="/auth/login">
-              <Button className="inline-flex items-center bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              <Button className="inline-flex bg-yellow items-center px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
                 Sign in
               </Button>
             </Link>

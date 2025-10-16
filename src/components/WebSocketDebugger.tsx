@@ -3,11 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "@/hooks/useRedux";
 import { useNotifications } from "@/common/hooks/useNotifications";
+import { useWebSocketReconnect } from "@/common/hooks/useWebSocketReconnect";
+import { wsManager } from "@/lib/websocket";
 
 export function WebSocketDebugger() {
   const dispatch = useAppDispatch();
-  const { createNotification, isConnected, isConnecting, error } =
-    useNotifications();
+  const { createNotification } = useNotifications();
+  const { reconnect } = useWebSocketReconnect();
+  
+  // Lấy trực tiếp từ Redux state thay vì qua useNotifications
+  const websocketState = useAppSelector((state) => state.websocket);
+  const { isConnected, isConnecting, error } = websocketState;
 
   const authState = useAppSelector((state) => state.auth);
 
@@ -34,6 +40,17 @@ export function WebSocketDebugger() {
       prevAuthRef.current = authState.isAuthenticated;
     }
   }, [authState.isAuthenticated, addLog]);
+
+  // Debug WebSocket state changes
+  useEffect(() => {
+    const debugInfo = wsManager.getDebugInfo();
+    console.log("🔌 WebSocketDebugger - State changed:", {
+      reduxState: { isConnected, isConnecting, error },
+      wsManagerState: debugInfo,
+      auth: authState.isAuthenticated,
+      token: !!authState.token
+    });
+  }, [isConnected, isConnecting, error, authState.isAuthenticated, authState.token]);
 
   useEffect(() => {
     if (prevTokenRef.current !== authState.token) {
@@ -79,9 +96,14 @@ export function WebSocketDebugger() {
     }
   };
 
-  const reconnect = () => {
-    dispatch({ type: "INIT_WEBSOCKET" });
+  const handleReconnect = () => {
+    reconnect();
     addLog("Triggered WebSocket reconnection");
+  };
+
+  const forceSetupListeners = () => {
+    wsManager.forceSetupListeners(dispatch);
+    addLog("Force setup WebSocket listeners");
   };
 
   const clearLogs = () => {
@@ -98,7 +120,7 @@ export function WebSocketDebugger() {
         <h3 className="font-bold text-sm">🔌 WebSocket Debug</h3>
         <div className="flex gap-2">
           <button
-            onClick={reconnect}
+            onClick={handleReconnect}
             className="text-xs bg-blue-600 px-2 py-1 rounded hover:bg-blue-700"
           >
             Reconnect
@@ -148,6 +170,15 @@ export function WebSocketDebugger() {
           </span>
         </div>
         {error && <div className="text-red-400 text-xs">Error: {error}</div>}
+        
+        {/* Debug info */}
+        <div className="mt-2 pt-2 border-t border-gray-600">
+          <div className="text-xs text-gray-300">
+            <div>WS Manager: {wsManager.isConnected() ? "✓" : "✗"}</div>
+            <div>Listeners: {wsManager.hasListeners() ? "✓" : "✗"}</div>
+            <div>Token: {wsManager.getCurrentToken() ? "✓" : "✗"}</div>
+          </div>
+        </div>
       </div>
 
       <div className="mt-3">

@@ -26,10 +26,21 @@ export default function AuthRestorer({
     dispatch(restoreAuth());
 
     // Trigger WebSocket initialization after auth restore
+    // Đợi lâu hơn để đảm bảo auth state được restore hoàn toàn
     setTimeout(() => {
       dispatch(initWebSocket());
-    }, 100);
+    }, 500);
   }, [dispatch]);
+
+  // Re-trigger WebSocket when auth state changes
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      console.log("🔌 Auth state changed, re-triggering WebSocket...");
+      setTimeout(() => {
+        dispatch(initWebSocket());
+      }, 100);
+    }
+  }, [dispatch, isAuthenticated, token]);
 
   // Force logout if isAuthenticated but no token
   useEffect(() => {

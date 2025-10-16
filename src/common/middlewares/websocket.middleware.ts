@@ -26,6 +26,11 @@ export const websocketMiddleware = createListenerMiddleware();
 // Action creator để trigger WebSocket initialization
 export const initWebSocket = createAction("INIT_WEBSOCKET");
 
+// Action creator để force reconnect WebSocket
+export const forceReconnectWebSocket = createAction(
+  "FORCE_RECONNECT_WEBSOCKET"
+);
+
 // Auto-connect khi app khởi động và khi auth state thay đổi
 websocketMiddleware.startListening({
   actionCreator: initWebSocket,
@@ -68,7 +73,15 @@ websocketMiddleware.startListening({
 
     if (token) {
       console.log("🔌 User logged in, connecting WebSocket...");
-      await connectWebSocketWithRetry(listenerApi.dispatch, token);
+
+      // Luôn force reconnect khi user đăng nhập để đảm bảo sync
+      if (wsManager.isConnected()) {
+        console.log("🔌 User logged in, force reconnecting with new token...");
+        await wsManager.reconnectWithNewToken(token);
+      } else {
+        console.log("🔌 User logged in, connecting WebSocket...");
+        await connectWebSocketWithRetry(listenerApi.dispatch, token);
+      }
     }
   },
 });
@@ -82,6 +95,52 @@ websocketMiddleware.startListening({
 
     if (token) {
       console.log("🔌 Google login successful, connecting WebSocket...");
+
+      // Luôn force reconnect khi user đăng nhập để đảm bảo sync
+      if (wsManager.isConnected()) {
+        console.log(
+          "🔌 Google login successful, force reconnecting with new token..."
+        );
+        await wsManager.reconnectWithNewToken(token);
+      } else {
+        console.log("🔌 Google login successful, connecting WebSocket...");
+        await connectWebSocketWithRetry(listenerApi.dispatch, token);
+      }
+    }
+  },
+});
+
+// Listen for force reconnect action
+websocketMiddleware.startListening({
+  actionCreator: forceReconnectWebSocket,
+  effect: async (action, listenerApi) => {
+    const state = listenerApi.getState() as RootState;
+    const token = state.auth?.token || localStorage.getItem("auth_token") || "";
+
+    if (token) {
+      console.log("🔌 Force reconnecting WebSocket...");
+      await wsManager.reconnectWithNewToken(token);
+    }
+  },
+});
+
+// Listen for auth state changes to trigger WebSocket reconnect
+websocketMiddleware.startListening({
+  predicate: (action) => {
+    // Listen for any auth-related actions
+    return (
+      action.type.includes("auth/") &&
+      (action.type.includes("fulfilled") || action.type.includes("restoreAuth"))
+    );
+  },
+  effect: async (action, listenerApi) => {
+    const state = listenerApi.getState() as RootState;
+    const token = state.auth?.token;
+    const isAuthenticated = state.auth?.isAuthenticated;
+
+    // Nếu user đã authenticated và có token, đảm bảo WebSocket connected
+    if (isAuthenticated && token && !wsManager.isConnected()) {
+      console.log("🔌 Auth state changed, ensuring WebSocket connection...");
       await connectWebSocketWithRetry(listenerApi.dispatch, token);
     }
   },
@@ -108,9 +167,11 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
     dispatch(disconnected(reason));
 
     // Auto-reconnect với exponential backoff
+    // Chỉ reconnect nếu user vẫn đang authenticated
     setTimeout(() => {
       const token = localStorage.getItem("auth_token");
       if (token) {
+        console.log("🔌 Auto-reconnecting after disconnect...");
         connectWebSocketWithRetry(dispatch, token);
       }
     }, 3000);

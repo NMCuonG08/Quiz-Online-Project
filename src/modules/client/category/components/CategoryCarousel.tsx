@@ -3,6 +3,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper/modules";
 import { Star, Clock } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { formatTimeAgo } from "@/lib/time-utils";
 
 // Import Swiper styles
@@ -20,6 +21,7 @@ export interface QuizCardProps {
   difficulty_level?: string;
   category_name?: string;
   quiz_type?: string;
+  slug?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -42,6 +44,7 @@ const QuizCard: React.FC<QuizCardProps> = ({
   category_name,
   quiz_type,
   created_at,
+  slug,
 }) => {
   const [imageError, setImageError] = React.useState(false);
 
@@ -69,7 +72,7 @@ const QuizCard: React.FC<QuizCardProps> = ({
     return `${rating.toFixed(1)} (${totalRatings})`;
   };
 
-  return (
+  const CardInner = (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer">
       <div className="relative">
         {imageError ? (
@@ -147,6 +150,8 @@ const QuizCard: React.FC<QuizCardProps> = ({
       </div>
     </div>
   );
+
+  return slug ? <Link href={`/quiz/${slug}`}>{CardInner}</Link> : CardInner;
 };
 
 const CategoryCarousel: React.FC<CategoryCarouselProps> = ({

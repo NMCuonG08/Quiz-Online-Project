@@ -27,12 +27,12 @@ const QuizSection = () => {
               Kiểm tra trình độ và nâng cao kỹ năng tiếng Anh một cách thú vị.
             </p>
             <div className="flex flex-wrap items-center gap-4">
-              <Button className="px-6 py-3 text-base lg:text-lg">
+              <Button className="px-6 py-3 bg-yellow text-base lg:text-lg">
                 Bắt đầu Quiz ngay
               </Button>
               <Button
                 variant="outline"
-                className="px-6 py-3 text-base lg:text-lg"
+                className="px-6 py-3 bg-blue-green text-base lg:text-lg"
               >
                 <Link href="/category">Xem danh sách Quiz</Link>
               </Button>

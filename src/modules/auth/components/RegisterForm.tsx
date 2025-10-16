@@ -325,7 +325,7 @@ const RegisterForm = () => {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium hover:cursor-pointer transition-colors duration-200"
+                className="w-full h-11 bg-yellow text-primary-foreground hover:bg-primary/90 rounded-lg font-medium hover:cursor-pointer transition-colors duration-200"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
@@ -356,7 +356,7 @@ const RegisterForm = () => {
             type="button"
             variant="outline"
             onClick={handleGoogleRegister}
-            className="w-full h-11 border border-border bg-background hover:bg-accent hover:text-accent-foreground rounded-lg font-medium transition-colors"
+            className="w-full h-11 border  border-border bg-blue hover:bg-accent hover:text-accent-foreground rounded-lg font-medium transition-colors"
           >
             <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
               <path

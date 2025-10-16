@@ -11,6 +11,9 @@
   --color-foreground: var(--foreground);
   /* Tailwind v4 global gray palette */
   --color-gray: #EFF4FB;
+  --color-yellow: #FDD239;
+  --color-blue: #38bdf8;
+  --color-blue-green: #a7f3d0;
   --color-gray-dark: #122031;
   --color-gray-1: #F9FAFB;
   --color-gray-2: #F3F4F6;

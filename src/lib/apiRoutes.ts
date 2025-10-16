@@ -7,6 +7,13 @@ export const apiRoutes = {
     UPDATE_BY_ID: (id: string | number) => `/api/categories/${id}`,
     DELETE_BY_ID: (id: string | number) => `/api/categories/${id}`,
   },
+  ROOMS: {
+    BASE: "/api/rooms",
+    CREATE: "/api/rooms",
+    BY_QUIZ: (quizId: string, status?: string) =>
+      `/api/rooms/quiz/${quizId}${status ? `?status=${status}` : ""}`,
+    JOIN: (roomId: string) => `/api/rooms/${roomId}/join`,
+  },
   QUIZZES: {
     BASE: "/api/quizzes",
     GET_ALL: "/api/quizzes",
