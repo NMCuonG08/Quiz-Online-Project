@@ -2,7 +2,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ImageRepository } from './image.repository';
 import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
-import { ExternalServiceException } from '@/common/exceptions';
+import { ExternalServiceException } from '@/common/middlewares';
 
 @Injectable()
 export class ImageService {

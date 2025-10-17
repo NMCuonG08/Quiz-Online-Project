@@ -8,19 +8,24 @@ import { CategoryRepository } from '@/modules/category/repositories/category.rep
 import { CloudinaryModule } from '@/infrastructure/storage/cloudinary/cloudinary.module';
 import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
 import { JobRepository } from '@/common/repositories/job.repository';
-import { EventRepository } from '@/common/repositories/event.repository';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
 import { RedisService } from '@/infrastructure/cache/redis/redis.service';
 import { RedisModule } from '@/infrastructure/cache/redis/redis.module';
 import { GuardsModule } from '../guards/guards.module';
 import { AuthModule } from '@/modules/auth/auth.module';
-
+import { EmailRepository } from '../repositories/email.repository';
+import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
+import { QuestionModule } from '@/modules/questions/question.module';
+import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
+import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
 @Module({
   imports: [
     PrismaModule,
     CloudinaryModule,
     RedisModule,
+    forwardRef(() => QuestionModule),
     GuardsModule,
+
     forwardRef(() => AuthModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -37,9 +42,12 @@ import { AuthModule } from '@/modules/auth/auth.module';
     CategoryRepository,
     CloudinaryService,
     JobRepository,
-    EventRepository,
     LoggingRepository,
+    EmailRepository,
     RedisService,
+    NotificationRepository,
+    QuestionRepository,
+    QuestionOptionRepository,
   ],
   exports: [
     PrismaModule,
@@ -50,9 +58,11 @@ import { AuthModule } from '@/modules/auth/auth.module';
     CategoryRepository,
     CloudinaryService,
     JobRepository,
-    EventRepository,
     LoggingRepository,
-    RedisService,
+    EmailRepository,
+    NotificationRepository,
+    QuestionRepository,
+    QuestionOptionRepository,
   ],
 })
 export class BaseModule {}

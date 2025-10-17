@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsNotEmpty,
@@ -10,7 +10,6 @@ import {
   IsDateString,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
 import { DifficultyLevelEnum, QuizTypeEnumEnum } from '@/common/enums';
 
 export class CreateQuizDto {
@@ -35,12 +34,9 @@ export class CreateQuizDto {
   @IsOptional()
   description: string;
 
-  @ApiProperty({ example: '29c561b4-b4ff-4b2b-9d27-acbb46cae286' })
-  @IsUUID()
-  @IsString()
-  @IsNotEmpty()
-  creator_id: string;
-
+  @ApiPropertyOptional({
+    description: 'Populated from authenticated user token',
+  })
   @ApiProperty({
     example: DifficultyLevelEnum.EASY,
     enum: DifficultyLevelEnum,

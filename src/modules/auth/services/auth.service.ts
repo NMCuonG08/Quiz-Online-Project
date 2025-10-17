@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { IncomingHttpHeaders } from 'http';
-import { AuthDto, LoginDto, SignupDto } from '../dto';
+import { AuthDto, ForgotPasswordDto, LoginDto, SignupDto } from '../dto';
 import { projectHeader } from '@/common/enums';
 import { Permission } from '@/common/enums';
 import { isGranted } from '@/common/utils/access';
@@ -209,6 +209,7 @@ export class AuthService extends BaseService {
 
     // Get user roles for client payload
     const roles = await this.getUserRoles(user.id);
+    await this.eventRepository.emit('UserLogin', { userId: user.id });
 
     return {
       user: {
@@ -514,7 +515,7 @@ export class AuthService extends BaseService {
 
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: '15m',
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),
     });
   }
 
@@ -569,6 +570,12 @@ export class AuthService extends BaseService {
       }
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+
+    await this.emailRepository.sendWelcomeEmail(email, 'User', 'User');
   }
 
   // Legacy placeholder methods removed to avoid signature conflicts with BaseService

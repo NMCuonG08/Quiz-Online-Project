@@ -7,12 +7,13 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { TransformResponseInterceptor } from '@/common/interceptors/transform-response.interceptor';
+import { TransformResponseInterceptor } from '@/common/middlewares/transform-response.interceptor';
 import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter';
 import { PrismaExceptionFilter } from '@/common/filters/prisma-exception.filter';
 import { JobRepository } from '@/common/repositories/job.repository';
 import { QuizService } from '@/modules/quizz/services/quiz.service';
 import cookieParser from 'cookie-parser';
+import { WebSocketAdapter } from '@/common/middlewares/websocket.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -178,6 +179,10 @@ async function bootstrap() {
 
   // Start workers to process jobs
   jobRepository.startWorkers();
+
+  // WebSocket setup will be done by WebSocketSetupService
+
+  app.useWebSocketAdapter(new WebSocketAdapter(app));
 
   const port = process.env.PORT || 5000;
   await app.listen(port, '0.0.0.0');

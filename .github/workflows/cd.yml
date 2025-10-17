@@ -1,0 +1,175 @@
+name: CD (EC2)
+
+on:
+  repository_dispatch:
+    types: [ci-passed]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: meta
+        run: |
+          SHA_TAG=${GITHUB_SHA::12}
+          echo "sha=$SHA_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build & Push Docker image
+        run: |
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          docker build -t $IMAGE_URI:latest -t $IMAGE_URI:${{ steps.meta.outputs.sha }} .
+          docker push $IMAGE_URI:latest
+          docker push $IMAGE_URI:${{ steps.meta.outputs.sha }}
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          # Map all secrets
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_TLS: ${{ secrets.REDIS_TLS }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          REDIS_KEY_PREFIX: dev:app
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOUDINARY_FOLDER: ${{ secrets.CLOUDINARY_FOLDER }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_IGNORE_CERT: false
+          EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
+          EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
+          EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          IMMICH_LOG_LEVEL: ${{ secrets.IMMICH_LOG_LEVEL }}
+          NODE_ENV: production
+          PORT: 5000
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.meta.outputs.sha }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: REDIS_HOST,REDIS_PORT,REDIS_TLS,JWT_SECRET,JWT_REFRESH_SECRET,DATABASE_URL,REDIS_URL,REDIS_KEY_PREFIX,CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET,CLOUDINARY_FOLDER,SMTP_HOST,SMTP_PORT,SMTP_USERNAME,SMTP_PASSWORD,SMTP_IGNORE_CERT,EMAIL_FROM_NAME,EMAIL_FROM_ADDRESS,EMAIL_REPLY_TO,GOOGLE_CLIENT_ID,GOOGLE_REDIRECT_URI,GOOGLE_CLIENT_SECRET,FRONTEND_URL,IMMICH_LOG_LEVEL,NODE_ENV,PORT,AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG
+          script: |
+            set -e
+            cd ${{ secrets.EC2_PATH }}
+
+            # Create .env with all secrets
+            cat > .env << EOF
+            DATABASE_URL=$DATABASE_URL
+            REDIS_URL=$REDIS_URL
+            REDIS_KEY_PREFIX=$REDIS_KEY_PREFIX
+            CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME
+            CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY
+            CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET
+            CLOUDINARY_FOLDER=$CLOUDINARY_FOLDER
+            PORT=$PORT
+            FRONTEND_URL=$FRONTEND_URL
+            JWT_SECRET=$JWT_SECRET
+            JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
+            GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+            GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+            GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+            IMMICH_LOG_LEVEL=$IMMICH_LOG_LEVEL
+            SMTP_HOST=$SMTP_HOST
+            SMTP_PORT=$SMTP_PORT
+            SMTP_USERNAME=$SMTP_USERNAME
+            SMTP_PASSWORD=$SMTP_PASSWORD
+            SMTP_IGNORE_CERT=$SMTP_IGNORE_CERT
+            EMAIL_FROM_NAME=$EMAIL_FROM_NAME
+            EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
+            EMAIL_REPLY_TO=$EMAIL_REPLY_TO
+            REDIS_HOST=$REDIS_HOST
+            REDIS_PORT=$REDIS_PORT
+            REDIS_TLS=$REDIS_TLS
+            NODE_ENV=$NODE_ENV
+            EOF
+
+            chmod 600 .env
+
+            # AGGRESSIVE CLEANUP - Disk space optimization
+            echo "Starting aggressive cleanup..."
+
+            # Stop and remove containers
+            docker compose -f docker-compose.prod.yml down --remove-orphans || true
+
+            # Remove unused Docker resources (KEEP DATABASE VOLUMES)
+            docker system prune -af || true
+            docker image prune -af || true
+            docker container prune -f || true
+            docker network prune -f || true
+            # DO NOT prune volumes - they contain database data!
+            # docker volume prune -f || true  # ← COMMENTED OUT TO PROTECT DATABASE
+
+            # Clean Docker build cache
+            docker builder prune -af || true
+
+            # Clean old nginx configs (keep last 3 only)
+            sudo find /etc/nginx/sites-available/ -name "quiz-app.backup.*" -type f | sort -r | tail -n +4 | xargs sudo rm -f || true
+
+            # Clean system logs older than 3 days
+            sudo find /var/log -name "*.log.*" -mtime +3 -delete || true
+            sudo find /var/log -name "*.log" -size +100M -exec truncate -s 0 {} \; || true
+
+            # Clean Docker logs
+            sudo find /var/lib/docker/containers -name "*.log" -size +50M -exec truncate -s 0 {} \; || true
+
+            # Clean temporary files
+            sudo rm -rf /tmp/* || true
+            sudo rm -rf /var/tmp/* || true
+
+            # Show disk usage after cleanup
+            echo "Disk usage after cleanup:"
+            df -h
+
+            # Login to ECR
+            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+            # Pull latest image
+            docker compose -f docker-compose.prod.yml pull
+
+            # Start containers
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
+
+            # Verify deployment
+            docker compose -f docker-compose.prod.yml ps
+
+            # Test application accessibility
+            sleep 100
+            curl -f http://localhost:5000/health || {
+                echo "Application health check failed"
+                exit 1
+            }

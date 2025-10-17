@@ -7,8 +7,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
-import { ErrorCode } from '@/common/exceptions/error-codes.enum';
-import { ErrorResponse } from '@/common/exceptions/error-response.interface';
+import { ErrorCode } from '@/common/middlewares/error-codes.enum';
+import { ErrorResponse } from '@/common/middlewares/error-response.interface';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {

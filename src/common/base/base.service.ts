@@ -1,7 +1,5 @@
 import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { BaseRepository } from './base.repository';
-import { PaginationQueryDto } from '@/common/dtos/responses/base.response';
+import { Injectable } from '@nestjs/common';
 import { LoggingRepository } from '@/common/repositories/logging.repository';
 import { CryptoRepository } from '@/common/repositories/crypto.repository';
 import { JwtService } from '@nestjs/jwt';
@@ -12,13 +10,18 @@ import { CategoryRepository } from '@/modules/category/repositories/category.rep
 import { JobRepository } from '@/common/repositories/job.repository';
 import { RedisService } from '@/infrastructure/cache/redis/redis.service';
 import { AuthCacheService } from '@/modules/auth/services/auth-cache.service';
+import { EmailRepository } from '../repositories/email.repository';
+import { EventRepository } from '../repositories/event.repository';
+import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
+import { PrismaService } from '@/infrastructure/database/prisma.service';
+import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
+import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
 
 @Injectable()
 export abstract class BaseService {
   constructor(
     protected readonly jwtService: JwtService,
     protected readonly configService: ConfigService,
-    protected readonly repository: BaseRepository,
     protected readonly logger: LoggingRepository,
     protected readonly userRepository: UserRepository,
     protected readonly quizRepository: QuizRepository,
@@ -28,31 +31,11 @@ export abstract class BaseService {
     protected readonly jobRepository: JobRepository,
     protected readonly redisService: RedisService,
     protected readonly authCacheService: AuthCacheService,
+    protected readonly emailRepository: EmailRepository,
+    protected readonly eventRepository: EventRepository,
+    protected readonly notificationRepository: NotificationRepository,
+    protected readonly prisma: PrismaService,
+    protected readonly questionRepository: QuestionRepository,
+    protected readonly questionOptionRepository: QuestionOptionRepository,
   ) {}
-
-  async findAll(paginationDto: PaginationQueryDto) {
-    return await this.repository.paginate(paginationDto);
-  }
-
-  async findOne(id: string) {
-    const entity = await this.repository.findUnique({ id });
-    if (!entity) {
-      throw new NotFoundException(`Entity with ID ${id} not found`);
-    }
-    return entity;
-  }
-
-  async create(createDto: unknown) {
-    return await this.repository.create(createDto);
-  }
-
-  async update(id: string, updateDto: unknown) {
-    await this.findOne(id); // Check if exists
-    return await this.repository.update({ id }, updateDto);
-  }
-
-  async remove(id: string) {
-    await this.findOne(id); // Check if exists
-    return await this.repository.delete({ id });
-  }
 }

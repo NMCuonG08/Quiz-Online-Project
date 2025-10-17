@@ -1,13 +1,29 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersService } from './user.service';
+import { UserService } from './user.service';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ResourceNotFoundException } from '@/common/exceptions';
-import { createTestUser } from '../../../test/setup';
+import { ResourceNotFoundException } from '@/common/middlewares';
+// import { createTestUser } from '../../../test/setup';
+
+// Mock createTestUser function
+const createTestUser = (overrides: any = {}) => ({
+  id: 'test-id',
+  email: 'test@example.com',
+  username: 'testuser',
+  full_name: 'Test User',
+  password: 'hashed-password',
+  avatar: 'avatar-url',
+  bio: null,
+  isAdmin: false,
+  deletedAt: null,
+  created_at: new Date(),
+  updated_at: new Date(),
+  ...overrides,
+});
 
 describe('UsersService', () => {
-  let service: UsersService;
+  let service: UserService;
   let prismaService: PrismaService;
 
   const mockPrismaService = {
@@ -23,7 +39,7 @@ describe('UsersService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        UsersService,
+        UserService,
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -31,7 +47,7 @@ describe('UsersService', () => {
       ],
     }).compile();
 
-    service = module.get<UsersService>(UsersService);
+    service = module.get<UserService>(UserService);
     prismaService = module.get<PrismaService>(PrismaService);
 
     // Reset all mocks

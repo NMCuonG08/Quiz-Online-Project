@@ -35,6 +35,7 @@ export class UserController {
   }
 
   @Get()
+  @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.ActivityRead })
   findAll() {
     return this.userService.findAll();
@@ -42,7 +43,7 @@ export class UserController {
 
   @Get('profile')
   @UseGuards(AuthGuard)
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @Authenticated({ permission: Permission.ActivityRead })
   getProfile(@Auth() auth: AuthDto) {
     return auth.user;
   }

@@ -1,113 +1,259 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { BaseService } from '@/common/base/base.service';
 import { CreateQuizDto } from '../dtos/create-quiz.dto';
-import { JobName, JobStatus, QueueName } from '@/common/enums';
+import { JobStatus, JobName, QueueName } from '@/common/enums';
 import { OnJob } from '@/common/decorators';
+import { PaginatedResponseDto } from '@/common/dtos/responses/base.response';
+import { QuizPaginationQueryDto } from '../dtos/quiz-pagination.dto';
+import { QuizResponseDto } from '../dtos/quiz-response.dto';
 
-interface SerializedFile {
-  fieldname: string;
-  originalname: string;
-  encoding: string;
-  mimetype: string;
-  buffer: string; // base64 string
-  size: number;
-}
-
-interface UploadImageJobData {
-  id: string;
-  image: SerializedFile;
-}
+// Removed queue-based upload types in favor of direct Cloudinary upload
 
 @Injectable()
 export class QuizService extends BaseService {
-  async getQuizzes() {
-    return this.quizRepository.findMany();
+  async getQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result =
+      await this.quizRepository.paginateWithRelations(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
   }
 
-  async getQuizzesByCategory(categoryId: string) {
-    return this.quizRepository.findMany({
-      where: { categoryId },
+  async getQuizzesByCategory(
+    categoryId: string,
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.paginateWithRelations(
+      paginationQuery,
+      {
+        category_id: categoryId,
+      },
+    );
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  // Search methods by different criteria
+  async getRecentlyPublishedQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result =
+      await this.quizRepository.getRecentlyPublishedQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getBestRatedQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result =
+      await this.quizRepository.getBestRatedQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getPopularQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.getPopularQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getEasyQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.getEasyQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getHardQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.getHardQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async searchQuizzes(
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.searchQuizzes(paginationQuery);
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
+  async getQuizzesByDifficulty(
+    difficulty: 'easy' | 'medium' | 'hard',
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.paginateWithRelations({
+      ...paginationQuery,
+      difficulty,
     });
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
   }
 
-  async createQuiz(quiz: CreateQuizDto, thumbnail?: Express.Multer.File) {
-    let thumbnailId: string | undefined;
-    const quizData = {
-      ...quiz,
-      thumbnail_id: thumbnailId || null,
-    };
-    const createdQuizz = await this.quizRepository.create(quizData);
-    console.log('Chuan  bi upload ');
+  async getQuizBySlug(slug: string): Promise<QuizResponseDto> {
+    const result = await this.quizRepository.findBySlug(slug);
+    if (!result) {
+      throw new NotFoundException('Quiz not found');
+    }
+    return result;
+  }
 
-    // Upload thumbnail to Cloudinary if provided
-    if (thumbnail) {
-      console.log('Co file de upload');
-      const serializedFile: SerializedFile = {
-        fieldname: thumbnail.fieldname,
-        originalname: thumbnail.originalname,
-        encoding: thumbnail.encoding,
-        mimetype: thumbnail.mimetype,
-        buffer: thumbnail.buffer.toString('base64'),
-        size: thumbnail.size,
-      };
-
-      const jobData: UploadImageJobData = {
-        id: createdQuizz.id,
-        image: serializedFile,
-      };
-
-      await this.jobRepository.queue({
-        name: JobName.UploadImage,
-        data: jobData as any,
-      });
+  async createQuiz(
+    quiz: CreateQuizDto,
+    thumbnail?: Express.Multer.File,
+    creatorId?: string,
+  ) {
+    // Check slug availability before creating
+    const isSlugAvailable = await this.quizRepository.isSlugAvailable(
+      quiz.slug,
+    );
+    if (!isSlugAvailable) {
+      throw new BadRequestException('Slug already exists');
     }
 
-    return createdQuizz;
+    let thumbnailId: string | undefined;
+    // If thumbnail file is provided, upload directly to Cloudinary first
+    if (thumbnail) {
+      const uploadResult = await this.cloudinaryService.uploadImage(thumbnail);
+      thumbnailId = uploadResult?.id;
+    }
+    const { thumbnail: _thumbnail, ...quizWithoutThumbnail } = quiz;
+    void _thumbnail;
+    const quizData = {
+      ...quizWithoutThumbnail,
+      ...(creatorId ? { creator_id: creatorId } : {}),
+      thumbnail_id: thumbnailId || null,
+    };
+    return await this.quizRepository.create(quizData);
   }
 
-  @OnJob({ name: JobName.UploadImage, queue: QueueName.ThumbnailGeneration })
-  async uploadImage(data: UploadImageJobData) {
-    console.log('uploadImage', data);
-    const { id, image } = data;
+  async updateQuiz(
+    id: string,
+    updateData: Record<string, any>,
+    creatorId: string,
+    thumbnail?: Express.Multer.File,
+  ): Promise<QuizResponseDto> {
+    const existingQuiz = await this.quizRepository.findByIdRaw(id);
+    if (!existingQuiz) {
+      throw new NotFoundException('Quiz not found');
+    }
+    if (existingQuiz.creator_id !== creatorId) {
+      throw new ForbiddenException(
+        'You are not authorized to update this quiz',
+      );
+    }
 
-    // Reconstruct the file object properly
-    const file: Express.Multer.File = {
-      fieldname: image.fieldname,
-      originalname: image.originalname,
-      encoding: image.encoding,
-      mimetype: image.mimetype,
-      buffer: Buffer.from(image.buffer, 'base64'),
-      size: image.size,
-      stream: null as any,
-      destination: '',
-      filename: '',
-      path: '',
+    // Check slug availability if slug is being updated
+    if (updateData.slug && typeof updateData.slug === 'string') {
+      const isSlugAvailable = await this.quizRepository.isSlugAvailable(
+        updateData.slug,
+        id,
+      );
+      if (!isSlugAvailable) {
+        throw new BadRequestException('Slug already exists');
+      }
+    }
+
+    // Handle thumbnail upload if provided
+    let thumbnailId: string | undefined;
+    if (thumbnail) {
+      const uploadResult = await this.cloudinaryService.uploadImage(thumbnail);
+      thumbnailId = uploadResult?.id;
+    }
+
+    // Prepare update data, excluding thumbnail file
+    const { thumbnail: _thumbnail, ...quizWithoutThumbnail } = updateData;
+    void _thumbnail;
+
+    const dataToUpdate: Record<string, any> = {
+      ...quizWithoutThumbnail,
+      ...(thumbnailId ? { thumbnail_id: thumbnailId } : {}),
     };
 
-    const uploadResult = await this.cloudinaryService.uploadImage(file);
-    const thumbnailId = uploadResult?.id;
-    await this.quizRepository.update({ id }, { thumbnail_id: thumbnailId });
-    return JobStatus.Success;
+    return await this.quizRepository.updateQuiz(id, dataToUpdate);
   }
 
+  async remove(id: string, creatorId: string) {
+    const existingQuiz = await this.quizRepository.findByIdRaw(id);
+    if (!existingQuiz) {
+      throw new NotFoundException('Quiz not found');
+    }
+    if (existingQuiz.creator_id !== creatorId) {
+      throw new ForbiddenException(
+        'You are not authorized to delete this quiz',
+      );
+    }
+    await this.quizRepository.delete({ id });
+    return 'Quiz deleted successfully';
+  }
+
+  // Minimal no-op handlers to satisfy JobRepository validation
   @OnJob({ name: JobName.AssetDelete, queue: QueueName.BackgroundTask })
-  assetDelete(data: any) {
-    // TODO: Implement asset deletion logic
-    this.logger.log('AssetDelete job executed', data);
+  assetDelete() {
     return JobStatus.Success;
   }
 
   @OnJob({ name: JobName.AssetDeleteCheck, queue: QueueName.BackgroundTask })
-  assetDeleteCheck(data: any) {
-    // TODO: Implement asset deletion check logic
-    this.logger.log('AssetDeleteCheck job executed', data);
+  assetDeleteCheck() {
     return JobStatus.Success;
   }
 
   @OnJob({ name: JobName.VersionCheck, queue: QueueName.BackgroundTask })
-  versionCheck(data: any) {
-    // TODO: Implement version check logic
-    this.logger.log('VersionCheck job executed', data);
+  versionCheck() {
+    return JobStatus.Success;
+  }
+
+  // Compatibility stub: we don't use queued upload anymore, but validation requires a handler
+  @OnJob({ name: JobName.UploadImage, queue: QueueName.ThumbnailGeneration })
+  uploadImageJob() {
     return JobStatus.Success;
   }
 }
