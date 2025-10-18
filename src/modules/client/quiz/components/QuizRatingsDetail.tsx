@@ -14,7 +14,7 @@ const QuizRatingsDetail: React.FC<QuizRatingsDetailProps> = ({
   breakdown = [],
 }) => {
   return (
-    <div className="rounded-md dark:bg-gray-dark border p-4 space-y-3">
+    <div className="bg-red-light dark:bg-gray-dark rounded-lg p-6 border space-y-3">
       <div className="flex items-end gap-4">
         <div className="text-3xl font-semibold">{average.toFixed(1)}</div>
         <div className="text-sm text-gray-600">{total} lượt đánh giá</div>

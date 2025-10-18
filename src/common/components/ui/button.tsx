@@ -10,25 +10,25 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground border-1 border-primary hover:bg-primary/90 active:translate-x-0.5 active:translate-y-0.5",
+          "bg-primary text-primary-foreground border-1 border-primary  active:translate-x-0.5 active:translate-y-0.5",
         destructive:
-          "bg-destructive text-destructive-foreground border-1 border-destructive hover:bg-destructive/90 active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+          "bg-destructive text-destructive-foreground border-1 border-destructive active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         outline:
-          "dark:bg-gray-dark bg-white border-1 border-input  hover:bg-accent hover:text-accent-foreground active:translate-x-0.5 active:translate-y-0.5",
+          "dark:bg-gray-dark bg-white border-1 border-input   hover:text-accent-foreground active:translate-x-0.5 active:translate-y-0.5",
         secondary:
-          "bg-secondary text-secondary-foreground border-1 border-secondary hover:bg-secondary/80 active:translate-x-0.5 active:translate-y-0.5",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+          "bg-secondary text-secondary-foreground border-1 border-secondary  active:translate-x-0.5 active:translate-y-0.5",
+        ghost: "hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         shadowBorder:
           "bg-background border-1 border-border active:translate-x-0.5 active:translate-y-0.5",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
+        default: "h-9 px-6 py-4 has-[>svg]:px-6",
         sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-9 has-[>svg]:px-4",
         xl: "h-12 rounded-lg px-12 has-[>svg]:px-6 text-base",
         icon: "size-9",
-        full: "w-full h-12 px-4 py-2 has-[>svg]:px-3 text-base",
+        full: "w-full h-12 px-4 py-4 has-[>svg]:px-3 text-base",
       },
     },
     defaultVariants: {
@@ -62,7 +62,7 @@ function Button({
     >
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
       <div
-        className="absolute bg-black/20 dark:bg-white/20 rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-hover:-bottom-1 group-hover:-right-1 group-active:bottom-0 group-active:right-0 -z-10"
+        className="absolute bg-black/80 dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-hover:-bottom-1 group-hover:-right-1 group-active:bottom-0 group-active:right-0 -z-10"
         style={{ overflow: "visible" }}
       ></div>
       <Comp

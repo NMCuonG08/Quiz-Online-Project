@@ -11,7 +11,7 @@ const QuizInstructions: React.FC<QuizInstructionsProps> = ({
 }) => {
   if (!instructions) return null;
   return (
-    <div className="rounded-md dark:bg-gray-dark border p-4">
+    <div className="bg-red-light dark:bg-gray-dark rounded-lg p-6 border">
       <div className="font-medium mb-2">Hướng dẫn</div>
       <p className="text-sm whitespace-pre-line">{instructions}</p>
     </div>

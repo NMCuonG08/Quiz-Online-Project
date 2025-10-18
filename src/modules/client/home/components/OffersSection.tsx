@@ -1,5 +1,13 @@
 import React from "react";
 import Image from "next/image";
+import {
+  Card,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/common/components/ui/card";
+import { Badge } from "@/common/components/ui/badge";
+import { Div } from "@/common/components/ui/div";
 
 const OffersSection = () => {
   const offers = [
@@ -29,7 +37,12 @@ const OffersSection = () => {
   ];
 
   return (
-    <section className="py-16 px-4 sm:px-8 lg:px-12 bg-gradient-to-br rounded-2xl from-background via-muted/50 to-background border border-border">
+    <Div
+      variant="elevated"
+      size="xl"
+      rounded="xl"
+      className="py-16 px-4 sm:px-8 lg:px-12 bg-red-light dark:bg-gray-dark border border-border w-full"
+    >
       <div className="max-w-7xl mx-auto">
         {/* Header with title and SVG stars */}
         <div className="flex items-center justify-between mb-12">
@@ -75,9 +88,9 @@ const OffersSection = () => {
         {/* Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {offers.map((offer) => (
-            <div
+            <Card
               key={offer.id}
-              className={`relative overflow-hidden border border-border rounded-lg ${
+              className={`relative overflow-hidden h-full flex flex-col ${
                 offer.featured
                   ? "shadow-lg bg-card"
                   : "bg-card/80 backdrop-blur-sm hover:bg-card transition-all duration-300"
@@ -98,58 +111,62 @@ const OffersSection = () => {
                 </div>
               )}
 
-              <div className="p-8 relative z-10">
-                {/* Icon */}
-                <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 ${
-                    offer.featured ? "bg-background" : "bg-muted"
-                  }`}
-                >
-                  <Image
-                    src={offer.icon}
-                    alt={offer.title}
-                    width={64}
-                    height={64}
-                    className="w-full h-full object-cover rounded-full"
-                  />
+              <CardContent className="p-4 relative z-10 flex flex-col flex-grow">
+                {/* Featured Badge */}
+                {offer.featured && (
+                  <div className="absolute top-4 right-4">
+                    <Badge
+                      variant="default"
+                      className="bg-primary text-primary-foreground"
+                    >
+                      Featured
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Icon and Title in same row */}
+                <div className="flex items-center gap-3 mb-4">
+                  {/* Icon */}
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      offer.featured ? "bg-background" : "bg-muted"
+                    }`}
+                  >
+                    <Image
+                      src={offer.icon}
+                      alt={offer.title}
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  </div>
+
+                  {/* Title */}
+                  <CardTitle
+                    className={`text-lg dark:text-black font-bold ${
+                      offer.featured ? "text-foreground" : "text-foreground"
+                    }`}
+                  >
+                    {offer.title}
+                  </CardTitle>
                 </div>
 
-                {/* Title */}
-                <h3
-                  className={`text-2xl dark:text-black font-bold mb-4 ${
-                    offer.featured ? "text-foreground" : "text-foreground"
-                  }`}
-                >
-                  {offer.title}
-                </h3>
-
                 {/* Description */}
-                <p
-                  className={`text-sm leading-relaxed dark:text-black ${
+                <CardDescription
+                  className={`text-sm leading-relaxed dark:text-black flex-grow ${
                     offer.featured
                       ? "text-muted-foreground"
                       : "text-muted-foreground"
                   }`}
                 >
                   {offer.description}
-                </p>
-
-                {/* Sparkle effect for featured card */}
-                {offer.featured && (
-                  <div className="absolute top-6 right-6">
-                    <div className="flex space-x-1">
-                      <div className="w-1 h-1 bg-primary rounded-full animate-pulse"></div>
-                      <div className="w-1 h-1 bg-primary rounded-full animate-pulse delay-100"></div>
-                      <div className="w-1 h-1 bg-primary rounded-full animate-pulse delay-200"></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                </CardDescription>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
-    </section>
+    </Div>
   );
 };
 

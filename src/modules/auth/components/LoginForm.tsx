@@ -311,7 +311,7 @@ const LoginForm = () => {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 bg-blue-green text-primary-foreground hover:bg-primary/90 hover:cursor-pointer rounded-lg font-medium transition-colors"
+                className="w-full h-11 bg-blue-green dark:bg-gray-dark text-primary-foreground hover:bg-primary/90 hover:cursor-pointer rounded-lg font-medium transition-colors"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">

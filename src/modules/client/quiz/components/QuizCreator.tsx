@@ -9,7 +9,7 @@ interface QuizCreatorProps {
 const QuizCreator: React.FC<QuizCreatorProps> = ({ creatorName }) => {
   if (!creatorName) return null;
   return (
-    <div className="rounded-md border dark:bg-gray-dark p-4">
+    <div className="bg-violet dark:bg-gray-dark rounded-lg p-6 border">
       <div className="font-medium mb-2">Người tạo</div>
       <div className="text-sm">{creatorName}</div>
     </div>

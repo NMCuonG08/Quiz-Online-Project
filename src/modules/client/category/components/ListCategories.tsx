@@ -90,7 +90,7 @@ const CategoryCarousel = () => {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-6">
+    <div className="w-full max-w-7xl mx-auto px-4 py-6">
       <div className="mb-4">
         <h2 className="text-2xl font-bold text-center mb-2">Danh mục Quiz</h2>
         <p className="text-gray-600 dark:text-gray-400 text-center text-sm">

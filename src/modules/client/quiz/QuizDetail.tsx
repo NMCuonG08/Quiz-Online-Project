@@ -144,20 +144,20 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* CTA Section */}
-            <div className="bg-white dark:bg-gray-dark rounded-lg p-6 border">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="bg-red-light dark:bg-gray-dark rounded-lg p-6 border">
+              <div className="space-y-4">
                 <div>
                   <h3 className="text-lg font-semibold mb-2">
                     Sẵn sàng thử thách?
                   </h3>
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="text-sm text-gray-600">
                     {data.questions_count} câu hỏi •{" "}
                     {Math.floor(data.time_limit / 60)} phút •{" "}
                     {data.difficulty_level}
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                     <DoorOpen />
                     Bắt đầu làm bài
                   </Button>
@@ -170,7 +170,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     }}
                   >
                     <DialogTrigger asChild>
-                      <Button className="w-full sm:w-auto">
+                      <Button>
                         <Users />
                         Tham gia phòng
                       </Button>
@@ -295,7 +295,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     onOpenChange={setOpenCreateRoom}
                   >
                     <DialogTrigger asChild>
-                      <Button className="w-full sm:w-auto">
+                      <Button>
                         <Users />
                         Tạo phòng
                       </Button>
@@ -434,7 +434,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Quiz Stats Card */}
-            <div className="bg-white dark:bg-gray-dark rounded-lg border p-6">
+            <div className="bg-violet dark:bg-gray-dark rounded-lg border p-6">
               <h3 className="font-semibold mb-4">Thông tin chi tiết</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">

@@ -17,7 +17,7 @@ const QuizComments: React.FC<QuizCommentsProps> = ({ comments = [] }) => {
   const [value, setValue] = useState("");
 
   return (
-    <div className="rounded-md border p-4 dark:bg-gray-dark  space-y-3">
+    <div className="bg-red-light dark:bg-gray-dark rounded-lg p-6 border space-y-3">
       <div className="font-medium">Bình luận</div>
       <div className="flex gap-2">
         <input

@@ -27,12 +27,12 @@ const QuizSection = () => {
               Kiểm tra trình độ và nâng cao kỹ năng tiếng Anh một cách thú vị.
             </p>
             <div className="flex flex-wrap items-center gap-4">
-              <Button className="px-6 py-3 bg-yellow text-base lg:text-lg">
+              <Button className="px-6 py-6 bg-yellow dark:bg-gray-dark text-base lg:text-lg">
                 Bắt đầu Quiz ngay
               </Button>
               <Button
                 variant="outline"
-                className="px-6 py-3 bg-blue-green text-base lg:text-lg"
+                className="px-6 py-6 bg-blue-green dark:bg-gray-dark text-base lg:text-lg"
               >
                 <Link href="/category">Xem danh sách Quiz</Link>
               </Button>
@@ -42,7 +42,7 @@ const QuizSection = () => {
               {quizCategories.map((src, idx) => (
                 <div
                   key={idx}
-                  className="h-16 sm:h-20 lg:h-24 w-full rounded-md border border-border/60 bg-background/50 flex items-center justify-center"
+                  className="h-16 sm:h-20 lg:h-24 w-full  border border-border/60 bg-background/50 flex items-center justify-center"
                 >
                   <Image
                     src={src}

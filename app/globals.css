@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Line clamp utilities */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 @variant dark (.dark &);
 
 @theme inline {
@@ -15,6 +23,9 @@
   --color-blue: #38bdf8;
   --color-blue-green: #a7f3d0;
   --color-gray-dark: #122031;
+  --color-violet: #fcd7ff;
+  --color-green-light: #dcfce7;
+  --color-red-light: #fee2e2;
   --color-gray-1: #F9FAFB;
   --color-gray-2: #F3F4F6;
   --color-gray-3: #E5E7EB;

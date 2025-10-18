@@ -325,7 +325,7 @@ const RegisterForm = () => {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 bg-yellow text-primary-foreground hover:bg-primary/90 rounded-lg font-medium hover:cursor-pointer transition-colors duration-200"
+                className="w-full h-11 bg-yellow dark:bg-gray-dark text-primary-foreground hover:bg-primary/90 rounded-lg font-medium hover:cursor-pointer transition-colors duration-200"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">

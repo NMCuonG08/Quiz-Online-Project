@@ -20,7 +20,7 @@ function Card({ className, disableHover, tightShadow, ...props }: CardProps) {
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
       <div
         className={cn(
-          "absolute bg-black/20 dark:bg-white/20 rounded-xl w-full h-full transition-all duration-300 -z-10",
+          "absolute bg-black/80 dark:bg-white rounded-xl w-full h-full transition-all duration-300 -z-10",
           shadowOffset,
           shadowHover
         )}
