@@ -11,12 +11,14 @@ export const apiRoutes = {
     BASE: "/api/rooms",
     CREATE: "/api/rooms",
     BY_QUIZ: (quizId: string, status?: string) =>
-      `/api/rooms/quiz/${quizId}${status ? `?status=${status}` : ""}`,
+      `/api/rooms/quiz/id/${quizId}${status ? `?status=${status}` : ""}`,
     JOIN: (roomId: string) => `/api/rooms/${roomId}/join`,
+    BY_CODE: (roomCode: string) => `/api/rooms/code/${roomCode}`,
   },
   QUIZZES: {
     BASE: "/api/quizzes",
     GET_ALL: "/api/quizzes",
+
     GET_BY_SLUG: (slug: string) => `/api/quizzes/slug/${slug}`,
     CREATE: "/api/quizzes",
     UPDATE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,

@@ -157,7 +157,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Button className="bg-blue-600 dark:bg-gray-dark text-white">
                     <DoorOpen />
                     Bắt đầu làm bài
                   </Button>
@@ -170,7 +170,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     }}
                   >
                     <DialogTrigger asChild>
-                      <Button>
+                      <Button className="bg-green-600 dark:bg-gray-dark text-white">
                         <Users />
                         Tham gia phòng
                       </Button>
@@ -295,12 +295,12 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     onOpenChange={setOpenCreateRoom}
                   >
                     <DialogTrigger asChild>
-                      <Button>
+                      <Button className="bg-red-600 dark:bg-gray-dark text-white">
                         <Users />
                         Tạo phòng
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-lg">
+                    <DialogContent className="bg-violet-light dark:bg-gray-dark sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                           <Users /> Tạo phòng với bạn bè
@@ -407,7 +407,11 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                               {createRoomError}
                             </div>
                           )}
-                          <Button type="submit" disabled={creatingRoom}>
+                          <Button
+                            type="submit"
+                            disabled={creatingRoom}
+                            className="bg-blue dark:bg-gray-dark text-dark"
+                          >
                             <Users /> Tạo phòng
                           </Button>
                         </DialogFooter>

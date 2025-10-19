@@ -1,5 +1,11 @@
 import React from "react";
 import { Button } from "@/common/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/common/components/ui/card";
 import Link from "next/link";
 
 const HowItWorksSection = () => {
@@ -138,50 +144,51 @@ const HowItWorksSection = () => {
         {/* Three Cards Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {steps.map((step, index) => (
-            <div
+            <Card
               key={step.id}
-              className="relative bg-gray-600 dark:bg-gray-dark rounded-lg p-8 text-white"
-              style={{ overflow: "visible" }}
+              className="relative bg-[#c953d2] dark:bg-gray-dark text-black dark:text-white border-gray-500 h-full flex flex-col"
             >
-              {/* Step Number */}
-              {step.stepNumber && (
-                <div className="text-sm text-white/80 mb-4">
-                  {step.stepNumber}
-                </div>
-              )}
-
-              {/* Icon */}
-              <div className="absolute top-6 right-6 w-6 h-6">{step.icon}</div>
-
-              {/* Title */}
-              <h3 className="text-2xl font-bold mb-4">{step.title}</h3>
-
-              {/* Description */}
-              <p className="text-sm text-white/80 mb-6 leading-relaxed">
-                {step.description}
-              </p>
-
-              {/* Action Buttons */}
-              <div
-                className="flex flex-row gap-3 items-center"
-                style={{ overflow: "visible" }}
-              >
-                {step.buttonText && (
-                  <Button
-                    variant="shadowBorder"
-                    className="w-fit bg-yellow dark:bg-gray-dark text-gray-dark dark:text-primary-foreground hover:text-gray-600 border-yellow dark:border-gray-dark"
-                  >
-                    {step.buttonText}
-                  </Button>
+              <CardHeader className="relative flex-shrink-0">
+                {/* Step Number */}
+                {step.stepNumber && (
+                  <div className="text-sm text-white/80 mb-2">
+                    {step.stepNumber}
+                  </div>
                 )}
-                <Link
-                  href="#"
-                  className="text-sm text-white hover:text-white/80 transition-colors"
-                >
-                  {step.linkText}
-                </Link>
-              </div>
-            </div>
+
+                {/* Icon */}
+                <div className="absolute top-6 right-6 w-6 h-6">
+                  {step.icon}
+                </div>
+
+                {/* Title */}
+                <CardTitle className="text-2xl font-bold text-white">
+                  {step.title}
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent className="flex flex-col flex-grow space-y-6">
+                {/* Description */}
+                <p className="text-sm text-white/80 leading-relaxed flex-grow">
+                  {step.description}
+                </p>
+
+                {/* Action Buttons */}
+                <div className="flex flex-row gap-3 items-center mt-auto">
+                  {step.buttonText && (
+                    <Button className="px-6 py-3 bg-yellow dark:bg-gray-dark text-gray-dark dark:text-primary-foreground hover:opacity-90">
+                      {step.buttonText}
+                    </Button>
+                  )}
+                  <Link
+                    href="#"
+                    className="text-sm text-white hover:text-white/80 transition-colors"
+                  >
+                    {step.linkText}
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>

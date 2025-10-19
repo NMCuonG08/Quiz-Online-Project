@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client";
-import type { ServerEventMap } from "../types";
+import type { ServerEventMap } from "@/common/types/websocket-event.type";
 
 class WebSocketManager {
   private socket: Socket | null = null;
@@ -8,38 +8,78 @@ class WebSocketManager {
   private currentToken: string | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
+  private connectionAttempts = 0;
+  private maxConnectionAttempts = 3;
+  private lastConnectionAttempt = 0;
+  private connectionDebounceMs = 3000; // 3 seconds debounce
+  private connectionTimeout: NodeJS.Timeout | null = null;
 
   async connect(token: string): Promise<void> {
-    // Nếu đã connected với cùng token, không cần reconnect
-    if (this.socket?.connected && this.currentToken === token) {
-      console.log("🔌 WebSocket already connected with same token");
+    // Clear any pending connection timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+
+    // Check debounce - prevent too frequent connection attempts
+    const now = Date.now();
+    if (now - this.lastConnectionAttempt < this.connectionDebounceMs) {
+      console.log("🔌 Connection attempt too soon, debouncing...");
+      // Schedule connection for later
+      this.connectionTimeout = setTimeout(() => {
+        this.connect(token);
+      }, this.connectionDebounceMs - (now - this.lastConnectionAttempt));
       return;
     }
+    this.lastConnectionAttempt = now;
+
+    // Check if we've exceeded max connection attempts
+    if (this.connectionAttempts >= this.maxConnectionAttempts) {
+      console.warn("🔌 Max connection attempts reached, skipping connection");
+      return;
+    }
+
+    // Nếu đã connected với cùng token, không cần connect lại
+    if (this.socket?.connected && this.currentToken === token) {
+      console.log("🔌 Already connected with same token, skipping");
+      return;
+    }
+
+    // Luôn disconnect trước khi connect mới
+    if (this.socket) {
+      console.log("🔌 Disconnecting previous WebSocket before connecting mới");
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
+    this.connectionAttempts++;
 
     // Nếu đang connecting, đợi hoặc cancel connection cũ
     if (this.isConnecting) {
       console.log("🔌 WebSocket connection in progress, waiting...");
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 30; // 3 seconds max wait
+
         const checkConnection = () => {
+          attempts++;
           if (!this.isConnecting) {
-            if (this.socket?.connected && this.currentToken === token) {
-              resolve();
-            } else {
-              this.connect(token).then(resolve);
+            this.connect(token).then(resolve).catch(reject);
+          } else if (attempts >= maxAttempts) {
+            console.warn("🔌 Connection timeout, forcing new connection");
+            this.isConnecting = false;
+            // Disconnect existing socket before new connection
+            if (this.socket) {
+              this.socket.disconnect();
+              this.socket = null;
             }
+            this.connect(token).then(resolve).catch(reject);
           } else {
             setTimeout(checkConnection, 100);
           }
         };
         checkConnection();
       });
-    }
-
-    // Disconnect existing connection if token changed
-    if (this.socket && this.currentToken !== token) {
-      console.log("🔌 Token changed, disconnecting old connection");
-      this.socket.disconnect();
-      this.socket = null;
     }
 
     this.isConnecting = true;
@@ -58,6 +98,7 @@ class WebSocketManager {
       this.socket.on("connect", () => {
         console.log("🔌 WebSocket connected");
         this.isConnecting = false;
+        this.connectionAttempts = 0; // Reset on successful connection
         this.startHeartbeat();
         this.emit("connected");
         resolve();
@@ -65,15 +106,30 @@ class WebSocketManager {
 
       this.socket.on("disconnect", (reason) => {
         console.log("🔌 WebSocket disconnected:", reason);
+        this.isConnecting = false; // Đảm bảo luôn reset trạng thái
         this.stopHeartbeat();
         this.emit("disconnected", reason);
       });
 
       this.socket.on("connect_error", (error) => {
-        console.error("🔌 WebSocket error:", error);
+        console.error("🔌 WebSocket connection error:", error);
         this.isConnecting = false;
-        this.emit("error", error);
-        reject(error);
+
+        // Handle specific error types
+        if (error.message?.includes("Connection too frequent")) {
+          console.warn(
+            "🔌 Connection rejected: too frequent, will retry later"
+          );
+          // Don't reject immediately, let the retry logic handle it
+          setTimeout(() => {
+            if (!this.socket?.connected) {
+              reject(error);
+            }
+          }, 2000);
+        } else {
+          this.emit("error", error);
+          reject(error);
+        }
       });
 
       // Listen for backend events
@@ -117,8 +173,15 @@ class WebSocketManager {
     }
     this.isConnecting = false;
     this.currentToken = null;
+    this.connectionAttempts = 0; // Reset connection attempts
     this.stopHeartbeat();
     this.clearReconnectTimeout();
+
+    // Clear connection timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
   }
 
   emit(event: string, ...args: unknown[]): void {
@@ -154,6 +217,10 @@ class WebSocketManager {
     return this.socket?.connected || false;
   }
 
+  getIsConnecting(): boolean {
+    return this.isConnecting;
+  }
+
   getCurrentToken(): string | null {
     return this.currentToken;
   }
@@ -174,6 +241,7 @@ class WebSocketManager {
   }
 
   clearListeners(): void {
+    console.log("🔌 Clearing WebSocket listeners");
     this.eventCallbacks.clear();
   }
 

@@ -98,7 +98,7 @@ const NavBarLaptop = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="inline-flex items-center justify-center w-9 h-9 p-0"
+                  className="inline-flex bg-yellow items-center justify-center w-9 h-9 p-0"
                 >
                   <User className="h-4 w-4" />
                 </Button>
@@ -122,7 +122,7 @@ const NavBarLaptop = () => {
             </DropdownMenu>
           ) : (
             <Link href="/auth/login">
-              <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground transition-colors">
                 Sign in
               </Button>
             </Link>

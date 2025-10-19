@@ -9,10 +9,8 @@ type CardProps = React.ComponentProps<"div"> & {
 
 function Card({ className, disableHover, tightShadow, ...props }: CardProps) {
   const wrapperClass = cn("relative inline-block", disableHover ? "" : "group");
-  const shadowHover = disableHover
-    ? ""
-    : "group-hover:-bottom-2 group-hover:-right-2 group-hover:scale-105";
-  const contentHover = disableHover ? "" : "group-hover:scale-105";
+  const shadowHover = disableHover ? "" : " ";
+  const contentHover = disableHover ? "" : "";
   const shadowOffset = tightShadow ? "bottom-0 right-0" : "-bottom-1 -right-1";
 
   return (

@@ -24,23 +24,20 @@ export default function AuthRestorer({
     // Always try to restore auth state on mount
     // This ensures we have the latest state from sessionStorage
     dispatch(restoreAuth());
-
-    // Trigger WebSocket initialization after auth restore
-    // Đợi lâu hơn để đảm bảo auth state được restore hoàn toàn
-    setTimeout(() => {
-      dispatch(initWebSocket());
-    }, 500);
   }, [dispatch]);
 
-  // Re-trigger WebSocket when auth state changes
+  // Single effect to handle WebSocket initialization after auth restore
   useEffect(() => {
     if (isAuthenticated && token) {
-      console.log("🔌 Auth state changed, re-triggering WebSocket...");
-      setTimeout(() => {
+      console.log("🔌 Auth state ready, initializing WebSocket...");
+      // Single timeout to prevent multiple triggers
+      const timeoutId = setTimeout(() => {
         dispatch(initWebSocket());
-      }, 100);
+      }, 1000); // Wait 1 second for auth state to stabilize
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [dispatch, isAuthenticated, token]);
+  }, [dispatch, isAuthenticated, token]); // Only trigger when auth state is actually ready
 
   // Force logout if isAuthenticated but no token
   useEffect(() => {

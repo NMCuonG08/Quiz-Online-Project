@@ -53,7 +53,7 @@ const MultiplayerSection = () => {
               </Button>
               <Link
                 href="#"
-                className="text-foreground hover:text-muted-foreground transition-colors"
+                className="text-foreground hover:text-muted-foreground transition-colors ml-auto"
               >
                 Learn more &gt;
               </Link>

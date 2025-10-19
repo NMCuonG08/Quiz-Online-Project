@@ -23,6 +23,11 @@ import type { RootState } from "@/store";
 
 export const websocketMiddleware = createListenerMiddleware();
 
+// Flag to prevent multiple listener setups
+let listenersSetup = false;
+// Flag to prevent multiple connection attempts
+let isConnecting = false;
+
 // Action creator để trigger WebSocket initialization
 export const initWebSocket = createAction("INIT_WEBSOCKET");
 
@@ -52,10 +57,17 @@ websocketMiddleware.startListening({
       return;
     }
 
+    // Prevent multiple simultaneous connection attempts
+    if (wsManager.getIsConnecting() || isConnecting) {
+      console.log("🔌 WebSocket already connecting, skipping...");
+      return;
+    }
+
     // Setup WebSocket event listeners (chỉ setup 1 lần)
-    if (!wsManager.hasListeners()) {
+    if (!listenersSetup) {
       console.log("🔌 Setting up WebSocket listeners");
       setupWebSocketListeners(listenerApi.dispatch);
+      listenersSetup = true;
     }
 
     // Connect với retry logic
@@ -127,10 +139,11 @@ websocketMiddleware.startListening({
 // Listen for auth state changes to trigger WebSocket reconnect
 websocketMiddleware.startListening({
   predicate: (action) => {
-    // Listen for any auth-related actions
+    // Only listen for specific auth actions, not all auth actions
     return (
-      action.type.includes("auth/") &&
-      (action.type.includes("fulfilled") || action.type.includes("restoreAuth"))
+      action.type === "auth/restoreAuth/fulfilled" ||
+      action.type === "auth/loginUser/fulfilled" ||
+      action.type === "auth/loginWithGoogleCode/fulfilled"
     );
   },
   effect: async (action, listenerApi) => {
@@ -138,8 +151,14 @@ websocketMiddleware.startListening({
     const token = state.auth?.token;
     const isAuthenticated = state.auth?.isAuthenticated;
 
-    // Nếu user đã authenticated và có token, đảm bảo WebSocket connected
-    if (isAuthenticated && token && !wsManager.isConnected()) {
+    // Only connect if not already connected and not connecting
+    if (
+      isAuthenticated &&
+      token &&
+      !wsManager.isConnected() &&
+      !wsManager.getIsConnecting() &&
+      !isConnecting
+    ) {
       console.log("🔌 Auth state changed, ensuring WebSocket connection...");
       await connectWebSocketWithRetry(listenerApi.dispatch, token);
     }
@@ -152,29 +171,57 @@ websocketMiddleware.startListening({
   effect: async (action, listenerApi) => {
     console.log("🔌 User logged out, disconnecting WebSocket");
     wsManager.disconnect();
+    listenersSetup = false; // Reset flag on logout
     listenerApi.dispatch(disconnected("User logged out"));
   },
 });
 
 function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
+  console.log("🔌 Setting up WebSocket listeners (clearing old ones first)");
+  // Clear all existing listeners first to prevent duplicates
+  wsManager.clearListeners();
+
   wsManager.on("connected", () => {
     console.log("🔌 WebSocket connected successfully");
+    isConnecting = false; // Reset flag on successful connection
     dispatch(connected());
   });
 
   wsManager.on("disconnected", (reason: string) => {
     console.log("🔌 WebSocket disconnected:", reason);
+    isConnecting = false; // Reset flag on disconnect
     dispatch(disconnected(reason));
 
-    // Auto-reconnect với exponential backoff
-    // Chỉ reconnect nếu user vẫn đang authenticated
-    setTimeout(() => {
-      const token = localStorage.getItem("auth_token");
-      if (token) {
-        console.log("🔌 Auto-reconnecting after disconnect...");
-        connectWebSocketWithRetry(dispatch, token);
-      }
-    }, 3000);
+    // Chỉ auto-reconnect nếu:
+    // 1. Không phải do user logout
+    // 2. Không phải do server force disconnect
+    // 3. Không phải do client disconnect
+    // 4. Chưa có connection attempt nào đang chạy
+    if (
+      reason !== "io server disconnect" &&
+      reason !== "User logged out" &&
+      reason !== "io client disconnect" &&
+      !wsManager.getIsConnecting() &&
+      !isConnecting
+    ) {
+      // Thêm delay để tránh reconnect quá nhanh
+      setTimeout(() => {
+        const token = localStorage.getItem("auth_token");
+        if (
+          token &&
+          !wsManager.getIsConnecting() &&
+          !wsManager.isConnected() &&
+          !isConnecting
+        ) {
+          console.log("🔌 Auto-reconnecting after disconnect...");
+          connectWebSocketWithRetry(dispatch, token);
+        }
+      }, 5000); // Tăng delay lên 5s
+    } else {
+      console.log(
+        "🔌 Server/client disconnect or logout, skipping auto-reconnect"
+      );
+    }
   });
 
   wsManager.on("error", (error: Error) => {
@@ -203,6 +250,9 @@ async function connectWebSocketWithRetry(
 ) {
   if (!token) return;
 
+  // Set connecting flag
+  isConnecting = true;
+
   const maxAttempts = 5;
   const baseDelay = 1000; // 1 second
   const maxDelay = 30000; // 30 seconds
@@ -215,6 +265,7 @@ async function connectWebSocketWithRetry(
     }
 
     await wsManager.connect(token);
+    isConnecting = false; // Reset flag on success
   } catch (error: unknown) {
     console.error(`🔌 Connection attempt ${attempt} failed:`, error);
 
@@ -227,6 +278,7 @@ async function connectWebSocketWithRetry(
       }, delay);
     } else {
       console.error("🔌 Max reconnection attempts reached");
+      isConnecting = false; // Reset flag on failure
       dispatch(
         connectionError(
           error instanceof Error

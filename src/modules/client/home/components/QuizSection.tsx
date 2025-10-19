@@ -27,15 +27,19 @@ const QuizSection = () => {
               Kiểm tra trình độ và nâng cao kỹ năng tiếng Anh một cách thú vị.
             </p>
             <div className="flex flex-wrap items-center gap-4">
-              <Button className="px-6 py-6 bg-yellow dark:bg-gray-dark text-base lg:text-lg">
-                Bắt đầu Quiz ngay
-              </Button>
-              <Button
-                variant="outline"
-                className="px-6 py-6 bg-blue-green dark:bg-gray-dark text-base lg:text-lg"
-              >
-                <Link href="/category">Xem danh sách Quiz</Link>
-              </Button>
+              <div className="flex-1 min-w-0 sm:min-w-fit">
+                <Button className="w-full px-6 py-6 bg-yellow dark:bg-gray-dark text-base lg:text-lg">
+                  Bắt đầu Quiz ngay
+                </Button>
+              </div>
+              <div className="flex-1 min-w-0 sm:min-w-fit">
+                <Button
+                  variant="outline"
+                  className="w-full px-6 py-6 bg-blue-green dark:bg-gray-dark text-base lg:text-lg"
+                >
+                  <Link href="/category">Xem danh sách Quiz</Link>
+                </Button>
+              </div>
             </div>
 
             <div className="mt-8 hidden sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
