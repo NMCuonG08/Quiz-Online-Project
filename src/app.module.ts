@@ -17,7 +17,8 @@ import { JobRepository } from './common/repositories/job.repository';
 import configuration from './config/configuration';
 import { NotificationModule } from './modules/notification/notification.module';
 import { WebSocketModule } from './common/websocket/websocket.module';
-import { NotificationService } from './modules/notification/services/notification.service';
+// import { NotificationService } from './modules/notification/services/notification.service';
+import { RoomPlayModule } from './modules/room-play/room-play.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -164,7 +165,7 @@ import { NotificationService } from './modules/notification/services/notificatio
     QuizModule,
     CategoryModule,
     QuestionModule,
-
+    RoomPlayModule,
     WebSocketModule,
   ],
   controllers: [AppController],

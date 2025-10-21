@@ -27,6 +27,7 @@ import { EmailRepository } from '@/common/repositories/email.repository';
 import { EventRepository } from '@/common/repositories/event.repository';
 import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
+import { RoomRepository } from '@/modules/room-play/repositories/room.repository';
 
 @Injectable()
 export class QuestionOptionService extends BaseService {
@@ -48,6 +49,7 @@ export class QuestionOptionService extends BaseService {
     prisma: PrismaService,
     questionRepository: QuestionRepository,
     questionOptionRepository: QuestionOptionRepository,
+    roomRepository: RoomRepository,
   ) {
     super(
       jwtService,
@@ -64,6 +66,7 @@ export class QuestionOptionService extends BaseService {
       emailRepository,
       eventRepository,
       notificationRepository,
+      roomRepository,
       prisma,
       questionRepository,
       questionOptionRepository,

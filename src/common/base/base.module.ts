@@ -18,14 +18,15 @@ import { NotificationRepository } from '@/modules/notification/repositories/noti
 import { QuestionModule } from '@/modules/questions/question.module';
 import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
 import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
+import { RoomRepository } from '@/modules/room-play/repositories/room.repository';
 @Module({
   imports: [
     PrismaModule,
     CloudinaryModule,
     RedisModule,
-    forwardRef(() => QuestionModule),
+    QuestionModule,
     GuardsModule,
-
+    // forwardRef(() => RoomPlayModule),
     forwardRef(() => AuthModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -48,6 +49,7 @@ import { QuestionOptionRepository } from '@/modules/questions/repositories/quest
     NotificationRepository,
     QuestionRepository,
     QuestionOptionRepository,
+    RoomRepository,
   ],
   exports: [
     PrismaModule,
@@ -63,6 +65,7 @@ import { QuestionOptionRepository } from '@/modules/questions/repositories/quest
     NotificationRepository,
     QuestionRepository,
     QuestionOptionRepository,
+    RoomRepository,
   ],
 })
 export class BaseModule {}

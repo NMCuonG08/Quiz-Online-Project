@@ -15,7 +15,8 @@ export class PrismaService
           url: config.get('DATABASE_URL'),
         },
       },
-      log: ['query', 'info', 'warn', 'error'],
+      // Remove 'query' to stop prisma:query logs
+      log: ['info', 'warn', 'error'],
     });
   }
 

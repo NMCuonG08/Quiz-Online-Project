@@ -2,103 +2,84 @@ pipeline {
     agent {
         label 'quiz-server'
     }
-
     parameters {
         choice(name: 'DEPLOY_ENV', choices: ['production'], description: 'Select deployment environment')
     }
-
     environment {
-        apiUser = "nestdev"
         appName = "nest-shopping-api"
         folderDeploy = "/var/www/${appName}"
-        buildScript = "npm install && npm run build"
-        installProdScript = "cd ${folderDeploy} && sudo npm install --production"
-        chownScript = "sudo chown -R ${apiUser}:${apiUser} ${folderDeploy}"
-        killScript = "sudo pkill -f 'node.*main.js' || true"
-        runScript = "sudo su ${apiUser} -c 'cd ${folderDeploy}; npm run start:prod > nohup.out 2>&1 &'"
     }
-
     tools {
-        git 'Default' // tên Git installation trong Jenkins Global Tool Config
+        git 'Default'
     }
-
     stages {
-
-        stage('Load Environment & Credentials') {
-            steps {
-                // Load all credentials via Jenkins credentials plugin
-                withCredentials([
-                    string(credentialsId: "${params.DEPLOY_ENV}-database-url", variable: 'DATABASE_URL'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-redis-password", variable: 'REDIS_PASSWORD'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-secret", variable: 'JWT_SECRET'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-jwt-refresh-secret", variable: 'JWT_REFRESH_SECRET'),
-                    string(credentialsId: "${params.DEPLOY_ENV}-cloudinary-secret", variable: 'CLOUDINARY_API_SECRET')
-                ]) {
-                    echo "✅ Loaded credentials for ${params.DEPLOY_ENV}"
-                }
-            }
-        }
-
-        stage('Build') {
+        stage('Build Image') {
             steps {
                 sh """
                 set -x
-                npm config set loglevel verbose
-                ${buildScript}
+                # Prepare folder
+                sudo mkdir -p ${folderDeploy}
+                
+                # Backup current deployment
+                if [ -d "${folderDeploy}.backup" ]; then
+                    sudo rm -rf ${folderDeploy}.backup
+                fi
+                if [ -d "${folderDeploy}" ]; then
+                    sudo cp -r ${folderDeploy} ${folderDeploy}.backup
+                fi
+                
+                # Copy new code
+                sudo cp -r . ${folderDeploy}/
+                
+                # Build docker image
+                cd ${folderDeploy}
+                sudo docker-compose build
                 """
             }
         }
-
+        stage('Approval') {
+            steps {
+                script {
+                    timeout(time: 30, unit: 'MINUTES') {
+                        input message: 'Deploy to Production?', 
+                              ok: 'Deploy Now',
+                              submitter: 'admin'
+                    }
+                }
+            }
+        }
         stage('Deploy') {
             steps {
                 sh """
                 set -x
-
-                # Stop previous app
-                ${killScript}
-
-                # Prepare folder
-                sudo rm -rf ${folderDeploy}
-                sudo mkdir -p ${folderDeploy}
-                sudo cp -r dist/* ${folderDeploy}/
-                sudo cp package*.json ${folderDeploy}/
-
-                # Create .env file
-                sudo tee ${folderDeploy}/.env > /dev/null <<EOF
-DATABASE_URL=${DATABASE_URL}
-REDIS_PASSWORD=${REDIS_PASSWORD}
-JWT_SECRET=${JWT_SECRET}
-JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
-PORT=${env.PORT}
-NODE_ENV=${env.NODE_ENV}
-FRONTEND_URL=${env.FRONTEND_URL}
-EOF
-
-                # Install production dependencies
-                ${installProdScript}
-
-                # Fix permissions
-                ${chownScript}
-                sudo chmod 600 ${folderDeploy}/.env
-
-                # Run application
-                ${runScript}
-
-                # Health check (pipeline fail if health check fail)
-                curl -f http://localhost:${env.PORT}/api/v1/health
+                cd ${folderDeploy}
+                sudo docker-compose up -d
                 """
             }
-        }
-
+        } 
     }
-
     post {
         success {
             echo "✅ Deployed ${params.DEPLOY_ENV} successfully!"
+            sh "sudo rm -rf ${folderDeploy}.backup || true"
         }
         failure {
-            echo "❌ Deploy failed for ${params.DEPLOY_ENV}"
+            echo "❌ Deploy failed for ${params.DEPLOY_ENV}, rolling back..."
+            sh """
+                if [ -d "${folderDeploy}.backup" ]; then
+                    cd ${folderDeploy}
+                    sudo docker-compose down || true
+                    sudo rm -rf ${folderDeploy}
+                    sudo mv ${folderDeploy}.backup ${folderDeploy}
+                    cd ${folderDeploy}
+                    sudo docker-compose up -d
+                    echo "Rollback completed"
+                fi
+            """
+        }
+        aborted {
+            echo "⚠️ Deployment aborted by user"
+            sh "sudo rm -rf ${folderDeploy}.backup || true"
         }
     }
 }

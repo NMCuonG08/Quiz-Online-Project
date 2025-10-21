@@ -167,6 +167,7 @@ model Quiz {
   questions    Question[]
   attempts     QuizAttempt[]
   sessions     QuizSession[]
+  rooms        QuizRoom[]
   statistics   QuizStatistics?
   cache        QuizCache[]
   leaderboards Leaderboard[]
@@ -227,6 +228,51 @@ model QuestionOption {
   @@index([question_id])
   @@index([is_correct])
   @@map("question_options")
+}
+
+// Quiz Room Models
+
+model QuizRoom {
+  id                   String      @id @default(uuid()) @db.Uuid
+  quiz_id              String      @db.Uuid
+  owner_id             String      @db.Uuid
+  room_code            String      @unique
+  status               RoomStatus  @default(OPEN)
+  is_private           Boolean     @default(false)
+  password_hash        String?
+  max_participants     Int         @default(100)
+  current_participants Int         @default(0)
+  settings             Json        @default("{}")
+  created_at           DateTime    @default(now())
+  updated_at           DateTime    @updatedAt
+
+  quiz         Quiz              @relation(fields: [quiz_id], references: [id])
+  participants RoomParticipant[]
+  connections  ActiveConnection[]
+
+  @@index([quiz_id])
+  @@index([owner_id])
+  @@index([status])
+  @@index([room_code])
+  @@map("quiz_rooms")
+}
+
+model RoomParticipant {
+  id         String            @id @default(uuid()) @db.Uuid
+  room_id    String            @db.Uuid
+  user_id    String            @db.Uuid
+  joined_at  DateTime          @default(now())
+  left_at    DateTime?
+  status     ParticipantStatus @default(JOINED)
+  device_info Json             @default("{}")
+  ip_address String?
+
+  room QuizRoom @relation(fields: [room_id], references: [id])
+
+  @@unique([room_id, user_id])
+  @@index([room_id])
+  @@index([user_id])
+  @@map("room_participants")
 }
 
 // Quiz Session Models
@@ -340,6 +386,7 @@ model ActiveConnection {
   user_id         String         @db.Uuid
   socket_id       String         @unique
   session_id      String?        @db.Uuid
+  room_id         String?        @db.Uuid
   connection_type ConnectionType @default(QUIZ)
   connected_at    DateTime       @default(now())
   last_ping       DateTime       @default(now())
@@ -348,9 +395,11 @@ model ActiveConnection {
 
   user    User         @relation(fields: [user_id], references: [id])
   session QuizSession? @relation(fields: [session_id], references: [id])
+  room    QuizRoom?    @relation(fields: [room_id], references: [id])
 
   @@index([user_id])
   @@index([session_id])
+  @@index([room_id])
   @@index([socket_id])
   @@map("active_connections")
 }
@@ -639,6 +688,12 @@ enum SessionStatus {
   ACTIVE
   PAUSED
   ENDED
+}
+
+enum RoomStatus {
+  OPEN
+  IN_GAME
+  CLOSED
 }
 
 enum ParticipantStatus {
