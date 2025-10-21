@@ -27,24 +27,22 @@ export class CategoryController {
 
   @ApiOperation({ summary: 'Create category with optional icon upload' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('icon'))
+  @UseInterceptors(FileInterceptor('iconFile'))
   @Post()
   createCategory(
     @Body() createCategoryDto: CreateCategoryDto,
-    @UploadedFile() icon?: Express.Multer.File,
+    @UploadedFile() iconFile?: Express.Multer.File,
   ): Promise<Category> {
     return this.categoryService.createCategory(
       createCategoryDto,
-      icon,
+      iconFile,
     ) as unknown as Promise<Category>;
   }
 
   @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.ActivityRead })
   @Get()
-  findAllCategories(
-    @Auth() auth: AuthDto,
-  ) {
+  findAllCategories(@Auth() auth: AuthDto) {
     return this.categoryService.findAllCategories(auth.user.id);
   }
 

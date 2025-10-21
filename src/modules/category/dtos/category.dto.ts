@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  ValidateIf,
+} from 'class-validator';
 import { IsBoolean } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateCategoryDto {
   @ApiProperty({ example: 'Category 1' })
@@ -32,6 +39,13 @@ export class CreateCategoryDto {
     nullable: true,
   })
   @IsOptional()
+  @Transform(({ value }: { value: string | null | undefined }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
+  @ValidateIf(
+    (o: CreateCategoryDto) =>
+      typeof o.parent_id === 'string' && o.parent_id.trim() !== '',
+  )
   @IsUUID()
   parent_id?: string;
 
@@ -63,6 +77,13 @@ export class UpdateCategoryDto {
     nullable: true,
   })
   @IsOptional()
+  @Transform(({ value }: { value: string | null | undefined }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
+  @ValidateIf(
+    (o: UpdateCategoryDto) =>
+      typeof o.parent_id === 'string' && o.parent_id.trim() !== '',
+  )
   @IsUUID()
   parent_id?: string;
 
