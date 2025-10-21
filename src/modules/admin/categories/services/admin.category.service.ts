@@ -90,7 +90,7 @@ export class CategoryService {
         ) {
           form.append("parent_id", String(payload.parentId));
         }
-        form.append("icon", payload.iconFile);
+        form.append("iconFile", payload.iconFile);
         console.log("createCategory FormData entries:");
         for (const [k, v] of form.entries()) {
           console.log("  ", k, v);
@@ -159,7 +159,7 @@ export class CategoryService {
           payload.parentId !== ""
         )
           form.append("parent_id", String(payload.parentId));
-        form.append("icon", payload.iconFile);
+        form.append("iconFile", payload.iconFile);
         console.log("updateCategory FormData entries:");
         for (const [k, v] of form.entries()) {
           console.log("  ", k, v);
