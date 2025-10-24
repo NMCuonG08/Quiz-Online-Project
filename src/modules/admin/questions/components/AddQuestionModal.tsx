@@ -20,8 +20,16 @@ import {
 import { OptionRendererFactory } from "../strategies/OptionRenderer";
 import AddOptionCard from "./AddOptionCard";
 import type { QuestionItem, QuestionOption } from "../types/admin.question";
-import { createQuestionSchema, transformQuestionData } from "../schema/question";
-import { showError, showSuccess, showLoading, closeLoading } from "@/lib/Notification";
+import {
+  createQuestionSchema,
+  transformQuestionData,
+} from "../schema/question";
+import {
+  showError,
+  showSuccess,
+  showLoading,
+  closeLoading,
+} from "@/lib/Notification";
 import { useAdminQuestions } from "../hooks/useAdminQuestions";
 
 type Props = {
@@ -98,13 +106,15 @@ const AddQuestionModal: React.FC<Props> = ({
     });
 
     const parsed = createQuestionSchema.safeParse(dataToValidate);
-    
+
     if (!parsed.success) {
       // Surface the first validation error via error toast notification
       const firstError = parsed.error.issues?.[0]?.message || "Invalid input";
-      const fieldPath = parsed.error.issues?.[0]?.path?.join('.') || 'unknown field';
+      const fieldPath = Array.isArray(parsed.error.issues?.[0]?.path)
+        ? parsed.error.issues[0].path.join(".")
+        : "unknown field";
       const errorMessage = `${fieldPath}: ${firstError}`;
-      
+
       showError(errorMessage);
       return;
     }
@@ -113,7 +123,7 @@ const AddQuestionModal: React.FC<Props> = ({
 
     try {
       const result = await addQuestion(parsed.data);
-      
+
       if (result.success) {
         showSuccess("Question created successfully!");
         // Reset form
@@ -172,7 +182,9 @@ const AddQuestionModal: React.FC<Props> = ({
 
             {/* Question Image Upload */}
             <div>
-              <label className="text-sm font-medium">Question Image (Optional)</label>
+              <label className="text-sm font-medium">
+                Question Image (Optional)
+              </label>
               <UploadImage
                 value={questionData.media_url}
                 onChange={(file) =>

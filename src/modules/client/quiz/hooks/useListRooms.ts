@@ -24,20 +24,43 @@ export function useListRooms(quizId?: string, status: string = "OPEN") {
   const [items, setItems] = useState<RoomItem[]>([]);
 
   const fetchRooms = useCallback(async () => {
-    if (!quizId) return;
+    if (!quizId) {
+      console.log("⚠️ useListRooms: No quizId provided");
+      return;
+    }
+
+    console.log(
+      "🚀 useListRooms: Fetching rooms for quizId:",
+      quizId,
+      "status:",
+      status
+    );
     setLoading(true);
     setError(null);
+
     try {
       const res = await RoomService.listByQuiz(quizId, status);
+      console.log("📊 useListRooms: RoomService response:", res);
+
       if (res.success) {
         setItems(res.data.items || []);
+        console.log(
+          "✅ useListRooms: Rooms loaded successfully:",
+          res.data.items?.length || 0,
+          "rooms"
+        );
       } else {
-        setError(res.message || "Tải danh sách phòng thất bại");
+        const errorMsg = res.message || "Tải danh sách phòng thất bại";
+        console.log("❌ useListRooms: API returned error:", errorMsg);
+        setError(errorMsg);
+        setItems([]); // Clear items on error
       }
     } catch (e) {
-      setError(
-        (e as { message?: string })?.message || "Tải danh sách phòng thất bại"
-      );
+      const errorMsg =
+        (e as { message?: string })?.message || "Tải danh sách phòng thất bại";
+      console.error("💥 useListRooms: Exception occurred:", e);
+      setError(errorMsg);
+      setItems([]); // Clear items on error
     } finally {
       setLoading(false);
     }

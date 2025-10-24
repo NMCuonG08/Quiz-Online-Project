@@ -35,7 +35,6 @@ const ListQuizTable = () => {
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {String(error)}</div>;
-  if (!quizzes || quizzes.length === 0) return <div>No quizzes found</div>;
 
   return (
     <div>
@@ -67,145 +66,155 @@ const ListQuizTable = () => {
             </TableHeader>
 
             <TableBody>
-              {quizzes.map((item, index) => (
-                <TableRow
-                  key={index}
-                  className="border-[#eee] dark:border-dark-3"
-                >
-                  {/* Actions first */}
-                  <TableCell className="min-w-[120px] xl:pl-7.5">
-                    <div className="flex items-center gap-x-3.5">
-                      <button
-                        className="hover:text-primary hover:cursor-pointer"
-                        title="View quiz"
-                        aria-label="View quiz"
-                        onClick={() =>
-                          router.push(`/admin/quizzes/questions/${item.id}`)
-                        }
-                      >
-                        <span className="sr-only">View Quiz</span>
-                        <PreviewIcon width={24} height={24} />
-                      </button>
-
-                      <button
-                        className="hover:text-primary hover:cursor-pointer"
-                        title="Edit quiz"
-                        aria-label="Edit quiz"
-                        onClick={() =>
-                          router.push(`/admin/quizzes/edit/${item.slug}`)
-                        }
-                      >
-                        <span className="sr-only">Edit Quiz</span>
-                        <PencilSquareIcon width={24} height={24} />
-                      </button>
-
-                      <button
-                        className="hover:text-primary hover:cursor-pointer"
-                        title="Delete quiz"
-                        aria-label="Delete quiz"
-                        onClick={async () => {
-                          const res = await showDeleteConfirm(item.title);
-                          if (res.isConfirmed) {
-                            const result = await deleteQuiz(item.id);
-                            if (result.success) {
-                              showSuccess("Deleted successfully");
-                            } else {
-                              showError(
-                                String(result.error || "Delete failed")
-                              );
-                            }
-                          }
-                        }}
-                      >
-                        <span className="sr-only">Delete Quiz</span>
-                        <TrashIcon width={24} height={24} />
-                      </button>
+              {!quizzes || quizzes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8">
+                    <div className="text-gray-500 dark:text-gray-400">
+                      No quizzes found
                     </div>
                   </TableCell>
-
-                  {/* Thumbnail */}
-                  <TableCell className="min-w-[80px] xl:pl-7.5">
-                    <div className="flex-shrink-0">
-                      <Image
-                        src={
-                          item.thumbnail_url ||
-                          "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
-                        }
-                        alt={item.title}
-                        width={60}
-                        height={60}
-                        className="rounded-md object-cover"
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell className="min-w-[200px] max-w-[200px]">
-                    <h5
-                      className="text-dark dark:text-white truncate block overflow-hidden text-ellipsis whitespace-nowrap"
-                      title={item.title}
-                    >
-                      {item.title}
-                    </h5>
-                    <p
-                      className="mt-[3px] text-body-sm font-medium truncate block overflow-hidden text-ellipsis whitespace-nowrap text-gray-500"
-                      title={item.slug}
-                    >
-                      {item.slug}
-                    </p>
-                  </TableCell>
-                  <TableCell className="min-w-[300px] max-w-[300px]">
-                    <p
-                      className="text-dark dark:text-white truncate block overflow-hidden text-ellipsis whitespace-nowrap"
-                      title={item.description}
-                    >
-                      {item.description}
-                    </p>
-                  </TableCell>
-                  <TableCell className="min-w-[150px] max-w-[150px]">
-                    <p
-                      className="text-dark dark:text-white truncate block overflow-hidden text-ellipsis whitespace-nowrap"
-                      title={item.category_name || "—"}
-                    >
-                      {item.category_name || "—"}
-                    </p>
-                  </TableCell>
-                  <TableCell className="min-w-[100px] text-center">
-                    <p className="text-dark dark:text-white">
-                      {item.questions_count || 0}
-                    </p>
-                  </TableCell>
-                  <TableCell className="min-w-[100px] text-center">
-                    <p className="text-dark dark:text-white">
-                      {item.attempts_count || 0}
-                    </p>
-                  </TableCell>
-                  <TableCell className="min-w-[120px]">
-                    <p className="text-dark dark:text-white truncate">
-                      {item.created_at
-                        ? dayjs(item.created_at).format("MMM DD, YYYY")
-                        : "—"}
-                    </p>
-                  </TableCell>
-
-                  <TableCell className="min-w-[100px]">
-                    <div
-                      className={cn(
-                        "max-w-fit rounded-full px-3.5 py-1 text-sm font-medium",
-                        {
-                          "bg-[#219653]/[0.08] text-[#219653]":
-                            item.is_active === true,
-                          "bg-[#D34053]/[0.08] text-[#D34053]":
-                            item.is_active === false,
-                          "bg-[#FFA70B]/[0.08] text-[#FFA70B]":
-                            item.is_active === null,
-                        }
-                      )}
-                    >
-                      {item.is_active === true ? "Active" : "Inactive"}
-                    </div>
-                  </TableCell>
-                  {/* (Actions moved to first column) */}
                 </TableRow>
-              ))}
+              ) : (
+                quizzes.map((item, index) => (
+                  <TableRow
+                    key={index}
+                    className="border-[#eee] dark:border-dark-3"
+                  >
+                    {/* Actions first */}
+                    <TableCell className="min-w-[120px] xl:pl-7.5">
+                      <div className="flex items-center gap-x-3.5">
+                        <button
+                          className="hover:text-primary hover:cursor-pointer"
+                          title="View quiz"
+                          aria-label="View quiz"
+                          onClick={() =>
+                            router.push(`/admin/quizzes/questions/${item.id}`)
+                          }
+                        >
+                          <span className="sr-only">View Quiz</span>
+                          <PreviewIcon width={24} height={24} />
+                        </button>
+
+                        <button
+                          className="hover:text-primary hover:cursor-pointer"
+                          title="Edit quiz"
+                          aria-label="Edit quiz"
+                          onClick={() =>
+                            router.push(`/admin/quizzes/edit/${item.slug}`)
+                          }
+                        >
+                          <span className="sr-only">Edit Quiz</span>
+                          <PencilSquareIcon width={24} height={24} />
+                        </button>
+
+                        <button
+                          className="hover:text-primary hover:cursor-pointer"
+                          title="Delete quiz"
+                          aria-label="Delete quiz"
+                          onClick={async () => {
+                            const res = await showDeleteConfirm(item.title);
+                            if (res.isConfirmed) {
+                              const result = await deleteQuiz(item.id);
+                              if (result.success) {
+                                showSuccess("Deleted successfully");
+                              } else {
+                                showError(
+                                  String(result.error || "Delete failed")
+                                );
+                              }
+                            }
+                          }}
+                        >
+                          <span className="sr-only">Delete Quiz</span>
+                          <TrashIcon width={24} height={24} />
+                        </button>
+                      </div>
+                    </TableCell>
+
+                    {/* Thumbnail */}
+                    <TableCell className="min-w-[80px] xl:pl-7.5">
+                      <div className="flex-shrink-0">
+                        <Image
+                          src={
+                            item.thumbnail_url ||
+                            "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
+                          }
+                          alt={item.title}
+                          width={60}
+                          height={60}
+                          className="rounded-md object-cover"
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-[200px] max-w-[200px]">
+                      <h5
+                        className="text-dark dark:text-white truncate block overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </h5>
+                      <p
+                        className="mt-[3px] text-body-sm font-medium truncate block overflow-hidden text-ellipsis whitespace-nowrap text-gray-500"
+                        title={item.slug}
+                      >
+                        {item.slug}
+                      </p>
+                    </TableCell>
+                    <TableCell className="min-w-[300px] max-w-[300px]">
+                      <p
+                        className="text-dark dark:text-white truncate block overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={item.description}
+                      >
+                        {item.description}
+                      </p>
+                    </TableCell>
+                    <TableCell className="min-w-[150px] max-w-[150px]">
+                      <p
+                        className="text-dark dark:text-white truncate block overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={item.category_name || "—"}
+                      >
+                        {item.category_name || "—"}
+                      </p>
+                    </TableCell>
+                    <TableCell className="min-w-[100px] text-center">
+                      <p className="text-dark dark:text-white">
+                        {item.questions_count || 0}
+                      </p>
+                    </TableCell>
+                    <TableCell className="min-w-[100px] text-center">
+                      <p className="text-dark dark:text-white">
+                        {item.attempts_count || 0}
+                      </p>
+                    </TableCell>
+                    <TableCell className="min-w-[120px]">
+                      <p className="text-dark dark:text-white truncate">
+                        {item.created_at
+                          ? dayjs(item.created_at).format("MMM DD, YYYY")
+                          : "—"}
+                      </p>
+                    </TableCell>
+
+                    <TableCell className="min-w-[100px]">
+                      <div
+                        className={cn(
+                          "max-w-fit rounded-full px-3.5 py-1 text-sm font-medium",
+                          {
+                            "bg-[#219653]/[0.08] text-[#219653]":
+                              item.is_active === true,
+                            "bg-[#D34053]/[0.08] text-[#D34053]":
+                              item.is_active === false,
+                            "bg-[#FFA70B]/[0.08] text-[#FFA70B]":
+                              item.is_active === null,
+                          }
+                        )}
+                      >
+                        {item.is_active === true ? "Active" : "Inactive"}
+                      </div>
+                    </TableCell>
+                    {/* (Actions moved to first column) */}
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>

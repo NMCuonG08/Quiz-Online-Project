@@ -1,6 +1,12 @@
 "use client";
 
 import React from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/common/components/ui/card";
 
 interface QuizCreatorProps {
   creatorName?: string | null;
@@ -9,10 +15,14 @@ interface QuizCreatorProps {
 const QuizCreator: React.FC<QuizCreatorProps> = ({ creatorName }) => {
   if (!creatorName) return null;
   return (
-    <div className="bg-violet dark:bg-gray-dark rounded-lg p-6 border">
-      <div className="font-medium mb-2">Người tạo</div>
-      <div className="text-sm">{creatorName}</div>
-    </div>
+    <Card className="bg-violet dark:bg-gray-dark w-full">
+      <CardHeader>
+        <CardTitle>Người tạo</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-sm">{creatorName}</div>
+      </CardContent>
+    </Card>
   );
 };
 

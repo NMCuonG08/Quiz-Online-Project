@@ -35,9 +35,6 @@ const ListCategoriesTable = () => {
   if (error) {
     return <div>Error: {String(error)}</div>;
   }
-  if (categories.length === 0) {
-    return <div>No categories found</div>;
-  }
   return (
     <div>
       <div className="rounded-[10px] border border-stroke bg-white p-4 shadow-1 dark:border-dark-3 dark:bg-[#122031] dark:shadow-card sm:p-7.5">
@@ -63,113 +60,127 @@ const ListCategoriesTable = () => {
           </TableHeader>
 
           <TableBody>
-            {categories.map((item, index) => (
-              <TableRow
-                key={index}
-                className="border-[#eee] dark:border-dark-3"
-              >
-                {/* Actions first */}
-                <TableCell className="min-w-[120px] xl:pl-7.5">
-                  <div className="flex items-center gap-x-3.5">
-                    <button
-                      className="hover:text-primary hover:cursor-pointer"
-                      title="View quiz category"
-                      aria-label="View quiz category"
-                    >
-                      <span className="sr-only">View Category</span>
-                      <PreviewIcon />
-                    </button>
-
-                    <button
-                      className="hover:text-primary hover:cursor-pointer"
-                      title="Edit quiz category"
-                      aria-label="Edit quiz category"
-                      onClick={() =>
-                        router.push(`/admin/quiz-categories/edit/${item.slug}`)
-                      }
-                    >
-                      <span className="sr-only">Edit Category</span>
-                      <PencilSquareIcon />
-                    </button>
-
-                    <button
-                      className="hover:text-primary hover:cursor-pointer"
-                      title="Delete quiz category"
-                      aria-label="Delete quiz category"
-                      onClick={async () => {
-                        const res = await showDeleteConfirm(item.name);
-                        if (res.isConfirmed) {
-                          const result = await deleteCategory(item.id);
-                          if (result.success) {
-                            showSuccess("Deleted successfully");
-                          } else {
-                            showError(String(result.error || "Delete failed"));
-                          }
-                        }
-                      }}
-                    >
-                      <span className="sr-only">Delete Category</span>
-                      <TrashIcon />
-                    </button>
-                  </div>
-                </TableCell>
-
-                <TableCell className="min-w-[155px]">
-                  <Image
-                    src={
-                      item.icon_url ||
-                      "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
-                    }
-                    alt={item.name}
-                    width={50}
-                    height={50}
-                  />
-                </TableCell>
-                <TableCell className="min-w-[155px] xl:pl-7.5">
-                  <h5 className="text-dark dark:text-white">{item.name}</h5>
-                  <p className="mt-[3px] text-body-sm font-medium">
-                    {item.slug}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  <p className="text-dark dark:text-white">
-                    {item.description}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  <p className="text-dark dark:text-white">
-                    {(item as unknown as { parent_name?: string })
-                      .parent_name ??
-                      (item as unknown as { parent?: { name?: string } }).parent
-                        ?.name ??
-                      "—"}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  <p className="text-dark dark:text-white">
-                    {dayjs(item.created_at).format("MMM DD, YYYY")}
-                  </p>
-                </TableCell>
-
-                <TableCell>
-                  <div
-                    className={cn(
-                      "max-w-fit rounded-full px-3.5 py-1 text-sm font-medium",
-                      {
-                        "bg-[#219653]/[0.08] text-[#219653]":
-                          item.is_active === true,
-                        "bg-[#D34053]/[0.08] text-[#D34053]":
-                          item.is_active === false,
-                        "bg-[#FFA70B]/[0.08] text-[#FFA70B]":
-                          item.is_active === null,
-                      }
-                    )}
-                  >
-                    {item.is_active === true ? "Active" : "Inactive"}
+            {categories.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8">
+                  <div className="text-gray-500 dark:text-gray-400">
+                    No categories found
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              categories.map((item, index) => (
+                <TableRow
+                  key={index}
+                  className="border-[#eee] dark:border-dark-3"
+                >
+                  {/* Actions first */}
+                  <TableCell className="min-w-[120px] xl:pl-7.5">
+                    <div className="flex items-center gap-x-3.5">
+                      <button
+                        className="hover:text-primary hover:cursor-pointer"
+                        title="View quiz category"
+                        aria-label="View quiz category"
+                      >
+                        <span className="sr-only">View Category</span>
+                        <PreviewIcon />
+                      </button>
+
+                      <button
+                        className="hover:text-primary hover:cursor-pointer"
+                        title="Edit quiz category"
+                        aria-label="Edit quiz category"
+                        onClick={() =>
+                          router.push(
+                            `/admin/quiz-categories/edit/${item.slug}`
+                          )
+                        }
+                      >
+                        <span className="sr-only">Edit Category</span>
+                        <PencilSquareIcon />
+                      </button>
+
+                      <button
+                        className="hover:text-primary hover:cursor-pointer"
+                        title="Delete quiz category"
+                        aria-label="Delete quiz category"
+                        onClick={async () => {
+                          const res = await showDeleteConfirm(item.name);
+                          if (res.isConfirmed) {
+                            const result = await deleteCategory(item.id);
+                            if (result.success) {
+                              showSuccess("Deleted successfully");
+                            } else {
+                              showError(
+                                String(result.error || "Delete failed")
+                              );
+                            }
+                          }
+                        }}
+                      >
+                        <span className="sr-only">Delete Category</span>
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="min-w-[155px]">
+                    <Image
+                      src={
+                        item.icon_url ||
+                        "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
+                      }
+                      alt={item.name}
+                      width={50}
+                      height={50}
+                    />
+                  </TableCell>
+                  <TableCell className="min-w-[155px] xl:pl-7.5">
+                    <h5 className="text-dark dark:text-white">{item.name}</h5>
+                    <p className="mt-[3px] text-body-sm font-medium">
+                      {item.slug}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-dark dark:text-white">
+                      {item.description}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-dark dark:text-white">
+                      {(item as unknown as { parent_name?: string })
+                        .parent_name ??
+                        (item as unknown as { parent?: { name?: string } })
+                          .parent?.name ??
+                        "—"}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-dark dark:text-white">
+                      {dayjs(item.created_at).format("MMM DD, YYYY")}
+                    </p>
+                  </TableCell>
+
+                  <TableCell>
+                    <div
+                      className={cn(
+                        "max-w-fit rounded-full px-3.5 py-1 text-sm font-medium",
+                        {
+                          "bg-[#219653]/[0.08] text-[#219653]":
+                            item.is_active === true,
+                          "bg-[#D34053]/[0.08] text-[#D34053]":
+                            item.is_active === false,
+                          "bg-[#FFA70B]/[0.08] text-[#FFA70B]":
+                            item.is_active === null,
+                        }
+                      )}
+                    >
+                      {item.is_active === true ? "Active" : "Inactive"}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

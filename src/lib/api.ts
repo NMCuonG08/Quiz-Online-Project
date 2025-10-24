@@ -280,6 +280,23 @@ apiClient.interceptors.response.use(
     // Log the error with professional formatting
     APILogger.logError(error);
 
+    // Handle 500 Internal Server Error - return fallback response
+    if (error.response?.status === 500) {
+      console.warn("🔄 API returned 500 error, returning fallback response");
+      return Promise.resolve({
+        data: {
+          success: false,
+          statusCode: 500,
+          message: "Internal server error - backend may be down",
+          data: null,
+        },
+        status: 500,
+        statusText: "Internal Server Error",
+        headers: error.response?.headers || {},
+        config: error.config,
+      });
+    }
+
     // Handle 401 Unauthorized - try refresh once, then retry request
     if (error.response?.status === 401) {
       const originalConfig = error.config as AxiosRequestConfig & {

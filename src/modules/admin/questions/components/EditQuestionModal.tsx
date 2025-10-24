@@ -20,8 +20,16 @@ import {
 import { OptionRendererFactory } from "../strategies/OptionRenderer";
 import AddOptionCard from "./AddOptionCard";
 import type { QuestionItem, QuestionOption } from "../types/admin.question";
-import { updateQuestionSchema, transformQuestionData } from "../schema/question";
-import { showError, showSuccess, showLoading, closeLoading } from "@/lib/Notification";
+import {
+  updateQuestionSchema,
+  transformQuestionData,
+} from "../schema/question";
+import {
+  showError,
+  showSuccess,
+  showLoading,
+  closeLoading,
+} from "@/lib/Notification";
 import { useAdminQuestions } from "../hooks/useAdminQuestions";
 
 type Props = {
@@ -115,13 +123,15 @@ const EditQuestionModal: React.FC<Props> = ({
     });
 
     const parsed = updateQuestionSchema.safeParse(dataToValidate);
-    
+
     if (!parsed.success) {
       // Surface the first validation error via error toast notification
       const firstError = parsed.error.issues?.[0]?.message || "Invalid input";
-      const fieldPath = parsed.error.issues?.[0]?.path?.join('.') || 'unknown field';
+      const fieldPath = Array.isArray(parsed.error.issues?.[0]?.path)
+        ? parsed.error.issues[0].path.join(".")
+        : "unknown field";
       const errorMessage = `${fieldPath}: ${firstError}`;
-      
+
       showError(errorMessage);
       return;
     }
@@ -130,7 +140,7 @@ const EditQuestionModal: React.FC<Props> = ({
 
     try {
       const result = await editQuestion(questionData.id, parsed.data);
-      
+
       if (result.success) {
         showSuccess("Question updated successfully!");
         onSuccess?.();
@@ -178,7 +188,9 @@ const EditQuestionModal: React.FC<Props> = ({
 
             {/* Question Image Upload */}
             <div>
-              <label className="text-sm font-medium">Question Image (Optional)</label>
+              <label className="text-sm font-medium">
+                Question Image (Optional)
+              </label>
               <UploadImage
                 value={questionData.media_url}
                 onChange={(file) =>
@@ -190,11 +202,12 @@ const EditQuestionModal: React.FC<Props> = ({
                 placeholder="Upload question image"
                 className="mt-1"
               />
-              {typeof questionData.media_url === 'string' && questionData.media_url && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Current image will be replaced if you upload a new one
-                </p>
-              )}
+              {typeof questionData.media_url === "string" &&
+                questionData.media_url && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Current image will be replaced if you upload a new one
+                  </p>
+                )}
             </div>
 
             <div className="grid grid-cols-4 gap-4">
