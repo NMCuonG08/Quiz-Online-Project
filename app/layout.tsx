@@ -8,6 +8,7 @@ import AuthRestorer from "@/common/contexts/AuthRestorer";
 import { NotificationContainer } from "@/common/components/NotificationContainer";
 import ClientOnly from "@/common/contexts/ClientOnly";
 import { WebSocketDebugger } from "@/components/WebSocketDebugger";
+import ErrorBoundary from "@/common/components/ErrorBoundary";
 
 const comfortaa = Comfortaa({
   variable: "--font-comfortaa",
@@ -44,13 +45,15 @@ export default function RootLayout({
       <body
         className={`${comfortaa.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>
-          <ReduxProvider>
-            <AuthRestorer>{children}</AuthRestorer>
-            <NotificationContainer />
-            <ClientOnly>{/* <WebSocketDebugger /> */}</ClientOnly>
-          </ReduxProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <ReduxProvider>
+              <AuthRestorer>{children}</AuthRestorer>
+              <NotificationContainer />
+              <ClientOnly>{/* <WebSocketDebugger /> */}</ClientOnly>
+            </ReduxProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

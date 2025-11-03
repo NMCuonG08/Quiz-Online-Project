@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 5173",
-    "build": "next build --turbopack",
+    "dev:turbo": "next dev --port 5173 --turbo",
+    "build": "next build",
+    "build:turbo": "next build --turbopack",
     "start": "next start",
     "lint": "eslint"
   },

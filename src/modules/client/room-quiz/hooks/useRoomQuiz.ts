@@ -53,7 +53,10 @@ export function useRoomQuiz() {
     (roomId: string) => {
       // Join room via WebSocket
       console.log("Joining room via WebSocket:", roomId);
-      wsManager.send("join_room", { roomId });
+      if (!wsManager.isConnected() && !wsManager.getIsConnecting()) {
+        wsManager.scheduleReconnect(0);
+      }
+      wsManager.joinRoom(roomId);
 
       // Also fetch room data via API
       return dispatch(fetchRoomById(roomId));
@@ -81,9 +84,7 @@ export function useRoomQuiz() {
 
   const leaveRoom = useCallback((roomId: string) => {
     // Leave room via WebSocket
-    if (wsManager.isConnected()) {
-      wsManager.send("leave_room", { roomId });
-    }
+    wsManager.leaveRoom(roomId);
   }, []);
 
   const clearJoinErrorAction = useCallback(() => {
@@ -99,24 +100,61 @@ export function useRoomQuiz() {
 
   const sendMessageAction = useCallback(
     (roomId: string, message: string) => {
-      // Send via WebSocket for real-time
+      // Optimistic append for instant UX; server echo will follow
+      dispatch(
+        addMessage({
+          id: `temp_${Date.now()}`,
+          room_id: roomId,
+          user_id: "me",
+          username: "You",
+          message,
+          message_type: "text",
+          created_at: new Date().toISOString(),
+        })
+      );
+
       if (wsManager.isConnected()) {
         wsManager.send("send_message", { roomId, message });
       }
-      // Also send via API for persistence
-      return dispatch(sendMessage({ roomId, message }));
     },
     [dispatch]
   );
 
   const getParticipants = useCallback(
     (roomId: string) => {
+      console.log("🔍 getParticipants called with roomId:", roomId);
+      console.log("🔌 WebSocket connected:", wsManager.isConnected());
+
       // Request participants via WebSocket
       if (wsManager.isConnected()) {
+        console.log("📡 Sending get_participants via WebSocket");
         wsManager.send("get_participants", { roomId });
+      } else {
+        console.log("⚠️ WebSocket not connected, using API fallback");
       }
+
       // Fallback to API if WebSocket not connected
-      return dispatch(fetchParticipants(roomId));
+      const action = dispatch(fetchParticipants(roomId));
+      action.then((res: any) => {
+        try {
+          console.log("🧾 API fetchParticipants result:", res);
+          const payload = res?.payload as any;
+          if (payload) {
+            console.log(
+              "📥 API participants payload keys:",
+              Object.keys(payload)
+            );
+            const apiParticipants = (payload as any).participants ?? payload;
+            console.log(
+              "📊 API participants length:",
+              Array.isArray(apiParticipants) ? apiParticipants.length : "n/a"
+            );
+          }
+        } catch (e) {
+          console.log("⚠️ Unable to inspect API payload:", e);
+        }
+      });
+      return action;
     },
     [dispatch]
   );
@@ -149,7 +187,13 @@ export function useRoomQuiz() {
   }, [dispatch]);
 
   // WebSocket event handlers
+  const wsBoundRef: { current: boolean } = (globalThis as any)
+    .__roomQuizWsBoundRef || { current: false };
+  (globalThis as any).__roomQuizWsBoundRef = wsBoundRef;
+
   useEffect(() => {
+    if (wsBoundRef.current) return;
+    wsBoundRef.current = true;
     const handleNewMessage = (message: ChatMessage) => {
       console.log("📨 New message received:", message);
       addMessageAction(message);
@@ -170,9 +214,13 @@ export function useRoomQuiz() {
       dispatch(removeParticipant(participantId));
     };
 
-    const handleParticipantsList = (data: { participants: Participant[] }) => {
-      console.log("👤 Participants list received:", data.participants);
-      dispatch(setParticipants(data.participants));
+    const handleParticipantsList = (
+      data: { participants: Participant[] } & any
+    ) => {
+      console.log("👤 Participants list event payload:", data);
+      const list = (data && (data as any).participants) || [];
+      console.log("📊 Total participants (WS):", list.length);
+      dispatch(setParticipants(list));
     };
 
     const handleRoomUpdate = (roomData: RoomData) => {
@@ -182,8 +230,13 @@ export function useRoomQuiz() {
 
     const handleRoomJoined = (data: RoomJoinedPayload) => {
       console.log("✅ Room joined successfully:", data);
-      // Show success notification if needed
-      // TODO: Update room data or show success message
+      const joinedRoomId = (data as any)?.room_id || (data as any)?.roomId;
+      if (joinedRoomId) {
+        console.log("🔄 Fetching participants after join for:", joinedRoomId);
+        getParticipants(joinedRoomId);
+        console.log("🔄 Fetching messages after join for:", joinedRoomId);
+        getChatMessages(joinedRoomId);
+      }
     };
 
     const handleRoomLeft = (data: RoomLeftPayload) => {
@@ -214,6 +267,9 @@ export function useRoomQuiz() {
     };
 
     // Listen for WebSocket events
+    console.log("🔌 Setting up WebSocket listeners...");
+    console.log("🔌 WebSocket connected:", wsManager.isConnected());
+
     wsManager.on("room_message", handleNewMessage);
     wsManager.on("messages_list", handleMessagesList);
     wsManager.on("participant_joined", handleParticipantJoined);
@@ -230,6 +286,7 @@ export function useRoomQuiz() {
     wsManager.on("user_left", handleUserLeft);
 
     return () => {
+      wsBoundRef.current = false;
       wsManager.off("room_message", handleNewMessage);
       wsManager.off("messages_list", handleMessagesList);
       wsManager.off("participant_joined", handleParticipantJoined);
@@ -245,7 +302,7 @@ export function useRoomQuiz() {
       wsManager.off("user_joined", handleUserJoined);
       wsManager.off("user_left", handleUserLeft);
     };
-  }, [addMessageAction, dispatch]);
+  }, [addMessageAction, dispatch, getParticipants]);
 
   return {
     // State

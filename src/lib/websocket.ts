@@ -13,6 +13,12 @@ class WebSocketManager {
   private lastConnectionAttempt = 0;
   private connectionDebounceMs = 3000; // 3 seconds debounce
   private connectionTimeout: NodeJS.Timeout | null = null;
+  private joinedRooms = new Set<string>();
+  private participantsRoomHandlers = new Map<
+    string,
+    Set<(payload: { roomId: string; participants: unknown[] }) => void>
+  >();
+  private pendingEmits: Array<{ event: string; args: unknown[] }> = [];
 
   async connect(token: string): Promise<void> {
     // Clear any pending connection timeout
@@ -101,6 +107,35 @@ class WebSocketManager {
         this.connectionAttempts = 0; // Reset on successful connection
         this.startHeartbeat();
         this.emit("connected");
+        // Flush any pending emits queued while offline
+        try {
+          if (this.pendingEmits.length) {
+            const toSend = [...this.pendingEmits];
+            this.pendingEmits = [];
+            toSend.forEach(({ event, args }) => {
+              try {
+                this.socket!.emit(event, ...args);
+              } catch {
+                // swallow
+              }
+            });
+          }
+        } catch {
+          // swallow
+        }
+        // Rejoin previously joined rooms and refresh state
+        try {
+          if (this.joinedRooms.size > 0) {
+            this.joinedRooms.forEach((roomId) => {
+              this.send("join_room", { roomId });
+              // Refresh participants and messages for this room
+              this.send("get_participants", { roomId });
+              this.send("get_messages", { roomId });
+            });
+          }
+        } catch (e) {
+          console.warn("⚠️ Failed to auto rejoin rooms after connect:", e);
+        }
         resolve();
       });
 
@@ -156,6 +191,72 @@ class WebSocketManager {
         this.emit("notification", notificationData);
       });
 
+      // ============== CHAT EVENTS ==============
+      this.socket.on("room_message", (message) => {
+        try {
+          this.emit("room_message", message);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch room_message:", e);
+        }
+      });
+
+      this.socket.on("messages_list", (messages) => {
+        try {
+          this.emit("messages_list", messages);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch messages_list:", e);
+        }
+      });
+
+      // ============== ROOM LIFECYCLE EVENTS ==============
+      this.socket.on("room_joined", (payload) => {
+        try {
+          this.emit("room_joined", payload);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch room_joined:", e);
+        }
+      });
+
+      this.socket.on("room_left", (payload) => {
+        try {
+          this.emit("room_left", payload);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch room_left:", e);
+        }
+      });
+
+      this.socket.on("room_join_error", (payload) => {
+        try {
+          this.emit("room_join_error", payload);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch room_join_error:", e);
+        }
+      });
+
+      this.socket.on("room_leave_error", (payload) => {
+        try {
+          this.emit("room_leave_error", payload);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch room_leave_error:", e);
+        }
+      });
+
+      this.socket.on("user_joined", (payload) => {
+        try {
+          this.emit("user_joined", payload);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch user_joined:", e);
+        }
+      });
+
+      this.socket.on("user_left", (payload) => {
+        try {
+          this.emit("user_left", payload);
+        } catch (e) {
+          console.warn("⚠️ Failed to dispatch user_left:", e);
+        }
+      });
+
       this.socket.on("on_user_delete", (userId) => {
         this.emit("user_deleted", userId);
       });
@@ -163,6 +264,23 @@ class WebSocketManager {
       this.socket.on("on_asset_delete", (assetId) => {
         this.emit("asset_deleted", assetId);
       });
+
+      // Room participants realtime updates
+      this.socket.on(
+        "participants_list",
+        (payload: { roomId: string; participants: unknown[] }) => {
+          try {
+            this.emit("participants_list", payload);
+            const roomId = payload?.roomId as string;
+            if (roomId && this.participantsRoomHandlers.has(roomId)) {
+              const handlers = this.participantsRoomHandlers.get(roomId)!;
+              handlers.forEach((cb) => cb(payload));
+            }
+          } catch (e) {
+            console.warn("⚠️ Failed to dispatch participants_list:", e);
+          }
+        }
+      );
     });
   }
 
@@ -209,8 +327,13 @@ class WebSocketManager {
     ...args: ServerEventMap[T]
   ): void {
     if (this.socket?.connected) {
-      this.socket.emit(event, ...args);
+      this.socket.emit(event as string, ...args);
+      return;
     }
+    // Queue emit until connection is available
+    this.pendingEmits.push({ event: event as string, args });
+    // Try to reconnect soon
+    this.scheduleReconnect(100);
   }
 
   isConnected(): boolean {
@@ -298,6 +421,52 @@ class WebSocketManager {
     this.clearListeners();
     // This will be called from middleware
     return true;
+  }
+
+  // =============== ROOM HELPERS ===============
+  joinRoom(roomId: string): void {
+    if (!roomId) return;
+    if (!this.joinedRooms.has(roomId)) {
+      this.send("join_room", { roomId });
+      this.joinedRooms.add(roomId);
+    }
+  }
+
+  leaveRoom(roomId: string): void {
+    if (!roomId) return;
+    if (this.joinedRooms.has(roomId)) {
+      this.send("leave_room", { roomId });
+      this.joinedRooms.delete(roomId);
+    }
+  }
+
+  subscribeParticipants(
+    roomId: string,
+    callback: (payload: { roomId: string; participants: unknown[] }) => void,
+    options: { immediateFetch?: boolean } = { immediateFetch: true }
+  ): () => void {
+    if (!roomId || !callback) return () => {};
+    // Ensure joined for realtime
+    this.joinRoom(roomId);
+    // Register handler
+    if (!this.participantsRoomHandlers.has(roomId)) {
+      this.participantsRoomHandlers.set(roomId, new Set());
+    }
+    const set = this.participantsRoomHandlers.get(roomId)!;
+    set.add(callback);
+    // Optionally request current list immediately
+    if (options.immediateFetch) {
+      this.send("get_participants", { roomId });
+    }
+    // Return unsubscribe
+    return () => {
+      const handlers = this.participantsRoomHandlers.get(roomId);
+      if (!handlers) return;
+      handlers.delete(callback);
+      if (handlers.size === 0) {
+        this.participantsRoomHandlers.delete(roomId);
+      }
+    };
   }
 }
 

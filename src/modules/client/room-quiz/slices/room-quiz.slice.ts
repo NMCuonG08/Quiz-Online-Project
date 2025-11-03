@@ -139,10 +139,20 @@ const roomQuizSlice = createSlice({
       state.joinError = null;
     },
     addMessage: (state, action) => {
-      state.messages.push(action.payload);
+      const msg = action.payload as ChatMessage;
+      if (!state.messages.some((m) => m.id === msg.id)) {
+        state.messages.push(msg);
+      }
     },
     setMessages: (state, action) => {
-      state.messages = Array.isArray(action.payload) ? action.payload : [];
+      const list = Array.isArray(action.payload) ? action.payload : [];
+      const seen = new Set<string>();
+      state.messages = list.filter((m: any) => {
+        if (!m?.id) return true;
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      }) as ChatMessage[];
     },
     addParticipant: (state, action) => {
       state.participants.push(action.payload);
@@ -153,7 +163,22 @@ const roomQuizSlice = createSlice({
       );
     },
     setParticipants: (state, action) => {
-      state.participants = Array.isArray(action.payload) ? action.payload : [];
+      const payload = action.payload as any;
+      const rawList = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.participants)
+        ? payload.participants
+        : [];
+      state.participants = rawList.map((p: any) => ({
+        id: p.id || p.user_id || `${p.user_id || Math.random()}`,
+        user_id: p.user_id || p.id || "",
+        username: p.username || p.full_name || p.user_id || "Unknown User",
+        avatar_url: p.avatar_url,
+        joined_at: p.joined_at || new Date().toISOString(),
+        is_ready: Boolean(p.is_ready),
+        is_host: Boolean(p.is_host),
+        status: p.status,
+      })) as Participant[];
     },
     clearMessagesError: (state) => {
       state.messagesError = null;
@@ -240,9 +265,22 @@ const roomQuizSlice = createSlice({
       })
       .addCase(fetchParticipants.fulfilled, (state, action) => {
         state.participantsLoading = false;
-        state.participants = Array.isArray(action.payload)
-          ? action.payload
+        const payload = action.payload as any;
+        const rawList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.participants)
+          ? payload.participants
           : [];
+        state.participants = rawList.map((p: any) => ({
+          id: p.id || p.user_id || `${p.user_id || Math.random()}`,
+          user_id: p.user_id || p.id || "",
+          username: p.username || p.full_name || p.user_id || "Unknown User",
+          avatar_url: p.avatar_url,
+          joined_at: p.joined_at || new Date().toISOString(),
+          is_ready: Boolean(p.is_ready),
+          is_host: Boolean(p.is_host),
+          status: p.status,
+        })) as Participant[];
         state.participantsError = null;
       })
       .addCase(fetchParticipants.rejected, (state, action) => {

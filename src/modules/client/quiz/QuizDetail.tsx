@@ -21,6 +21,13 @@ import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
 import { Label } from "@/common/components/ui/label";
 import { Switch } from "@/common/components/ui/switch";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/common/components/ui/card";
+import { Div } from "@/common/components/ui/div";
 import { Users, DoorOpen, Shield, Hash, LockKeyhole } from "lucide-react";
 import type { QuizDetailData } from "./services/quiz.detail.service";
 import { useCreateRoom } from "./hooks/useCreateRoom";
@@ -28,6 +35,7 @@ import { useListRooms } from "./hooks/useListRooms";
 import { useRouter } from "next/navigation";
 import { useJoinRoom } from "./hooks/useJoinRoom";
 import { showError } from "@/lib/Notification";
+import { BackendUnavailable } from "./components/BackendUnavailable";
 
 interface QuizDetailProps {
   slug: string;
@@ -54,12 +62,20 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
   }>({});
 
   const quizId = (data as QuizDetailData | null)?.id ?? slug;
+
+  // Validate quizId before using it
+  const isValidQuizId =
+    quizId &&
+    quizId.trim() !== "" &&
+    quizId !== "undefined" &&
+    quizId !== "null";
+
   const {
     items: rooms,
     loading: loadingRooms,
     error: roomsError,
     refetch,
-  } = useListRooms(quizId, "OPEN");
+  } = useListRooms(isValidQuizId ? quizId : undefined, "OPEN");
   const [joinPassword, setJoinPassword] = React.useState("");
   const [joiningRoomId, setJoiningRoomId] = React.useState<string | null>(null);
   const { join, loading: joining } = useJoinRoom();
@@ -118,7 +134,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
   return (
     <div>
       <QuizBanner src={data.thumbnail_url} title={data.title} />
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="w-full px-4 py-6">
         {/* Hero Section */}
         <div className="mb-8">
           <QuizHeader
@@ -140,24 +156,27 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
           {/* Left Column - Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 w-full">
             {/* CTA Section */}
-            <div className="bg-red-light dark:bg-gray-dark rounded-lg p-6 border">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">
+            <Card className="bg-red-light dark:bg-gray-dark">
+              <CardContent className="space-y-4">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">
                     Sẵn sàng thử thách?
-                  </h3>
+                  </CardTitle>
                   <p className="text-sm text-gray-600">
                     {data.questions_count} câu hỏi •{" "}
                     {Math.floor(data.time_limit / 60)} phút •{" "}
                     {data.difficulty_level}
                   </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <Button className="bg-blue-600 dark:bg-gray-dark text-white">
+                </CardHeader>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    className="bg-blue-600 dark:bg-gray-dark text-white flex-1"
+                    onClick={() => router.push(`/quiz/${slug}/do-quiz`)}
+                  >
                     <DoorOpen />
                     Bắt đầu làm bài
                   </Button>
@@ -170,7 +189,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     }}
                   >
                     <DialogTrigger asChild>
-                      <Button className="bg-green-600 dark:bg-gray-dark text-white">
+                      <Button className="bg-green-600 dark:bg-gray-dark text-white flex-1">
                         <Users />
                         Tham gia phòng
                       </Button>
@@ -207,9 +226,10 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                       </DialogHeader>
                       <div className="mt-0">
                         {roomsError && (
-                          <div className="text-sm text-red-500">
-                            {roomsError}
-                          </div>
+                          <BackendUnavailable
+                            message={roomsError}
+                            onRetry={refetch}
+                          />
                         )}
                         {loadingRooms ? (
                           <div>Đang tải...</div>
@@ -295,7 +315,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     onOpenChange={setOpenCreateRoom}
                   >
                     <DialogTrigger asChild>
-                      <Button className="bg-red-600 dark:bg-gray-dark text-white">
+                      <Button className="bg-red-600 dark:bg-gray-dark text-white flex-1">
                         <Users />
                         Tạo phòng
                       </Button>
@@ -419,8 +439,8 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Instructions */}
             <QuizInstructions instructions={data.instructions} />
@@ -438,45 +458,56 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Quiz Stats Card */}
-            <div className="bg-violet dark:bg-gray-dark rounded-lg border p-6">
-              <h3 className="font-semibold mb-4">Thông tin chi tiết</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Độ khó</span>
-                  <span className="font-medium">{data.difficulty_level}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Thời gian</span>
-                  <span className="font-medium">{data.time_limit}s</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Lượt làm tối đa</span>
-                  <span className="font-medium">{data.max_attempts}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Điểm qua môn</span>
-                  <span className="font-medium">{data.passing_score}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Loại quiz</span>
-                  <span className="font-medium">{data.quiz_type}</span>
-                </div>
-                {data.published_at && (
+            <Card className="bg-violet dark:bg-gray-dark">
+              <CardHeader>
+                <CardTitle className="font-semibold">
+                  Thông tin chi tiết
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Ngày tạo</span>
-                    <span className="font-medium">
-                      {new Date(data.published_at).toLocaleDateString()}
-                    </span>
+                    <span className="text-gray-600">Độ khó</span>
+                    <span className="font-medium">{data.difficulty_level}</span>
                   </div>
-                )}
-              </div>
-            </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Thời gian</span>
+                    <span className="font-medium">{data.time_limit}s</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Lượt làm tối đa</span>
+                    <span className="font-medium">{data.max_attempts}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Điểm qua môn</span>
+                    <span className="font-medium">{data.passing_score}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Loại quiz</span>
+                    <span className="font-medium">{data.quiz_type}</span>
+                  </div>
+                  {data.published_at && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Ngày tạo</span>
+                      <span className="font-medium">
+                        {new Date(data.published_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Creator Info */}
             <QuizCreator creatorName={data.creator_name} />
 
             {/* Quick Stats */}
-            <div className="bg-gray-50 dark:bg-gray-dark rounded-lg p-4">
+            <Div
+              variant="elevated"
+              size="default"
+              rounded="lg"
+              className="bg-gray-50 dark:bg-gray-dark"
+            >
               <h4 className="font-medium mb-3">Thống kê</h4>
               <div className="grid grid-cols-2 gap-4 text-center">
                 <div>
@@ -492,7 +523,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                   <div className="text-xs text-gray-600">Lượt làm</div>
                 </div>
               </div>
-            </div>
+            </Div>
           </div>
         </div>
       </div>

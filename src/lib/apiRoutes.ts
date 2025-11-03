@@ -12,6 +12,8 @@ export const apiRoutes = {
     CREATE: "/api/rooms",
     BY_QUIZ: (quizId: string, status?: string) =>
       `/api/rooms/quiz/id/${quizId}${status ? `?status=${status}` : ""}`,
+    BY_QUIZ_SLUG: (quizSlug: string, status?: string) =>
+      `/api/rooms/quiz/slug/${quizSlug}${status ? `?status=${status}` : ""}`,
     JOIN: (roomId: string) => `/api/rooms/${roomId}/join`,
     BY_CODE: (roomCode: string) => `/api/rooms/code/${roomCode}`,
   },
@@ -20,6 +22,7 @@ export const apiRoutes = {
     GET_ALL: "/api/quizzes",
 
     GET_BY_SLUG: (slug: string) => `/api/quizzes/slug/${slug}`,
+    GET_BY_ID: (id: string) => `/api/quizzes/id/${id}`,
     CREATE: "/api/quizzes",
     UPDATE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
     DELETE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
@@ -36,8 +39,27 @@ export const apiRoutes = {
     BASE: "/api/questions",
     GET_ALL: "/api/questions",
     GET_BY_ID: (id: string) => `/api/questions/quiz/${id}`,
+    GET_ALL_BY_QUIZ: (quizId: string) => `/api/questions/quiz/${quizId}/all`,
+    GET_PUBLIC_BY_QUIZ: (quizId: string) =>
+      `/api/questions/quiz/${quizId}/public`,
+    GET_PUBLIC_BY_SLUG: (slug: string) =>
+      `/api/questions/quiz/slug/${slug}/public`,
     CREATE: "/api/questions",
     UPDATE_BY_ID: (id: string) => `/api/questions/${id}`,
     DELETE_BY_ID: (id: string) => `/api/questions/${id}`,
+  },
+  QUIZ_SESSIONS: {
+    BASE: "/api/quiz-sessions",
+    CREATE: "/api/quiz-sessions",
+    CREATE_PUBLIC: "/api/quiz-sessions/public",
+    CREATE_PUBLIC_BY_SLUG: "/api/quiz-sessions/public/slug",
+    SUBMIT_ANSWER: (sessionId: string) =>
+      `/api/quiz-sessions/${sessionId}/answers`,
+    SUBMIT_ANSWER_PUBLIC: (sessionId: string) =>
+      `/api/quiz-sessions/${sessionId}/answers/public`,
+    COMPLETE: (sessionId: string) => `/api/quiz-sessions/${sessionId}/complete`,
+    COMPLETE_PUBLIC: (sessionId: string) =>
+      `/api/quiz-sessions/${sessionId}/complete/public`,
+    GET_RESULT: (sessionId: string) => `/api/quiz-sessions/${sessionId}/result`,
   },
 };

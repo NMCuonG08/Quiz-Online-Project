@@ -45,6 +45,7 @@ export interface ChatMessage {
   message: string;
   message_type: "text" | "system" | "notification";
   created_at: string;
+  avatar_url?: string | null;
 }
 
 export interface Participant {
@@ -55,6 +56,7 @@ export interface Participant {
   joined_at: string;
   is_ready: boolean;
   is_host: boolean;
+  status?: string;
 }
 
 export interface ChatMessagesResponse {
@@ -80,7 +82,7 @@ export class RoomQuizService {
     if (roomData.success && roomData.data?.quiz_id) {
       try {
         const quizResponse = await apiClient.get(
-          `${apiRoutes.QUIZZES.BASE}/${roomData.data.quiz_id}`
+          `${apiRoutes.QUIZZES.GET_BY_ID(roomData.data.quiz_id)}`
         );
         if (quizResponse.data?.success && quizResponse.data?.data) {
           roomData.data.quiz = quizResponse.data.data as QuizDetailData;

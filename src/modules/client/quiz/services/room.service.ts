@@ -59,8 +59,85 @@ export class RoomService {
       };
     };
   }> {
-    const res = await apiClient.get(apiRoutes.ROOMS.BY_QUIZ(quizId, status));
-    return res.data;
+    try {
+      // Validate quizId
+      if (!quizId || quizId.trim() === "") {
+        throw new Error("Quiz ID is required");
+      }
+
+      // Check if quizId is a UUID or slug
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          quizId
+        );
+
+      console.log(
+        "🔍 RoomService: Fetching rooms for quizId:",
+        quizId,
+        "status:",
+        status,
+        "isUUID:",
+        isUUID
+      );
+
+      const url = isUUID
+        ? apiRoutes.ROOMS.BY_QUIZ(quizId, status)
+        : apiRoutes.ROOMS.BY_QUIZ_SLUG(quizId, status);
+      console.log("📡 RoomService: API URL:", url);
+
+      const res = await apiClient.get(url);
+      console.log("✅ RoomService: Response:", res.data);
+
+      return res.data;
+    } catch (error: unknown) {
+      console.error("❌ RoomService: Error fetching rooms:", error);
+
+      // Check if it's a 500 error from backend
+      const axiosError = error as {
+        response?: { status?: number; data?: any };
+      };
+      if (axiosError.response?.status === 500) {
+        console.warn(
+          "🔄 Backend returned 500 error, returning empty rooms list"
+        );
+        return {
+          success: true, // Return success to prevent UI crash
+          statusCode: 200,
+          message: "No rooms available (backend error)",
+          data: {
+            items: [],
+            pagination: {
+              page: 1,
+              limit: 10,
+              total: 0,
+              totalItems: 0,
+              totalPages: 0,
+              hasNext: false,
+              hasPrev: false,
+            },
+          },
+        };
+      }
+
+      // Return a fallback response for other errors
+      return {
+        success: false,
+        statusCode: 500,
+        message: "Failed to fetch rooms",
+        data: {
+          items: [],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            totalItems: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+          },
+        },
+      };
+    }
   }
 
   static async join(

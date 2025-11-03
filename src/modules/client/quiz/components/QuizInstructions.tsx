@@ -1,6 +1,12 @@
 "use client";
 
 import React from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/common/components/ui/card";
 
 interface QuizInstructionsProps {
   instructions?: string | null;
@@ -11,10 +17,14 @@ const QuizInstructions: React.FC<QuizInstructionsProps> = ({
 }) => {
   if (!instructions) return null;
   return (
-    <div className="bg-red-light dark:bg-gray-dark rounded-lg p-6 border">
-      <div className="font-medium mb-2">Hướng dẫn</div>
-      <p className="text-sm whitespace-pre-line">{instructions}</p>
-    </div>
+    <Card className="bg-red-light dark:bg-gray-dark w-full">
+      <CardHeader>
+        <CardTitle>Hướng dẫn</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm whitespace-pre-line">{instructions}</p>
+      </CardContent>
+    </Card>
   );
 };
 
