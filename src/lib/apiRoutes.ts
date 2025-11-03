@@ -22,6 +22,7 @@ export const apiRoutes = {
     GET_ALL: "/api/quizzes",
 
     GET_BY_SLUG: (slug: string) => `/api/quizzes/slug/${slug}`,
+    GET_BY_ID: (id: string) => `/api/quizzes/id/${id}`,
     CREATE: "/api/quizzes",
     UPDATE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
     DELETE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,

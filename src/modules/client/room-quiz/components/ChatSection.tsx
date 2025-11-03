@@ -2,9 +2,14 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Send, MessageCircle } from "lucide-react";
-import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
 import { type ChatMessage } from "../services/room-quiz.service";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/common/components/ui/avatar";
+import { wsManager } from "@/lib/websocket";
 
 interface ChatSectionProps {
   messages: ChatMessage[];
@@ -49,6 +54,18 @@ export function ChatSection({
     });
   };
 
+  const getCurrentUserId = () => {
+    try {
+      const token = wsManager.getCurrentToken();
+      if (!token) return undefined;
+      const payload = JSON.parse(atob(token.split(".")[1] || ""));
+      return payload?.sub || payload?.userId || payload?.id;
+    } catch {
+      return undefined;
+    }
+  };
+  const myUserId = getCurrentUserId();
+
   return (
     <div
       className={`bg-card border border-border rounded-lg h-full flex flex-col ${className}`}
@@ -74,34 +91,80 @@ export function ChatSection({
             No messages yet. Start the conversation!
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${
-                msg.message_type === "system" ? "items-center" : "items-start"
-              }`}
-            >
-              {msg.message_type === "system" ? (
-                <div className="bg-muted/50 text-muted-foreground text-sm px-3 py-1 rounded-full">
-                  {msg.message}
-                </div>
-              ) : (
-                <div className="max-w-[80%]">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-foreground">
-                      {msg.username}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatTime(msg.created_at)}
-                    </span>
-                  </div>
-                  <div className="bg-muted/50 text-foreground p-2 rounded-lg text-sm">
+          messages.map((msg) => {
+            const isSystem = msg.message_type === "system";
+            const isMe = !!myUserId && msg.user_id === myUserId;
+            return (
+              <div
+                key={msg.id}
+                className={`flex ${
+                  isSystem
+                    ? "justify-center"
+                    : isMe
+                    ? "justify-end"
+                    : "justify-start"
+                }`}
+              >
+                {isSystem ? (
+                  <div className="bg-muted/50 text-muted-foreground text-sm px-3 py-1 rounded-full">
                     {msg.message}
                   </div>
-                </div>
-              )}
-            </div>
-          ))
+                ) : (
+                  <div
+                    className={`flex items-start gap-2 max-w-[80%] ${
+                      isMe ? "flex-row-reverse" : ""
+                    }`}
+                  >
+                    <Avatar className="w-8 h-8 mt-0.5">
+                      <AvatarImage src={msg.avatar_url || undefined} />
+                      <AvatarFallback className="text-xs">
+                        {(
+                          (isMe
+                            ? msg.username || "You"
+                            : msg.username ||
+                              (msg.user_id || "").slice(0, 2)) || "U"
+                        )
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div
+                      className={`flex-1 ${isMe ? "text-right" : "text-left"}`}
+                    >
+                      <div
+                        className={`flex items-center gap-2 mb-1 ${
+                          isMe ? "justify-end" : "justify-start"
+                        }`}
+                      >
+                        <span className="text-sm font-medium text-foreground">
+                          {isMe
+                            ? msg.username || "You"
+                            : msg.username || (msg.user_id || "").slice(0, 8)}
+                        </span>
+                        {isMe && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            You
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {formatTime(msg.created_at)}
+                        </span>
+                      </div>
+                      <div
+                        className={`${
+                          isMe
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/50 text-foreground"
+                        } p-2 rounded-lg text-sm inline-block`}
+                      >
+                        {msg.message}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>

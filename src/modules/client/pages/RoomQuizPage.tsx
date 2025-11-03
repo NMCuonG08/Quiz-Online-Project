@@ -40,7 +40,7 @@ const RoomQuizPage = () => {
     if (roomId) {
       console.log("Fetching room with ID:", roomId);
       getRoomById(roomId);
-      getChatMessages(roomId);
+      // Moved to run after room_joined event to avoid race/overwrite
       getParticipants(roomId);
     }
 
@@ -64,7 +64,7 @@ const RoomQuizPage = () => {
     if (roomId) {
       console.log("Retrying fetch room with ID:", roomId);
       getRoomById(roomId);
-      getChatMessages(roomId);
+      // Moved to run after room_joined event to avoid race/overwrite
       getParticipants(roomId);
     }
   };
@@ -183,27 +183,28 @@ const RoomQuizPage = () => {
                 </div>
               </div>
 
-              {/* Chat Section */}
-              <div className="h-80">
-                <ChatSection
-                  messages={messages}
-                  loading={messagesLoading}
-                  error={messagesError}
-                  sendMessageLoading={sendMessageLoading}
-                  onSendMessage={handleSendMessage}
+              {/* Participants Section (left, shorter) */}
+              <div className="h-96">
+                <ParticipantsSection
+                  roomId={roomId}
+                  participants={participants}
+                  loading={participantsLoading}
+                  error={participantsError}
+                  onInviteFriends={handleInviteFriends}
                 />
               </div>
             </div>
 
             {/* Right Side - 40% */}
             <div className="lg:col-span-2">
-              {/* Participants Section */}
-              <div className="h-full">
-                <ParticipantsSection
-                  participants={participants}
-                  loading={participantsLoading}
-                  error={participantsError}
-                  onInviteFriends={handleInviteFriends}
+              {/* Chat Section (right, taller with scroll) */}
+              <div className="h-[700px]">
+                <ChatSection
+                  messages={messages}
+                  loading={messagesLoading}
+                  error={messagesError}
+                  sendMessageLoading={sendMessageLoading}
+                  onSendMessage={handleSendMessage}
                 />
               </div>
             </div>

@@ -9,22 +9,46 @@ import {
   AvatarImage,
 } from "@/common/components/ui/avatar";
 import { type Participant } from "../services/room-quiz.service";
+import { useRoomQuiz } from "../hooks/useRoomQuiz";
 
 interface ParticipantsSectionProps {
-  participants: Participant[];
-  loading: boolean;
-  error: string | null;
-  onInviteFriends: () => void;
+  roomId?: string;
+  participants?: Participant[];
+  loading?: boolean;
+  error?: string | null;
+  onInviteFriends?: () => void;
   className?: string;
 }
 
 export function ParticipantsSection({
-  participants,
-  loading,
-  error,
+  roomId,
+  participants: participantsProp,
+  loading: loadingProp,
+  error: errorProp,
   onInviteFriends,
   className = "",
 }: ParticipantsSectionProps) {
+  const {
+    participants: participantsState,
+    participantsLoading,
+    participantsError,
+    getParticipants,
+  } = useRoomQuiz();
+
+  const participants = participantsProp ?? participantsState;
+  const loading = loadingProp ?? participantsLoading;
+  const error =
+    errorProp ?? (participantsError ? String(participantsError) : null);
+
+  React.useEffect(() => {
+    if (roomId) {
+      console.log(
+        "🚀 ParticipantsSection: fetching participants for room:",
+        roomId
+      );
+      getParticipants(roomId);
+    }
+  }, [roomId, getParticipants]);
   const getInitials = (username: string) => {
     return username
       .split(" ")
@@ -102,8 +126,22 @@ export function ParticipantsSection({
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Joined{" "}
-                    {new Date(participant.joined_at).toLocaleDateString()}
+                    {(() => {
+                      const st = (participant as unknown as { status?: string })
+                        ?.status;
+                      const isJoined = st === "JOINED";
+                      const label = isJoined ? "Đang tham gia" : "Đã rời phòng";
+                      const cls = isJoined
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-600";
+                      return (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${cls}`}
+                        >
+                          {label}
+                        </span>
+                      );
+                    })()}
                   </p>
                 </div>
               </div>

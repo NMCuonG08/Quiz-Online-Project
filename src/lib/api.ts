@@ -137,6 +137,9 @@ let isLoggingOut = false;
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
+// Flag to track if currently calling refresh endpoint (prevent interceptor loop)
+let isCallingRefreshEndpoint = false;
+
 // Removed unused store access helpers
 
 // Token expiration configuration (for future use if needed)
@@ -247,6 +250,7 @@ const startTokenRefresh = async (): Promise<string | null> => {
     return refreshPromise;
   }
   isRefreshing = true;
+  isCallingRefreshEndpoint = true; // Set flag before calling refresh
   refreshPromise = (async () => {
     try {
       type RefreshResult =
@@ -265,6 +269,7 @@ const startTokenRefresh = async (): Promise<string | null> => {
       return null;
     } finally {
       isRefreshing = false;
+      isCallingRefreshEndpoint = false; // Reset flag after refresh completes
     }
   })();
   return refreshPromise;
@@ -297,14 +302,41 @@ apiClient.interceptors.response.use(
       });
     }
 
-    // Handle 401 Unauthorized - try refresh once, then retry request
+    // Handle 401 Unauthorized - try refresh once, then logout if refresh fails
     if (error.response?.status === 401) {
       const originalConfig = error.config as AxiosRequestConfig & {
         _retry?: boolean;
       };
 
+      // If we're currently calling refresh endpoint and it fails, logout immediately
+      if (isCallingRefreshEndpoint) {
+        console.warn(
+          "⚠️ 401 on refresh endpoint - Refresh token invalid, auto logout"
+        );
+        if (!isLoggingOut) {
+          isLoggingOut = true;
+          await performLogout();
+          setTimeout(() => {
+            isLoggingOut = false;
+          }, 1000);
+        }
+        return Promise.resolve({
+          data: error.response?.data || {
+            error: {
+              message: "Unauthorized - Refresh token invalid",
+              code: "REFRESH_FAILED",
+            },
+          },
+          status: 401,
+          statusText: "Unauthorized",
+          headers: error.response?.headers || {},
+          config: error.config,
+        });
+      }
+
       if (originalConfig && originalConfig._retry) {
         // Already retried, prevent loops -> logout
+        console.warn("🔄 401 Already retried - Auto logout");
         if (!isLoggingOut) {
           isLoggingOut = true;
           await performLogout();
@@ -323,11 +355,14 @@ apiClient.interceptors.response.use(
         });
       }
 
-      // Queue until refresh completes
+      // Try to refresh token - only retry if refresh succeeds
       try {
+        console.log("🔄 Attempting token refresh...");
         const newToken: string | null = await startTokenRefresh();
+
         if (!newToken) {
-          // Refresh failed -> logout
+          // Refresh failed -> logout immediately
+          console.warn("⚠️ Token refresh failed - Auto logout");
           if (!isLoggingOut) {
             isLoggingOut = true;
             await performLogout();
@@ -345,13 +380,16 @@ apiClient.interceptors.response.use(
         }
 
         // Retry once with new token
+        console.log("✅ Token refreshed successfully - Retrying request");
         originalConfig._retry = true;
         const hdrs: Record<string, unknown> =
           (originalConfig.headers as Record<string, unknown>) || {};
         hdrs["Authorization"] = `Bearer ${newToken}`;
         originalConfig.headers = hdrs as AxiosRequestConfig["headers"];
         return apiClient(originalConfig) as Promise<AxiosResponse>;
-      } catch {
+      } catch (refreshError) {
+        // Refresh failed with error -> logout
+        console.error("❌ Token refresh error - Auto logout:", refreshError);
         if (!isLoggingOut) {
           isLoggingOut = true;
           await performLogout();
@@ -367,6 +405,29 @@ apiClient.interceptors.response.use(
           config: error.config,
         });
       }
+    }
+
+    // Handle 403 Forbidden - invalid token or access denied, auto logout
+    if (error.response?.status === 403) {
+      console.warn(
+        "🔒 403 Forbidden - Auto logout due to invalid token or access denied"
+      );
+      if (!isLoggingOut) {
+        isLoggingOut = true;
+        await performLogout();
+        setTimeout(() => {
+          isLoggingOut = false;
+        }, 1000);
+      }
+      return Promise.resolve({
+        data: error.response?.data || {
+          error: { message: "Forbidden - Access denied", code: "FORBIDDEN" },
+        },
+        status: 403,
+        statusText: "Forbidden",
+        headers: error.response?.headers || {},
+        config: error.config,
+      });
     }
 
     // For all other errors, return the response instead of rejecting
