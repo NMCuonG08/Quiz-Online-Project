@@ -36,8 +36,10 @@ export class CategoryService extends BaseService {
       ...(iconUrl ? { icon_url: iconUrl } : {}),
     });
 
-    // Invalidate cache khi tạo category mới
-    await this.redisService.del('categories:all');
+    // Invalidate cache via event
+    await this.eventRepository.emit('CategoryCacheInvalidated', {
+      keys: 'categories:all',
+    });
 
     const withParent = await this.categoryRepository.findByIdWithParent(
       newCategory.id,
@@ -125,8 +127,10 @@ export class CategoryService extends BaseService {
       },
     );
 
-    // Invalidate cache after update
-    await this.redisService.del('categories:all');
+    // Invalidate cache after update via event
+    await this.eventRepository.emit('CategoryCacheInvalidated', {
+      keys: 'categories:all',
+    });
 
     const withParent = await this.categoryRepository.findByIdWithParent(id);
     return {

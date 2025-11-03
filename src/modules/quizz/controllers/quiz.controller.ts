@@ -52,6 +52,20 @@ export class QuizController {
     return this.quizService.getQuizBySlug(slug);
   }
 
+  @Get('id/:id')
+  @ApiOperation({ summary: 'Get a quiz by id' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved quiz by id',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Quiz not found',
+  })
+  async getQuizById(@Param('id') id: string): Promise<QuizResponseDto> {
+    return this.quizService.getQuizById(id);
+  }
+
   @Patch(':id')
   @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.QuizUpdate })

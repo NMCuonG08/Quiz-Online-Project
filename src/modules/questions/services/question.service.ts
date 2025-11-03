@@ -116,7 +116,13 @@ export class QuestionService extends BaseService {
       media_id: mediaId || null,
     };
 
-    return await this.questionRepository.createWithOptions(questionData);
+    const created =
+      await this.questionRepository.createWithOptions(questionData);
+    await this.eventRepository.emit('QuestionCreated', {
+      id: created.id,
+      quizId: created.quiz_id,
+    } as any);
+    return created;
   }
 
   async updateQuestion(
@@ -153,7 +159,15 @@ export class QuestionService extends BaseService {
       ...(mediaId ? { media_id: mediaId } : {}),
     };
 
-    return await this.questionRepository.updateQuestion(id, dataToUpdate);
+    const updated = await this.questionRepository.updateQuestion(
+      id,
+      dataToUpdate,
+    );
+    await this.eventRepository.emit('QuestionUpdated', {
+      id,
+      quizId: updated.quiz_id,
+    } as any);
+    return updated;
   }
 
   async deleteQuestion(id: string): Promise<void> {
@@ -163,6 +177,10 @@ export class QuestionService extends BaseService {
     }
 
     await this.questionRepository.deleteQuestion(id);
+    await this.eventRepository.emit('QuestionDeleted', {
+      id,
+      quizId: '',
+    } as any);
   }
 
   async getQuestionsByQuizId(quizId: string): Promise<QuestionResponseDto[]> {

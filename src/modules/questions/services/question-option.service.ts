@@ -150,7 +150,7 @@ export class QuestionOptionService extends BaseService {
     });
 
     // Map to DTO
-    return {
+    const dto = {
       id: createdOption.id,
       question_id: createdOption.question_id,
       option_text: createdOption.option_text,
@@ -163,6 +163,11 @@ export class QuestionOptionService extends BaseService {
       question_text: createdOption.question.question_text,
       question_type: createdOption.question.question_type,
     };
+    await this.eventRepository.emit('QuestionOptionCreated', {
+      id: createdOption.id,
+      questionId: createdOption.question_id,
+    } as any);
+    return dto;
   }
 
   async updateQuestionOption(
@@ -175,7 +180,15 @@ export class QuestionOptionService extends BaseService {
     }
 
     // Update the option
-    return await this.questionOptionRepository.updateOption(id, updateData);
+    const updated = await this.questionOptionRepository.updateOption(
+      id,
+      updateData,
+    );
+    await this.eventRepository.emit('QuestionOptionUpdated', {
+      id,
+      questionId: updated.question_id,
+    } as any);
+    return updated;
   }
 
   async deleteQuestionOption(id: string): Promise<void> {
@@ -185,6 +198,10 @@ export class QuestionOptionService extends BaseService {
     }
 
     await this.questionOptionRepository.deleteOption(id);
+    await this.eventRepository.emit('QuestionOptionDeleted', {
+      id,
+      questionId: existingOption.question_id,
+    } as any);
   }
 
   async getQuestionOptionsByQuestionId(

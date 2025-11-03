@@ -4,14 +4,18 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '@prisma/client';
 import { ResourceNotFoundException } from '@/common/middlewares';
+import { EventRepository } from '@/common/repositories/event.repository';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly eventRepository: EventRepository,
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     const { email, username, fullName, password, avatar } = createUserDto;
-    return this.prismaService.user.create({
+    const created = await this.prismaService.user.create({
       data: {
         email,
         username: username ?? undefined,
@@ -20,6 +24,8 @@ export class UserService {
         avatar: avatar ?? undefined,
       },
     });
+    await this.eventRepository.emit('UserCreated', { id: created.id });
+    return created;
   }
 
   async findAll() {
@@ -38,7 +44,7 @@ export class UserService {
 
   async update(id: string, updateUserDto: UpdateUserDto) {
     const { email, username, fullName, password, avatar } = updateUserDto;
-    return this.prismaService.user.update({
+    const updated = await this.prismaService.user.update({
       where: { id },
       data: {
         ...(email !== undefined ? { email } : {}),
@@ -48,9 +54,13 @@ export class UserService {
         ...(avatar !== undefined ? { avatar } : {}),
       },
     });
+    await this.eventRepository.emit('UserUpdated', { id });
+    return updated;
   }
 
   async remove(id: string) {
-    return this.prismaService.user.delete({ where: { id } });
+    const deleted = await this.prismaService.user.delete({ where: { id } });
+    await this.eventRepository.emit('UserDeleted', { id });
+    return deleted;
   }
 }

@@ -5,6 +5,7 @@ import { AuthModule } from '@/modules/auth/auth.module';
 import { CommonRepositoriesModule } from '@/common/repositories/common-repositories.module';
 import { NotificationModule } from '@/modules/notification/notification.module';
 import { CategoryModule } from '@/modules/category/category.module';
+import { BaseModule } from '@/common/base/base.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { CategoryModule } from '@/modules/category/category.module';
     AuthModule,
     NotificationModule,
     CategoryModule,
+    BaseModule,
   ],
   providers: [WebSocketSetupService],
   exports: [],

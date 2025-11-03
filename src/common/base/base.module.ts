@@ -19,6 +19,7 @@ import { QuestionModule } from '@/modules/questions/question.module';
 import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
 import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
 import { RoomRepository } from '@/modules/room-play/repositories/room.repository';
+import { CacheEventService } from '@/common/services/cache-event.service';
 @Module({
   imports: [
     PrismaModule,
@@ -50,6 +51,7 @@ import { RoomRepository } from '@/modules/room-play/repositories/room.repository
     QuestionRepository,
     QuestionOptionRepository,
     RoomRepository,
+    CacheEventService,
   ],
   exports: [
     PrismaModule,
@@ -66,6 +68,7 @@ import { RoomRepository } from '@/modules/room-play/repositories/room.repository
     QuestionRepository,
     QuestionOptionRepository,
     RoomRepository,
+    CacheEventService,
   ],
 })
 export class BaseModule {}

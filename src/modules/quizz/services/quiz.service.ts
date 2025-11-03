@@ -146,6 +146,14 @@ export class QuizService extends BaseService {
     return result;
   }
 
+  async getQuizById(id: string): Promise<QuizResponseDto> {
+    const result = await this.quizRepository.findById(id);
+    if (!result) {
+      throw new NotFoundException('Quiz not found');
+    }
+    return result;
+  }
+
   async createQuiz(
     quiz: CreateQuizDto,
     thumbnail?: Express.Multer.File,
@@ -172,7 +180,9 @@ export class QuizService extends BaseService {
       ...(creatorId ? { creator_id: creatorId } : {}),
       thumbnail_id: thumbnailId || null,
     };
-    return await this.quizRepository.create(quizData);
+    const created = await this.quizRepository.create(quizData);
+    await this.eventRepository.emit('QuizCreated', { id: created.id });
+    return created;
   }
 
   async updateQuiz(
@@ -218,7 +228,9 @@ export class QuizService extends BaseService {
       ...(thumbnailId ? { thumbnail_id: thumbnailId } : {}),
     };
 
-    return await this.quizRepository.updateQuiz(id, dataToUpdate);
+    const updated = await this.quizRepository.updateQuiz(id, dataToUpdate);
+    await this.eventRepository.emit('QuizUpdated', { id });
+    return updated;
   }
 
   async remove(id: string, creatorId: string) {

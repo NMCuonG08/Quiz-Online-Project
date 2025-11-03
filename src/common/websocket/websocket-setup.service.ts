@@ -12,6 +12,7 @@ import { AuthDto } from '@/modules/auth/dto';
 import { LazyModuleLoader, ModuleRef } from '@nestjs/core';
 import { NotificationService } from '@/modules/notification/services/notification.service';
 import { CategoryService } from '@/modules/category/services/category.service';
+import { CacheEventService } from '@/common/services/cache-event.service';
 
 @Injectable()
 export class WebSocketSetupService
@@ -24,6 +25,7 @@ export class WebSocketSetupService
     private authService: AuthService,
     private moduleRef: ModuleRef,
     private readonly lazyModuleLoader: LazyModuleLoader,
+    private cacheEventService: CacheEventService,
   ) {
     this.logger.log('WebSocketSetupService constructor called');
   }
@@ -45,11 +47,12 @@ export class WebSocketSetupService
       console.log('🔧 Setting up EventRepository with services:', [
         NotificationService.name,
         CategoryService.name,
+        CacheEventService.name,
       ]);
 
       // ✅ Pass class và moduleRef để EventRepository có thể tìm thấy service instances
       this.eventRepository.setup({
-        services: [NotificationService, CategoryService],
+        services: [NotificationService, CategoryService, CacheEventService],
         moduleRef: this.moduleRef,
       });
 
@@ -66,6 +69,7 @@ export class WebSocketSetupService
 
   private async authenticateSocket(client: Socket): Promise<AuthDto> {
     const token = client.handshake.auth?.token as string;
+    // const token = client.handshake.headers.authorization?.split(' ')[1];
     this.logger.debug(`Authenticating WebSocket client: ${client.id}`);
     this.logger.debug(`Token received: ${token}`);
     let lastError: Error | null = null;

@@ -301,8 +301,11 @@ export class AuthService extends BaseService {
       refreshToken: null,
     });
 
-    // Invalidate all user-related cache
-    await this.authCacheService.invalidateAllUserTokens(userId);
+    // Invalidate all user-related cache via event
+    await this.eventRepository.emit('UserCacheInvalidated', {
+      keys: [`auth:permissions:${userId}`, `auth:roles:${userId}`],
+      userId,
+    });
 
     return true;
   }

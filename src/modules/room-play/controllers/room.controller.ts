@@ -38,10 +38,109 @@ export class RoomController {
     return this.roomService.listRooms(pagination);
   }
 
+  @ApiOperation({
+    summary: 'List rooms by quiz ID with pagination and filtering',
+    description:
+      'Get rooms for a specific quiz by ID with optional status and room_code filtering. Use ?status=OPEN to get only open rooms.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of rooms for the quiz with pagination metadata',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/QuizRoom' },
+        },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+        total: { type: 'number' },
+      },
+    },
+  })
+  @Get('quiz/id/:quizId')
+  async listRoomsByQuizId(
+    @Param('quizId') quizId: string,
+    @Query() pagination: RoomPaginationDto,
+  ) {
+    try {
+      console.log(
+        `🔍 RoomController: Fetching rooms for quizId: ${quizId}, status: ${pagination.status}`,
+      );
+
+      // Validate quizId
+      if (!quizId || quizId.trim() === '') {
+        throw new Error('Quiz ID is required');
+      }
+
+      const result = await this.roomService.listRoomsByQuizId(
+        quizId,
+        pagination,
+      );
+      console.log(
+        `✅ RoomController: Found ${result.items?.length || 0} rooms for quizId: ${quizId}`,
+      );
+
+      return result;
+    } catch (error) {
+      console.error(
+        `❌ RoomController: Error fetching rooms for quizId ${quizId}:`,
+        error,
+      );
+
+      // Return a proper error response
+      return {
+        success: false,
+        statusCode: 500,
+        message: error.message || 'Failed to fetch rooms',
+        data: [],
+        page: 1,
+        limit: 10,
+        total: 0,
+      };
+    }
+  }
+
+  @ApiOperation({
+    summary: 'List rooms by quiz slug with pagination and filtering',
+    description:
+      'Get rooms for a specific quiz by slug with optional status and room_code filtering. Use ?status=OPEN to get only open rooms.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of rooms for the quiz with pagination metadata',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/QuizRoom' },
+        },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+        total: { type: 'number' },
+      },
+    },
+  })
+  @Get('quiz/slug/:quizSlug')
+  listRoomsByQuizSlug(
+    @Param('quizSlug') quizSlug: string,
+    @Query() pagination: RoomPaginationDto,
+  ) {
+    return this.roomService.listRoomsByQuizSlug(quizSlug, pagination);
+  }
+
   @ApiOperation({ summary: 'Get a room by id' })
   @Get(':id')
   getRoom(@Param('id') id: string) {
     return this.roomService.getRoom(id);
+  }
+
+  @ApiOperation({ summary: 'Get a room by code' })
+  @Get('code/:roomCode')
+  getRoomByCode(@Param('roomCode') roomCode: string) {
+    return this.roomService.getRoomByCode(roomCode);
   }
 
   @ApiOperation({ summary: 'Update a room (owner only)' })

@@ -48,6 +48,39 @@ type EventMap = {
   JobStart: [QueueName, JobItem];
   JobFailed: [{ job: JobItem; error: Error | any }];
   WebsocketConnect: [{ userId: string }];
+  // cache invalidation events
+  CategoryCacheInvalidated: [{ keys: string | string[] }];
+  CategoryAllCacheInvalidated: [{ keys: string | string[] }];
+  NotificationCacheInvalidated: [{ keys: string | string[] }];
+  NotificationAllCacheInvalidated: [{ keys: string | string[] }];
+  NotificationUserCacheInvalidated: [
+    { keys: string | string[]; userId: string },
+  ];
+  NotificationUnreadCacheInvalidated: [
+    { keys: string | string[]; userId: string },
+  ];
+  UserCacheInvalidated: [{ keys: string | string[]; userId: string }];
+  TokenCacheInvalidated: [{ keys: string | string[] }];
+  CustomCacheInvalidated: [{ keys: string | string[]; [key: string]: any }];
+  // domain CRUD events
+  CategoryCreated: [{ id: string }];
+  CategoryUpdated: [{ id: string }];
+  CategoryDeleted: [{ id: string }];
+  QuizCreated: [{ id: string }];
+  QuizUpdated: [{ id: string }];
+  QuizDeleted: [{ id: string }];
+  QuestionCreated: [{ id: string; quizId: string }];
+  QuestionUpdated: [{ id: string; quizId: string }];
+  QuestionDeleted: [{ id: string; quizId: string }];
+  QuestionOptionCreated: [{ id: string; questionId: string }];
+  QuestionOptionUpdated: [{ id: string; questionId: string }];
+  QuestionOptionDeleted: [{ id: string; questionId: string }];
+  RoomCreated: [{ id: string; ownerId: string }];
+  RoomUpdated: [{ id: string; ownerId: string }];
+  RoomDeleted: [{ id: string; ownerId: string }];
+  UserCreated: [{ id: string }];
+  UserUpdated: [{ id: string }];
+  UserDeleted: [{ id: string }];
 };
 
 export type EventItem<T extends EmitEvent> = {
@@ -71,6 +104,19 @@ export interface ClientEventMap {
   on_user_delete: [string];
   on_asset_delete: [string];
   notification: [string];
+  participants_list: [
+    {
+      roomId: string;
+      participants: Array<{
+        user_id: string;
+        username?: string | null;
+        full_name?: string | null;
+        avatar_url?: string | null;
+        joined_at: Date | string;
+        status: string;
+      }>;
+    },
+  ];
   //   on_asset_trash: [string[]];
   //   on_asset_hidden: [string];
   //   on_asset_restore: [string[]];

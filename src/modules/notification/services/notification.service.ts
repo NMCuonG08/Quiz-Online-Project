@@ -16,14 +16,15 @@ export class NotificationService extends BaseService {
       createNotificationDto,
     );
 
-    // Invalidate cache when creating new notification
+    // Invalidate cache when creating new notification via event
     if (createNotificationDto.user_id) {
-      await this.redisService.del(
-        `notifications:user:${createNotificationDto.user_id}`,
-      );
-      await this.redisService.del(
-        `notifications:unread:${createNotificationDto.user_id}`,
-      );
+      await this.eventRepository.emit('NotificationUserCacheInvalidated', {
+        keys: [
+          `notifications:user:${createNotificationDto.user_id}`,
+          `notifications:unread:${createNotificationDto.user_id}`,
+        ],
+        userId: createNotificationDto.user_id,
+      });
     }
 
     return newNotification;
@@ -111,20 +112,26 @@ export class NotificationService extends BaseService {
       updateNotificationDto,
     );
 
-    // Invalidate related caches
-    await this.redisService.del('notifications:all');
-    if (existingNotification.user_id) {
-      await this.redisService.del(
-        `notifications:user:${existingNotification.user_id}`,
-      );
-      await this.redisService.del(
-        `notifications:unread:${existingNotification.user_id}`,
-      );
-    }
+    // Invalidate related caches via events
+    const invalidateKeys: string[] = ['notifications:all'];
     if (updateNotificationDto.status) {
-      await this.redisService.del(
+      invalidateKeys.push(
         `notifications:status:${updateNotificationDto.status}`,
       );
+    }
+
+    await this.eventRepository.emit('NotificationAllCacheInvalidated', {
+      keys: invalidateKeys,
+    });
+
+    if (existingNotification.user_id) {
+      await this.eventRepository.emit('NotificationUserCacheInvalidated', {
+        keys: [
+          `notifications:user:${existingNotification.user_id}`,
+          `notifications:unread:${existingNotification.user_id}`,
+        ],
+        userId: existingNotification.user_id,
+      });
     }
 
     return updatedNotification;
@@ -140,15 +147,19 @@ export class NotificationService extends BaseService {
 
     await this.notificationRepository.delete(id);
 
-    // Invalidate related caches
-    await this.redisService.del('notifications:all');
+    // Invalidate related caches via events
+    await this.eventRepository.emit('NotificationAllCacheInvalidated', {
+      keys: 'notifications:all',
+    });
+
     if (existingNotification.user_id) {
-      await this.redisService.del(
-        `notifications:user:${existingNotification.user_id}`,
-      );
-      await this.redisService.del(
-        `notifications:unread:${existingNotification.user_id}`,
-      );
+      await this.eventRepository.emit('NotificationUserCacheInvalidated', {
+        keys: [
+          `notifications:user:${existingNotification.user_id}`,
+          `notifications:unread:${existingNotification.user_id}`,
+        ],
+        userId: existingNotification.user_id,
+      });
     }
 
     return { message: 'Notification deleted successfully' };
@@ -165,15 +176,19 @@ export class NotificationService extends BaseService {
     const updatedNotification =
       await this.notificationRepository.markAsRead(id);
 
-    // Invalidate related caches
-    await this.redisService.del('notifications:all');
+    // Invalidate related caches via events
+    await this.eventRepository.emit('NotificationAllCacheInvalidated', {
+      keys: 'notifications:all',
+    });
+
     if (existingNotification.user_id) {
-      await this.redisService.del(
-        `notifications:user:${existingNotification.user_id}`,
-      );
-      await this.redisService.del(
-        `notifications:unread:${existingNotification.user_id}`,
-      );
+      await this.eventRepository.emit('NotificationUserCacheInvalidated', {
+        keys: [
+          `notifications:user:${existingNotification.user_id}`,
+          `notifications:unread:${existingNotification.user_id}`,
+        ],
+        userId: existingNotification.user_id,
+      });
     }
 
     return updatedNotification;
@@ -190,15 +205,19 @@ export class NotificationService extends BaseService {
     const updatedNotification =
       await this.notificationRepository.markAsArchived(id);
 
-    // Invalidate related caches
-    await this.redisService.del('notifications:all');
+    // Invalidate related caches via events
+    await this.eventRepository.emit('NotificationAllCacheInvalidated', {
+      keys: 'notifications:all',
+    });
+
     if (existingNotification.user_id) {
-      await this.redisService.del(
-        `notifications:user:${existingNotification.user_id}`,
-      );
-      await this.redisService.del(
-        `notifications:unread:${existingNotification.user_id}`,
-      );
+      await this.eventRepository.emit('NotificationUserCacheInvalidated', {
+        keys: [
+          `notifications:user:${existingNotification.user_id}`,
+          `notifications:unread:${existingNotification.user_id}`,
+        ],
+        userId: existingNotification.user_id,
+      });
     }
 
     return updatedNotification;
@@ -207,9 +226,11 @@ export class NotificationService extends BaseService {
   async markAllAsRead(userId: string) {
     const result = await this.notificationRepository.markAllAsRead(userId);
 
-    // Invalidate related caches
-    await this.redisService.del(`notifications:user:${userId}`);
-    await this.redisService.del(`notifications:unread:${userId}`);
+    // Invalidate related caches via events
+    await this.eventRepository.emit('NotificationUserCacheInvalidated', {
+      keys: [`notifications:user:${userId}`, `notifications:unread:${userId}`],
+      userId,
+    });
 
     return {
       message: 'All notifications marked as read',
