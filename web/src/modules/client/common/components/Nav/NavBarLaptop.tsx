@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
+import { LocalizedLink } from "@/common/components/ui";
 import React from "react";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
+import { LanguageSwitcher } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
 import { useAuth } from "@/modules/auth/common/hooks/useAuth";
 import {
@@ -14,11 +16,18 @@ import {
 } from "@/common/components/ui/dropdown-menu";
 import { User, LogOut, LayoutDashboard } from "lucide-react";
 import "@/styles/nav-link.css";
+import { useLocale, useTranslations } from "next-intl";
 
 const NavBarLaptop = () => {
   const { isLoggedIn, logout } = useAuth();
   const pathname = usePathname();
   const [hash, setHash] = React.useState<string>("");
+  const tNav = useTranslations("nav");
+  const tAuth = useTranslations("auth");
+  const locale = useLocale();
+
+  const withLocale = (href: string) =>
+    href.startsWith("/") ? `/${locale}${href}` : href;
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -38,38 +47,38 @@ const NavBarLaptop = () => {
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <LocalizedLink href="/" className="flex items-center gap-2">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-pink-300 via-purple-300 to-blue-300" />
           <span className="text-lg font-semibold tracking-tight text-foreground">
             CourseCo
           </span>
-        </Link>
+        </LocalizedLink>
 
         {/* Nav links */}
         <nav className="hidden gap-8  md:flex">
-          <Link
+          <LocalizedLink
             href="/"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
               isActive("/") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
-            Home
-          </Link>
-          <Link
+            {tNav("home")}
+          </LocalizedLink>
+          <LocalizedLink
             href="/category"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
               isActive("/category") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
-            Quizzes
-          </Link>
+            {tNav("quizzes")}
+          </LocalizedLink>
           <Link
             href="#courses"
             className={`nav-link text-sm text-muted-foreground transition-colors ${
               isActive("#courses") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
-            Courses
+            {tNav("courses")}
           </Link>
           <Link
             href="#community"
@@ -77,7 +86,7 @@ const NavBarLaptop = () => {
               isActive("#community") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
-            Community
+            {tNav("community")}
           </Link>
           <Link
             href="#about"
@@ -85,12 +94,13 @@ const NavBarLaptop = () => {
               isActive("#about") ? "active" : "hover:text-[#FDD239]"
             }`}
           >
-            About
+            {tNav("about")}
           </Link>
         </nav>
 
         {/* Actions */}
         <div className="hidden md:flex items-center gap-3">
+          <LanguageSwitcher />
           <ThemeToggle />
           {isLoggedIn ? (
             <DropdownMenu>
@@ -105,10 +115,13 @@ const NavBarLaptop = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem asChild>
-                  <Link href="/user" className="flex items-center gap-2">
+                  <LocalizedLink
+                    href="/user"
+                    className="flex items-center gap-2"
+                  >
                     <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Link>
+                    {tNav("dashboard")}
+                  </LocalizedLink>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -116,16 +129,16 @@ const NavBarLaptop = () => {
                   className="flex items-center gap-2 text-red-600 focus:text-red-600"
                 >
                   <LogOut className="h-4 w-4" />
-                  Đăng xuất
+                  {tAuth("logout")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link href="/auth/login">
+            <LocalizedLink href="/auth/login">
               <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground transition-colors">
-                Sign in
+                {tAuth("signIn")}
               </Button>
-            </Link>
+            </LocalizedLink>
           )}
         </div>
       </div>

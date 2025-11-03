@@ -11,6 +11,7 @@ import { RoomPaginationDto } from '../dtos/room-pagination.dto';
 import { PaginatedResponseDto } from '@/common/dtos/responses/base.response';
 import { JoinRoomDto } from '../dtos/join-room.dto';
 import { QuizRoom } from '@prisma/client';
+import type { $Enums } from '@prisma/client';
 
 @Injectable()
 export class RoomService extends BaseService {
@@ -252,7 +253,7 @@ export class RoomService extends BaseService {
       this.prisma.roomParticipant.upsert({
         where: { room_id_user_id: { room_id: roomId, user_id: userId } },
         create: { room_id: roomId, user_id: userId },
-        update: { status: 'JOINED' },
+        update: { status: 'JOINED' as $Enums.ParticipantStatus },
       }),
       this.prisma.quizRoom.update({
         where: { id: roomId },
@@ -313,7 +314,7 @@ export class RoomService extends BaseService {
         status: r.status,
         username: u?.username ?? null,
         full_name: u?.full_name ?? null,
-        avatar_url: (u as any)?.avatar ?? null,
+        avatar_url: u?.avatar ?? null,
       };
     });
     console.log(`👥 Participants length: ${participants.length}`);
@@ -375,7 +376,7 @@ export class RoomService extends BaseService {
       this.prisma.roomParticipant.upsert({
         where: { room_id_user_id: { room_id: roomId, user_id: userId } },
         create: { room_id: roomId, user_id: userId },
-        update: { status: 'JOINED' },
+        update: { status: 'JOINED' as $Enums.ParticipantStatus },
       }),
       this.prisma.quizRoom.update({
         where: { id: roomId },
@@ -420,7 +421,10 @@ export class RoomService extends BaseService {
     await this.prisma.$transaction([
       this.prisma.roomParticipant.updateMany({
         where: { room_id: roomId, user_id: userId },
-        data: { status: 'LEFT', left_at: new Date() },
+        data: {
+          status: 'DISCONNECTED' as $Enums.ParticipantStatus,
+          left_at: new Date(),
+        },
       }),
       this.prisma.quizRoom.update({
         where: { id: roomId },
@@ -503,7 +507,11 @@ export class RoomService extends BaseService {
   ): Promise<{ isCorrect: boolean; correctAnswer: string; points: number }> {
     // Verify room and participant
     const participant = await this.prisma.roomParticipant.findFirst({
-      where: { room_id: roomId, user_id: userId, status: 'ACTIVE' },
+      where: {
+        room_id: roomId,
+        user_id: userId,
+        status: 'ACTIVE' as $Enums.ParticipantStatus,
+      },
     });
     if (!participant) {
       throw new ForbiddenException('Not an active participant');

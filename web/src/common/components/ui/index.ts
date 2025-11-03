@@ -46,5 +46,7 @@ export * from "./textarea";
 export * from "./theme-toggle";
 export * from "./toggle-group";
 export * from "./toggle";
+export * from "./language-switcher";
 export * from "./tooltip";
 export * from "./span";
+export { default as LocalizedLink } from "./localized-link";

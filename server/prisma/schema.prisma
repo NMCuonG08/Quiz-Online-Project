@@ -700,6 +700,7 @@ enum ParticipantStatus {
   JOINED
   ACTIVE
   DISCONNECTED
+	LEFT
   FINISHED
 }
 

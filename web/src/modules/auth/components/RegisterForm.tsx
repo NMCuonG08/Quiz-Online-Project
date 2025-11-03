@@ -22,6 +22,7 @@ import { useAuth } from "@/modules/auth/common/hooks/useAuth";
 import { showError, showSuccess } from "@/lib/Notification";
 import { useAppDispatch } from "@/hooks/useRedux";
 import { loginWithGoogleCode } from "@/modules/auth/common/slices/authSlice";
+import { useTranslations } from "next-intl";
 
 const RegisterForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -30,6 +31,8 @@ const RegisterForm = () => {
   const router = useRouter();
   const { register } = useAuth();
   const dispatch = useAppDispatch();
+  const tAuth = useTranslations("auth");
+  const tCommon = useTranslations("common");
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -51,7 +54,7 @@ const RegisterForm = () => {
         router.push("/");
       } else {
         console.error("Registration failed:", result);
-        showError(result || "Registration failed");
+        showError(result || tAuth("registrationFailed"));
       }
     } catch (error) {
       console.error("Error during registration:", error);
@@ -67,7 +70,7 @@ const RegisterForm = () => {
       `${window.location.origin}/auth/google/callback`;
 
     if (!clientId) {
-      showError("Thiếu NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+      showError(tAuth("missingGoogleClientId"));
       return;
     }
 
@@ -127,7 +130,7 @@ const RegisterForm = () => {
         try {
           const savedState = sessionStorage.getItem("google_oauth_state");
           if (!savedState || savedState !== returnedState) {
-            showError("Xác thực không hợp lệ (state)");
+            showError(tAuth("invalidState"));
             return;
           }
         } catch {}
@@ -142,7 +145,7 @@ const RegisterForm = () => {
           return;
         }
         if (!code) {
-          showError("Không nhận được mã từ Google");
+          showError(tAuth("missingGoogleCode"));
           return;
         }
 
@@ -162,14 +165,14 @@ const RegisterForm = () => {
               const msg =
                 result?.error?.message ||
                 result?.data?.error?.message ||
-                "Đăng nhập Google thất bại";
+                tAuth("googleLoginFailed");
               showError(msg);
             } else {
-              showSuccess("Đăng nhập Google thành công!");
+              showSuccess(tAuth("googleLoginSuccess"));
               router.push("/");
             }
           })
-          .catch(() => showError("Đăng nhập Google thất bại"))
+          .catch(() => showError(tAuth("googleLoginFailed")))
           .finally(() => setIsLoading(false));
       } catch {
         // ignore
@@ -183,7 +186,7 @@ const RegisterForm = () => {
         window.removeEventListener("message", messageHandler);
         if (!popup.closed) popup.close();
       } catch {}
-      showError("Hết thời gian đăng nhập Google, thử lại nhé");
+      showError(tAuth("googleLoginTimeout"));
     }, 120000);
 
     const clear = () => clearTimeout(timeout);
@@ -206,10 +209,10 @@ const RegisterForm = () => {
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-2">
-            Create your account
+            {tAuth("createAccount")}
           </h1>
           <p className="text-muted-foreground text-sm">
-            Join QuizMe and start your learning journey
+            {tAuth("registerSubtitle")}
           </p>
         </div>
 
@@ -225,7 +228,7 @@ const RegisterForm = () => {
                   <FormItem>
                     <FormControl>
                       <Input
-                        placeholder="Full name"
+                        placeholder={tAuth("fullNamePlaceholder")}
                         type="text"
                         className="h-11 border-0 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring transition-all"
                         {...field}
@@ -244,7 +247,7 @@ const RegisterForm = () => {
                   <FormItem>
                     <FormControl>
                       <Input
-                        placeholder="Email address"
+                        placeholder={tAuth("emailPlaceholder")}
                         type="email"
                         className="h-11 border-0 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring transition-all"
                         {...field}
@@ -264,7 +267,7 @@ const RegisterForm = () => {
                     <FormControl>
                       <div className="relative">
                         <Input
-                          placeholder="Password"
+                          placeholder={tAuth("passwordPlaceholder")}
                           type={showPassword ? "text" : "password"}
                           className="h-11 border-0 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring transition-all pr-10"
                           {...field}
@@ -296,7 +299,7 @@ const RegisterForm = () => {
                     <FormControl>
                       <div className="relative">
                         <Input
-                          placeholder="Confirm password"
+                          placeholder={tAuth("confirmPasswordPlaceholder")}
                           type={showConfirmPassword ? "text" : "password"}
                           className="h-11 border-0 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring transition-all pr-10"
                           {...field}
@@ -330,10 +333,10 @@ const RegisterForm = () => {
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-1 border-current border-t-transparent rounded-full animate-spin" />
-                    Creating account...
+                    {tAuth("creatingAccount")}
                   </div>
                 ) : (
-                  "Create account"
+                  tAuth("createAccountButton")
                 )}
               </Button>
             </form>
@@ -346,7 +349,7 @@ const RegisterForm = () => {
             </div>
             <div className="relative flex justify-center text-xs">
               <span className="bg-background px-2 text-muted-foreground">
-                OR
+                {tCommon("or")}
               </span>
             </div>
           </div>
@@ -376,17 +379,17 @@ const RegisterForm = () => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continue with Google
+            {tAuth("continueWithGoogle")}
           </Button>
 
           {/* Bottom Text */}
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Already have an account?{" "}
+            {tAuth("alreadyHaveAccount")}{" "}
             <Link
               href="/auth/login"
               className="text-foreground font-medium hover:underline"
             >
-              Sign in
+              {tAuth("signIn")}
             </Link>
           </p>
         </div>

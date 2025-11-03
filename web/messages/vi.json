@@ -1,0 +1,50 @@
+{
+  "common": {
+    "language": "Ngôn ngữ",
+    "english": "Tiếng Anh",
+    "vietnamese": "Tiếng Việt",
+    "search": "Tìm kiếm",
+    "adminSubtitle": "Bảng điều khiển quản trị Next.js",
+    "or": "HOẶC"
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "categories": "Danh mục",
+    "quizzes": "Bài trắc nghiệm",
+    "courses": "Khóa học",
+    "community": "Cộng đồng",
+    "about": "Giới thiệu",
+    "dashboard": "Bảng điều khiển"
+  },
+  "auth": {
+    "signIn": "Đăng nhập",
+    "logout": "Đăng xuất",
+    "welcomeBack": "Chào mừng trở lại",
+    "signInSubtitle": "Đăng nhập để tiếp tục vào tài khoản",
+    "emailPlaceholder": "Địa chỉ email",
+    "passwordPlaceholder": "Mật khẩu",
+    "forgotPassword": "Quên mật khẩu?",
+    "signingIn": "Đang đăng nhập...",
+    "continueWithGoogle": "Tiếp tục với Google",
+    "dontHaveAccount": "Chưa có tài khoản?",
+    "signUp": "Đăng ký",
+    "loginSuccess": "Đăng nhập thành công!",
+    "loginFailed": "Đăng nhập thất bại",
+    "missingGoogleClientId": "Thiếu NEXT_PUBLIC_GOOGLE_CLIENT_ID",
+    "invalidState": "Xác thực không hợp lệ (state)",
+    "missingGoogleCode": "Không nhận được mã từ Google",
+    "googleLoginFailed": "Đăng nhập Google thất bại",
+    "googleLoginSuccess": "Đăng nhập Google thành công!",
+    "googleLoginTimeout": "Hết thời gian đăng nhập Google, thử lại nhé",
+    "createAccount": "Tạo tài khoản của bạn",
+    "registerSubtitle": "Tham gia QuizMe và bắt đầu hành trình học tập",
+    "fullNamePlaceholder": "Họ và tên",
+    "confirmPasswordPlaceholder": "Xác nhận mật khẩu",
+    "creatingAccount": "Đang tạo tài khoản...",
+    "createAccountButton": "Tạo tài khoản",
+    "alreadyHaveAccount": "Đã có tài khoản?",
+    "registrationFailed": "Đăng ký thất bại"
+  }
+}
+
+

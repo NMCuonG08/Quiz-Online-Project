@@ -25,12 +25,15 @@ import { showError, showSuccess } from "@/lib/Notification";
 import { RootState } from "@/store";
 import { loginWithGoogleCode } from "@/modules/auth/common/slices/authSlice";
 // Removed service import for Google URL; we'll build it client-side
+import { useTranslations } from "next-intl";
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const tAuth = useTranslations("auth");
+  const tCommon = useTranslations("common");
 
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
@@ -54,14 +57,14 @@ const LoginForm = () => {
       const result = await dispatch(loginUser(data)).unwrap();
       console.log("Login result:", result);
       if (result.success) {
-        showSuccess("Login successful!");
+        showSuccess(tAuth("loginSuccess"));
         router.push("/");
       } else {
         showError(result.error);
       }
     } catch (error) {
       console.log("Login error in component:", error);
-      showError(error || "Login failed");
+      showError(error || tAuth("loginFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +72,7 @@ const LoginForm = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      showSuccess("Login successful!");
+      showSuccess(tAuth("loginSuccess"));
       // Add delay để user thấy success message
       setTimeout(() => {
         router.push("/");
@@ -87,7 +90,7 @@ const LoginForm = () => {
       `${window.location.origin}/auth/google/callback`;
 
     if (!clientId) {
-      showError("Thiếu NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+      showError(tAuth("missingGoogleClientId"));
       return;
     }
 
@@ -148,7 +151,7 @@ const LoginForm = () => {
         try {
           const savedState = sessionStorage.getItem("google_oauth_state");
           if (!savedState || savedState !== returnedState) {
-            showError("Xác thực không hợp lệ (state)");
+            showError(tAuth("invalidState"));
             return;
           }
         } catch {}
@@ -163,7 +166,7 @@ const LoginForm = () => {
           return;
         }
         if (!code) {
-          showError("Không nhận được mã từ Google");
+          showError(tAuth("missingGoogleCode"));
           return;
         }
 
@@ -183,14 +186,14 @@ const LoginForm = () => {
               const msg =
                 result?.error?.message ||
                 result?.data?.error?.message ||
-                "Đăng nhập Google thất bại";
+                tAuth("googleLoginFailed");
               showError(msg);
             } else {
-              showSuccess("Đăng nhập Google thành công!");
+              showSuccess(tAuth("googleLoginSuccess"));
               router.push("/");
             }
           })
-          .catch(() => showError("Đăng nhập Google thất bại"))
+          .catch(() => showError(tAuth("googleLoginFailed")))
           .finally(() => setIsLoading(false));
       } catch {
         // ignore
@@ -204,7 +207,7 @@ const LoginForm = () => {
         window.removeEventListener("message", messageHandler);
         if (!popup.closed) popup.close();
       } catch {}
-      showError("Hết thời gian đăng nhập Google, thử lại nhé");
+      showError(tAuth("googleLoginTimeout"));
     }, 120000);
 
     const clear = () => clearTimeout(timeout);
@@ -227,10 +230,10 @@ const LoginForm = () => {
           </div>
 
           <h1 className="text-2xl font-bold text-foreground mb-2">
-            Welcome back
+            {tAuth("welcomeBack")}
           </h1>
           <p className="text-muted-foreground text-sm">
-            Sign in to continue to your account
+            {tAuth("signInSubtitle")}
           </p>
         </div>
 
@@ -246,7 +249,7 @@ const LoginForm = () => {
                   <FormItem>
                     <FormControl>
                       <Input
-                        placeholder="Email address"
+                        placeholder={tAuth("emailPlaceholder")}
                         type="email"
                         className="h-11 border-0 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring transition-all"
                         {...field}
@@ -270,7 +273,7 @@ const LoginForm = () => {
                     <FormControl>
                       <div className="relative">
                         <Input
-                          placeholder="Password"
+                          placeholder={tAuth("passwordPlaceholder")}
                           type={showPassword ? "text" : "password"}
                           className="h-11 border-0 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring transition-all pr-10"
                           {...field}
@@ -303,7 +306,7 @@ const LoginForm = () => {
                   href="/auth/forgot-password"
                   className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300"
                 >
-                  Forgot password?
+                  {tAuth("forgotPassword")}
                 </Link>
               </div>
 
@@ -316,10 +319,10 @@ const LoginForm = () => {
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4  border-1 border-current border-t-transparent  rounded-full animate-spin" />
-                    Signing in...
+                    {tAuth("signingIn")}
                   </div>
                 ) : (
-                  "Sign in"
+                  tAuth("signIn")
                 )}
               </Button>
             </form>
@@ -332,7 +335,7 @@ const LoginForm = () => {
             </div>
             <div className="relative flex justify-center text-xs">
               <span className="bg-background px-2 text-muted-foreground">
-                OR
+                {tCommon("or")}
               </span>
             </div>
           </div>
@@ -354,17 +357,17 @@ const LoginForm = () => {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
-            Continue with Google
+            {tAuth("continueWithGoogle")}
           </Button>
 
           {/* Bottom Text */}
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Dont have an account?{" "}
+            {tAuth("dontHaveAccount")}{" "}
             <Link
               href="/auth/register"
               className="text-foreground font-medium hover:underline"
             >
-              Sign up
+              {tAuth("signUp")}
             </Link>
           </p>
         </div>

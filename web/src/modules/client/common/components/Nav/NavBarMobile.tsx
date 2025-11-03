@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
+import { LocalizedLink } from "@/common/components/ui";
 import React from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
+import { LanguageSwitcher } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
 import { useAuth } from "@/modules/auth/common/hooks/useAuth";
 import {
@@ -15,12 +17,19 @@ import {
 } from "@/common/components/ui/dropdown-menu";
 import { User, LogOut, LayoutDashboard } from "lucide-react";
 import "@/styles/nav-link.css";
+import { useLocale, useTranslations } from "next-intl";
 
 const NavBarMobile = () => {
   const [open, setOpen] = React.useState(false);
   const { isLoggedIn, logout } = useAuth();
   const pathname = usePathname();
   const [hash, setHash] = React.useState<string>("");
+  const tNav = useTranslations("nav");
+  const tAuth = useTranslations("auth");
+  const locale = useLocale();
+
+  const withLocale = (href: string) =>
+    href.startsWith("/") ? `/${locale}${href}` : href;
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -78,22 +87,22 @@ const NavBarMobile = () => {
 
           <nav className="flex flex-col gap-3">
             <Link
-              href="/"
+              href={withLocale("/")}
               className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
                 isActive("/") ? "active" : "hover:text-yellow-500"
               }`}
               onClick={() => setOpen(false)}
             >
-              Home
+              {tNav("home")}
             </Link>
             <Link
-              href="/category"
+              href={withLocale("/category")}
               className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
                 isActive("/category") ? "active" : "hover:text-yellow-500"
               }`}
               onClick={() => setOpen(false)}
             >
-              Quizzes
+              {tNav("quizzes")}
             </Link>
             <Link
               href="#courses"
@@ -102,7 +111,7 @@ const NavBarMobile = () => {
               }`}
               onClick={() => setOpen(false)}
             >
-              Courses
+              {tNav("courses")}
             </Link>
             <Link
               href="#community"
@@ -111,7 +120,7 @@ const NavBarMobile = () => {
               }`}
               onClick={() => setOpen(false)}
             >
-              Community
+              {tNav("community")}
             </Link>
             <Link
               href="#about"
@@ -120,7 +129,7 @@ const NavBarMobile = () => {
               }`}
               onClick={() => setOpen(false)}
             >
-              About
+              {tNav("about")}
             </Link>
           </nav>
 
@@ -155,14 +164,15 @@ const NavBarMobile = () => {
             </svg>
           </button>
 
-          <Link href="/" className="flex items-center gap-2">
+          <LocalizedLink href="/" className="flex items-center gap-2">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-pink-300 via-purple-300 to-blue-300" />
             <span className="text-base font-semibold tracking-tight text-foreground">
               CourseCo
             </span>
-          </Link>
+          </LocalizedLink>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <ThemeToggle />
             {isLoggedIn ? (
               <DropdownMenu>
@@ -177,10 +187,10 @@ const NavBarMobile = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
-                    <Link href="/user" className="flex items-center gap-2">
+                  <LocalizedLink href="/user" className="flex items-center gap-2">
                       <LayoutDashboard className="h-4 w-4" />
-                      Dashboard
-                    </Link>
+                      {tNav("dashboard")}
+                    </LocalizedLink>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -188,16 +198,16 @@ const NavBarMobile = () => {
                     className="flex items-center gap-2 text-red-600 focus:text-red-600"
                   >
                     <LogOut className="h-4 w-4" />
-                    Đăng xuất
+                    {tAuth("logout")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link href="/auth/login">
+              <LocalizedLink href="/auth/login">
                 <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground transition-colors">
-                  Sign in
+                  {tAuth("signIn")}
                 </Button>
-              </Link>
+              </LocalizedLink>
             )}
           </div>
         </div>
