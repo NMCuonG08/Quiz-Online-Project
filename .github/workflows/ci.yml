@@ -95,10 +95,12 @@ jobs:
     name: Trigger CD Workflow
     needs: [build-server, build-web]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.PAT_TOKEN != ''
     steps:
       - name: Trigger CD workflow
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.PAT_TOKEN }}
+          repository: ${{ github.repository }}
           event-type: ci-passed
+          continue-on-error: true
