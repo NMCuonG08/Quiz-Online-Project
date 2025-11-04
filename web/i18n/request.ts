@@ -6,6 +6,6 @@ export default getRequestConfig(async () => {
   const locale = h.get("X-NEXT-INTL-LOCALE") ?? "en";
   return {
     locale,
-    messages: (await import(`../messages/${locale}.json`)).default,
+    messages: (await import(`@i18n/messages/${locale}.json`)).default,
   };
 });

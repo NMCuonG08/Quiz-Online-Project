@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import path from "path";
 
 const nextConfig: NextConfig = {
   images: {
@@ -23,6 +24,14 @@ const nextConfig: NextConfig = {
         as: "*.js",
       },
     },
+  },
+  // Webpack alias to access i18n folder outside web directory
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@i18n": path.resolve(__dirname, "../i18n"),
+    };
+    return config;
   },
 };
 
