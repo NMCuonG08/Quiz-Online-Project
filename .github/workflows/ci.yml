@@ -7,18 +7,23 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
+  build-server:
+    name: Build Server (NestJS)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./server
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Use Node.js 22
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -26,18 +31,50 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      # - name: Lint
-      #   run: npm run lint --if-present
+      - name: Lint
+        run: npm run lint --if-present
+        continue-on-error: true
 
       - name: Build
         run: npm run build
 
-      - name: Docker build (validate Dockerfile)
-        run: docker build -t app-ci:latest .
+      - name: Validate Dockerfile
+        run: docker build -t quiz-server-ci:latest -f Dockerfile .
 
-  # Trigger CD workflow chỉ khi CI pass và push vào main
+  build-web:
+    name: Build Web (Next.js)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+        continue-on-error: true
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate Dockerfile
+        run: docker build -t quiz-web-ci:latest -f Dockerfile .
+
   trigger-deploy:
-    needs: build-and-test
+    name: Trigger CD Workflow
+    needs: [build-server, build-web]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
