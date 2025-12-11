@@ -32,7 +32,7 @@ import { Users, DoorOpen, Shield, Hash, LockKeyhole } from "lucide-react";
 import type { QuizDetailData } from "./services/quiz.detail.service";
 import { useCreateRoom } from "./hooks/useCreateRoom";
 import { useListRooms } from "./hooks/useListRooms";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { useJoinRoom } from "./hooks/useJoinRoom";
 import { showError } from "@/lib/Notification";
 import { BackendUnavailable } from "./components/BackendUnavailable";
@@ -43,7 +43,6 @@ interface QuizDetailProps {
 
 const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
   const { data, loading, error } = useQuizDetail(slug);
-  const router = useRouter();
   const {
     createRoom,
     loading: creatingRoom,
@@ -79,6 +78,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
   const [joinPassword, setJoinPassword] = React.useState("");
   const [joiningRoomId, setJoiningRoomId] = React.useState<string | null>(null);
   const { join, loading: joining } = useJoinRoom();
+  const { push: pushLocalized, prefixPath } = useLocalizedRouter();
 
   async function handleJoin(r: { id: string; is_private: boolean }) {
     if (r.is_private) {
@@ -89,7 +89,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
         return;
       }
     }
-    router.push(`/quiz/${quizId}/room/${r.id}`);
+    pushLocalized(prefixPath(`/quiz/${quizId}/room/${r.id}`));
   }
 
   function handleRoomCodeChange(v: string) {
@@ -175,7 +175,9 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     className="bg-blue-600 dark:bg-gray-dark text-white flex-1"
-                    onClick={() => router.push(`/quiz/${slug}/do-quiz`)}
+                    onClick={() =>
+                      pushLocalized(prefixPath(`/quiz/${slug}/do-quiz`))
+                    }
                   >
                     <DoorOpen />
                     Bắt đầu làm bài

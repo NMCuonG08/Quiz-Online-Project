@@ -3,7 +3,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper/modules";
 import { Star, Clock } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { LocalizedLink } from "@/common/components/ui";
 import { formatTimeAgo } from "@/lib/time-utils";
 import { Card, CardContent, CardHeader } from "@/common/components/ui/card";
 
@@ -156,7 +156,11 @@ const QuizCard: React.FC<QuizCardProps> = ({
     </Card>
   );
 
-  return slug ? <Link href={`/quiz/${slug}`}>{CardInner}</Link> : CardInner;
+  return slug ? (
+    <LocalizedLink href={`/quiz/${slug}`}>{CardInner}</LocalizedLink>
+  ) : (
+    CardInner
+  );
 };
 
 const CategoryCarousel: React.FC<CategoryCarouselProps> = ({

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { LocalizedLink } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
 import {
@@ -385,12 +386,12 @@ const RegisterForm = () => {
           {/* Bottom Text */}
           <p className="text-center text-xs text-muted-foreground mt-6">
             {tAuth("alreadyHaveAccount")}{" "}
-            <Link
+            <LocalizedLink
               href="/auth/login"
               className="text-foreground font-medium hover:underline"
             >
               {tAuth("signIn")}
-            </Link>
+            </LocalizedLink>
           </p>
         </div>
       </div>

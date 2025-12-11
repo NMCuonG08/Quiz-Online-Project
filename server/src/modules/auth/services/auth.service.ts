@@ -12,6 +12,7 @@ import { Permission } from '@/common/enums';
 import { isGranted } from '@/common/utils/access';
 import { BaseService } from '@/common/base/base.service';
 import { randomBytes } from 'crypto';
+import type { StringValue } from 'jsonwebtoken';
 
 type GoogleTokenResponse = {
   access_token: string;
@@ -516,9 +517,13 @@ export class AuthService extends BaseService {
   async generateAccessToken(userId: string): Promise<string> {
     const payload: JwtPayload = { sub: userId };
 
+    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
+    const expiresInConfig = this.configService.get<string>('JWT_EXPIRES_IN');
+    const expiresIn: StringValue | number | undefined = expiresInConfig ?? '7d';
+
     return this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),
+      secret,
+      expiresIn,
     });
   }
 
@@ -528,9 +533,16 @@ export class AuthService extends BaseService {
       type: 'refresh',
     };
 
+    const secret = this.configService.getOrThrow<string>('JWT_REFRESH_SECRET');
+    const expiresInConfig = this.configService.get<string>(
+      'REFRESH_TOKEN_EXPIRES_IN',
+    );
+    const expiresIn: StringValue | number | undefined =
+      expiresInConfig ?? '30d';
+
     return this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: '30d',
+      secret,
+      expiresIn,
     });
   }
 

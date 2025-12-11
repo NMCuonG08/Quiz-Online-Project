@@ -1,40 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Quiz Frontend (Next.js)
 
-## Getting Started
+Frontend for Quiz Online built with Next.js 15, React 19. Package manager: **pnpm** (shared workspace with `server/`).
 
-First, run the development server:
+## Requirements
+- Node 22.x
+- pnpm 9 (via `corepack`)
 
+## Install (workspace root)
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-
-
-
-
+corepack enable
+corepack prepare pnpm@9.12.3 --activate
+pnpm install          # run once at repo root
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Development
+From repo root:
+```bash
+pnpm --filter web run dev
+```
+Default dev port is 5173 (configured in `package.json`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production build / start
+```bash
+pnpm --filter web run build
+pnpm --filter web run start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Docker
+The `web/Dockerfile` uses pnpm in both build and runtime stages. Build and run:
+```bash
+cd web
+docker build -t quiz-web .
+docker run -p 3000:3000 quiz-web
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Env
+Configure environment variables as required by the app (e.g. API endpoints, Next auth/config) before running in production.

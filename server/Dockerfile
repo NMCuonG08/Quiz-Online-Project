@@ -3,29 +3,32 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Enable pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
+
 # Copy package files và tsconfig
 COPY package*.json ./
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 
-# Install dependencies (use install to avoid lockfile strictness in CI)
-RUN npm install
+# Install dependencies (workspace lock may live at repo root; allow missing lock)
+RUN pnpm install --frozen-lockfile=false
 
 # Copy source code
 COPY . .
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh && \
     sed -i 's/\r$//' /app/entrypoint.sh
 
 # Build NestJS app
-RUN npm run build
+RUN pnpm run build
 
 # Prune dev dependencies to keep only production deps for final image
-RUN npm prune --omit=dev && npm cache clean --force
+RUN pnpm prune --prod
 
 # 2. Production stage  
 FROM node:22-alpine AS production

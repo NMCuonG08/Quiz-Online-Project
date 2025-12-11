@@ -1,4 +1,5 @@
 import { AuthenticationService } from "@/modules/auth/common/services/auth.service";
+import { detectLocaleFromPath, withLocalePrefix } from "@/lib/locale";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 // Note: AuthenticationService will be dynamically imported to avoid circular dependencies
 // Enhanced error interface with comprehensive error information
@@ -198,23 +199,31 @@ const performLogout = async (): Promise<void> => {
 
     // Only redirect to login if not already on auth pages
     const currentPath = window.location.pathname;
+    const locale = detectLocaleFromPath(currentPath);
     const isOnAuthPage =
       currentPath.includes("/auth/login") ||
       currentPath.includes("/auth/register");
 
     if (!isOnAuthPage) {
-      window.location.href = "/auth/login";
+      window.location.href = withLocalePrefix("/auth/login", {
+        pathname: currentPath,
+        locale,
+      });
     }
   } catch (error) {
     console.error("Logout process failed:", error);
     // Only force redirect if not on auth pages
     const currentPath = window.location.pathname;
+    const locale = detectLocaleFromPath(currentPath);
     const isOnAuthPage =
       currentPath.includes("/auth/login") ||
       currentPath.includes("/auth/register");
 
     if (!isOnAuthPage) {
-      window.location.href = "/auth/login";
+      window.location.href = withLocalePrefix("/auth/login", {
+        pathname: currentPath,
+        locale,
+      });
     }
   }
 };

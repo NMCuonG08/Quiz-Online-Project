@@ -1,9 +1,10 @@
 // components/guards/AuthGuard.tsx
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { ReactNode } from "react";
 import CreateLoading from "@/common/components/CreateLoading";
+import { withLocalePrefix, detectLocaleFromPath } from "@/lib/locale";
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -19,8 +20,14 @@ const AuthGuard = ({
   fallback = null,
 }: AuthGuardProps) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [isChecking, setIsChecking] = useState(true);
   const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
+
+  const localizedRedirect = useMemo(() => {
+    const locale = detectLocaleFromPath(pathname ?? "/");
+    return withLocalePrefix(redirectTo, { pathname, locale });
+  }, [pathname, redirectTo]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -29,7 +36,7 @@ const AuthGuard = ({
 
       // Nếu chưa authenticate
       if (!isAuthenticated) {
-        router.replace(redirectTo);
+        router.replace(localizedRedirect);
         return;
       }
 
@@ -43,7 +50,7 @@ const AuthGuard = ({
     };
 
     checkAuth();
-  }, [isAuthenticated, user, loading, requiredRole, router, redirectTo]);
+  }, [isAuthenticated, user, loading, requiredRole, router, localizedRedirect]);
 
   // Vẫn đang check auth status
   if (loading || isChecking) {

@@ -3,13 +3,15 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
+
 COPY package*.json ./
-RUN npm ci
+RUN pnpm install --frozen-lockfile=false
 
 COPY . .
 
 # Build Next.js app (production)
-RUN npm run build
+RUN pnpm run build
 
 
 # 2) Runner stage
@@ -28,6 +30,6 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+CMD ["pnpm", "run", "start"]
 
 
