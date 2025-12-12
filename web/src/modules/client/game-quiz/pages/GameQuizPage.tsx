@@ -7,7 +7,6 @@ import { Question } from "../../do-quiz/types/quiz.types";
 import { useGameQuiz } from "../hooks/useGameQuiz";
 import { GameHeader } from "../components/GameHeader";
 import { QuestionDisplay } from "../components/QuestionDisplay";
-import { GameControls } from "../components/GameControls";
 import { GameLoading } from "../components/GameLoading";
 import { GameQuizAnswer } from "../types/game-quiz.types";
 import { Card } from "@/common/components/ui/card";
@@ -179,29 +178,27 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
         score={score}
         totalScore={totalScore}
         onExit={handleExit}
-      />
-
-      {/* Main Content with top/bottom padding to clear header/footer */}
-      <div className="flex-1 overflow-y-auto pt-20 sm:pt-24 md:pt-28 pb-[220px] sm:pb-[260px] md:pb-[280px]">
-        <QuestionDisplay
-          question={currentQuestion}
-          questionNumber={currentQuestionIndex + 1}
-          totalQuestions={totalQuestions}
-          selectedAnswer={selectedAnswer}
-          onAnswerSelect={selectAnswer}
-          isAnswered={isAnswered}
-          timeRemaining={timeRemaining}
-        />
-      </div>
-
-      {/* Controls (docked bottom) */}
-      <GameControls
         onSubmitAnswer={submitAnswer}
         onNextQuestion={nextQuestion}
         isAnswered={isAnswered}
         hasSelectedAnswer={hasSelectedAnswer}
         isLastQuestion={isLastQuestion}
       />
+
+      {/* Main Content with top padding to clear header */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="pt-6 sm:pt-8 md:pt-10 pb-8 px-4 sm:px-6 md:px-8 min-h-full">
+          <QuestionDisplay
+            question={currentQuestion}
+            questionNumber={currentQuestionIndex + 1}
+            totalQuestions={totalQuestions}
+            selectedAnswer={selectedAnswer}
+            onAnswerSelect={selectAnswer}
+            isAnswered={isAnswered}
+            timeRemaining={timeRemaining}
+          />
+        </div>
+      </div>
     </div>
   );
 

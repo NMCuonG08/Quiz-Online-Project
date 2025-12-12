@@ -10,7 +10,15 @@ import { Input } from "@/common/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
-  const { question, questionNumber, totalQuestions, selectedAnswer, onAnswerSelect, isAnswered, timeRemaining } = props;
+  const {
+    question,
+    questionNumber,
+    totalQuestions,
+    selectedAnswer,
+    onAnswerSelect,
+    isAnswered,
+    timeRemaining,
+  } = props;
   const [inputValue, setInputValue] = useState(
     typeof selectedAnswer === "string" ? selectedAnswer : ""
   );
@@ -27,20 +35,22 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
     onAnswerSelect(value);
   };
 
-  const isCorrect = isAnswered && question.correct_answer 
-    ? inputValue.toLowerCase().trim() === question.correct_answer.toLowerCase().trim()
-    : false;
+  const isCorrect =
+    isAnswered && question.correct_answer
+      ? inputValue.toLowerCase().trim() ===
+        question.correct_answer.toLowerCase().trim()
+      : false;
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
       {/* Question Header */}
       <div className="w-full max-w-6xl mb-6 sm:mb-8">
         <div className="flex items-center justify-between mb-4 sm:mb-6 gap-4">
-          <Badge variant="outline" className="text-xl sm:text-2xl md:text-3xl px-4 py-2">
-            Câu hỏi {questionNumber} / {totalQuestions}
-          </Badge>
           {timeRemaining !== undefined && (
-            <Badge variant="secondary" className="text-2xl sm:text-3xl md:text-4xl px-4 py-2 text-yellow-600 dark:text-yellow-400">
+            <Badge
+              variant="secondary"
+              className="text-2xl sm:text-3xl md:text-4xl px-4 py-2 text-yellow-600 dark:text-yellow-400"
+            >
               ⏱ {timeRemaining}s
             </Badge>
           )}
@@ -69,7 +79,10 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
             {question.content}
           </h2>
           <div className="text-center">
-            <Badge variant="secondary" className="text-lg sm:text-xl md:text-2xl px-4 py-2">
+            <Badge
+              variant="secondary"
+              className="text-lg sm:text-xl md:text-2xl px-4 py-2"
+            >
               {question.points} điểm
             </Badge>
           </div>
@@ -86,21 +99,28 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
           placeholder="Nhập câu trả lời của bạn..."
           className={cn(
             "w-full p-6 sm:p-8 text-2xl sm:text-3xl md:text-4xl font-semibold h-auto",
-            isAnswered && isCorrect && "border-green-500 bg-green-50 dark:bg-green-950/50",
-            isAnswered && !isCorrect && "border-destructive bg-destructive/10 dark:bg-destructive/20"
+            isAnswered &&
+              isCorrect &&
+              "border-green-500 bg-green-50 dark:bg-green-950/50",
+            isAnswered &&
+              !isCorrect &&
+              "border-destructive bg-destructive/10 dark:bg-destructive/20"
           )}
         />
         {isAnswered && question.correct_answer && (
           <Card className="mt-6 p-4 sm:p-6">
             <div className="text-center">
-              <Badge 
-                variant={isCorrect ? "default" : "destructive"} 
+              <Badge
+                variant={isCorrect ? "default" : "destructive"}
                 className="text-xl sm:text-2xl md:text-3xl px-4 py-2 mb-4"
               >
                 {isCorrect ? "✓ Đúng!" : "✗ Sai"}
               </Badge>
               <div className="text-lg sm:text-xl md:text-2xl text-muted-foreground mt-4">
-                Đáp án đúng: <span className="font-bold text-foreground">{question.correct_answer}</span>
+                Đáp án đúng:{" "}
+                <span className="font-bold text-foreground">
+                  {question.correct_answer}
+                </span>
               </div>
             </div>
           </Card>
@@ -118,11 +138,13 @@ export class FillBlankStrategy implements IQuestionRendererStrategy {
   validateAnswer(question: Question, answer: string | string[]): boolean {
     if (typeof answer !== "string") return false;
     if (!question.correct_answer) return false;
-    return answer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+    return (
+      answer.toLowerCase().trim() ===
+      question.correct_answer.toLowerCase().trim()
+    );
   }
 
   getDefaultAnswer(): string {
     return "";
   }
 }
-

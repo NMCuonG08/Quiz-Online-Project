@@ -28,12 +28,6 @@ export class MultipleChoiceStrategy implements IQuestionRendererStrategy {
         {/* Question Header */}
         <div className="w-full max-w-5xl mb-4 sm:mb-6">
           <div className="flex items-center justify-between mb-3 sm:mb-4 gap-3 sm:gap-4">
-            <Badge
-              variant="outline"
-              className="text-lg sm:text-xl md:text-2xl px-3 py-1.5"
-            >
-              Câu hỏi {questionNumber} / {totalQuestions}
-            </Badge>
             {timeRemaining !== undefined && (
               <Badge
                 variant="secondary"

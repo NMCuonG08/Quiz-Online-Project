@@ -71,14 +71,21 @@ function Button({
     >
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
       <div
-        className="absolute bg-black/60 dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active:bottom-0 group-active:right-0 -z-10"
+        className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active:bottom-0 group-active:right-0 -z-10"
         style={{ overflow: "visible" }}
+      />
+      {/* Background layer để đảm bảo button không transparent */}
+      <div
+        className={cn(
+          "absolute inset-0 rounded-md bg-white dark:bg-gray-dark -z-[5]",
+          variant === "link" && "hidden"
+        )}
       />
       <Comp
         data-slot="button"
         className={cn(
           buttonVariants({ variant, size, className: buttonClassName }),
-          "relative z-10 dark:bg-gray-dark dark:hover:!bg-gray-dark hover:cursor-pointer transition-all duration-200 w-full"
+          "relative z-10 hover:cursor-pointer transition-all duration-200 w-full"
         )}
         {...props}
       />

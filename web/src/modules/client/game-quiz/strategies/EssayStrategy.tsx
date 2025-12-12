@@ -9,7 +9,15 @@ import { Badge } from "@/common/components/ui/badge";
 import { Textarea } from "@/common/components/ui/textarea";
 
 const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
-  const { question, questionNumber, totalQuestions, selectedAnswer, onAnswerSelect, isAnswered, timeRemaining } = props;
+  const {
+    question,
+    questionNumber,
+    totalQuestions,
+    selectedAnswer,
+    onAnswerSelect,
+    isAnswered,
+    timeRemaining,
+  } = props;
   const [textValue, setTextValue] = useState(
     typeof selectedAnswer === "string" ? selectedAnswer : ""
   );
@@ -31,11 +39,11 @@ const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
       {/* Question Header */}
       <div className="w-full max-w-6xl mb-6 sm:mb-8">
         <div className="flex items-center justify-between mb-4 sm:mb-6 gap-4">
-          <Badge variant="outline" className="text-xl sm:text-2xl md:text-3xl px-4 py-2">
-            Câu hỏi {questionNumber} / {totalQuestions}
-          </Badge>
           {timeRemaining !== undefined && (
-            <Badge variant="secondary" className="text-2xl sm:text-3xl md:text-4xl px-4 py-2 text-yellow-600 dark:text-yellow-400">
+            <Badge
+              variant="secondary"
+              className="text-2xl sm:text-3xl md:text-4xl px-4 py-2 text-yellow-600 dark:text-yellow-400"
+            >
               ⏱ {timeRemaining}s
             </Badge>
           )}
@@ -64,7 +72,10 @@ const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
             {question.content}
           </h2>
           <div className="text-center">
-            <Badge variant="secondary" className="text-lg sm:text-xl md:text-2xl px-4 py-2">
+            <Badge
+              variant="secondary"
+              className="text-lg sm:text-xl md:text-2xl px-4 py-2"
+            >
               {question.points} điểm
             </Badge>
           </div>
@@ -82,7 +93,10 @@ const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
           className="w-full p-6 sm:p-8 text-xl sm:text-2xl font-medium min-h-[300px] sm:min-h-[400px] resize-none"
         />
         <div className="mt-4 text-right">
-          <Badge variant="outline" className="text-base sm:text-lg md:text-xl px-3 py-1">
+          <Badge
+            variant="outline"
+            className="text-base sm:text-lg md:text-xl px-3 py-1"
+          >
             {textValue.length} ký tự
           </Badge>
         </div>
@@ -106,4 +120,3 @@ export class EssayStrategy implements IQuestionRendererStrategy {
     return "";
   }
 }
-
