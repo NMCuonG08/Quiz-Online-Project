@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "@/hooks/useRedux";
 import { wsManager } from "@/lib/websocket";
 import {
@@ -18,6 +18,7 @@ import {
   setParticipants,
   clearMessagesError,
   clearParticipantsError,
+  removeParticipantByUserId,
 } from "../slices/room-quiz.slice";
 import {
   type JoinRoomPayload,
@@ -49,8 +50,12 @@ export function useRoomQuiz() {
     participantsError,
   } = useAppSelector((state) => state.roomQuiz);
 
+  // Store current roomId in ref để check trong handlers
+  const currentRoomIdRef = useRef<string | null>(null);
+
   const getRoomById = useCallback(
     (roomId: string) => {
+      currentRoomIdRef.current = roomId; // Store current roomId
       // Join room via WebSocket
       console.log("Joining room via WebSocket:", roomId);
       if (!wsManager.isConnected() && !wsManager.getIsConnecting()) {
@@ -79,6 +84,7 @@ export function useRoomQuiz() {
   );
 
   const clearData = useCallback(() => {
+    currentRoomIdRef.current = null;
     dispatch(clearRoomData());
   }, [dispatch]);
 
@@ -91,6 +97,17 @@ export function useRoomQuiz() {
     dispatch(clearJoinError());
   }, [dispatch]);
 
+  const getCurrentUserId = useCallback(() => {
+    try {
+      const token = wsManager.getCurrentToken();
+      if (!token) return undefined;
+      const payload = JSON.parse(atob(token.split(".")[1] || ""));
+      return payload?.sub || payload?.userId || payload?.id;
+    } catch {
+      return undefined;
+    }
+  }, []);
+
   const getChatMessages = useCallback((roomId: string) => {
     // Chỉ lấy qua WebSocket, không gọi API nữa
     if (wsManager.isConnected()) {
@@ -100,13 +117,14 @@ export function useRoomQuiz() {
 
   const sendMessageAction = useCallback(
     (roomId: string, message: string) => {
+      const currentUserId = getCurrentUserId() || "me";
       // Optimistic append for instant UX; server echo will follow
       dispatch(
         addMessage({
           id: `temp_${Date.now()}`,
           room_id: roomId,
-          user_id: "me",
-          username: "You",
+          user_id: currentUserId,
+          username: "",
           message,
           message_type: "text",
           created_at: new Date().toISOString(),
@@ -117,7 +135,7 @@ export function useRoomQuiz() {
         wsManager.send("send_message", { roomId, message });
       }
     },
-    [dispatch]
+    [dispatch, getCurrentUserId]
   );
 
   const getParticipants = useCallback(
@@ -215,9 +233,22 @@ export function useRoomQuiz() {
     };
 
     const handleParticipantsList = (
-      data: { participants: Participant[] } & any
+      data: { participants: Participant[]; roomId: string } & any
     ) => {
       console.log("👤 Participants list event payload:", data);
+
+      // Check if this event is for the current room
+      const eventRoomId = data?.roomId;
+      if (
+        currentRoomIdRef.current &&
+        eventRoomId !== currentRoomIdRef.current
+      ) {
+        console.log(
+          `⚠️ Ignoring participants_list for room ${eventRoomId}, current room is ${currentRoomIdRef.current}`
+        );
+        return;
+      }
+
       const list = (data && (data as any).participants) || [];
       console.log("📊 Total participants (WS):", list.length);
       dispatch(setParticipants(list));
@@ -256,13 +287,42 @@ export function useRoomQuiz() {
 
     const handleUserJoined = (data: UserRoomPayload) => {
       console.log("👤 User joined room:", data);
-      // Optionally refresh participants list or show notification
+
+      // Chỉ xử lý nếu đúng phòng hiện tại
+      if (
+        currentRoomIdRef.current &&
+        data.roomId !== currentRoomIdRef.current
+      ) {
+        console.log(
+          `⚠️ Ignoring user_joined for room ${data.roomId}, current room is ${currentRoomIdRef.current}`
+        );
+        return;
+      }
+
+      // Rely on backend 'participants_list' event; tránh load lại để UX mượt hơn
       // TODO: Show notification "User X joined the room"
     };
 
     const handleUserLeft = (data: UserRoomPayload) => {
       console.log("👋 User left room:", data);
-      // Optionally refresh participants list or show notification
+
+      // Check if this event is for the current room
+      if (
+        currentRoomIdRef.current &&
+        data.roomId !== currentRoomIdRef.current
+      ) {
+        console.log(
+          `⚠️ Ignoring user_left for room ${data.roomId}, current room is ${currentRoomIdRef.current}`
+        );
+        return;
+      }
+
+      // Optimistically remove by userId for immediate UI update
+      if (data.userId) {
+        dispatch(removeParticipantByUserId(data.userId));
+      }
+
+      // Tránh gọi getParticipants để UX không bị giật; backend sẽ gửi participants_list
       // TODO: Show notification "User X left the room"
     };
 

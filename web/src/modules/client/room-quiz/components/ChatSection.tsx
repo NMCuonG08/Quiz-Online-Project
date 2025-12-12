@@ -29,10 +29,13 @@ export function ChatSection({
   className = "",
 }: ChatSectionProps) {
   const [message, setMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -79,7 +82,10 @@ export function ChatSection({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-3"
+        ref={messagesContainerRef}
+      >
         {loading ? (
           <div className="text-center text-muted-foreground">
             Loading messages...
@@ -94,6 +100,9 @@ export function ChatSection({
           messages.map((msg) => {
             const isSystem = msg.message_type === "system";
             const isMe = !!myUserId && msg.user_id === myUserId;
+            const displayName = isMe
+              ? "You"
+              : msg.username || (msg.user_id || "").slice(0, 8) || "User";
             return (
               <div
                 key={msg.id}
@@ -118,14 +127,7 @@ export function ChatSection({
                     <Avatar className="w-8 h-8 mt-0.5">
                       <AvatarImage src={msg.avatar_url || undefined} />
                       <AvatarFallback className="text-xs">
-                        {(
-                          (isMe
-                            ? msg.username || "You"
-                            : msg.username ||
-                              (msg.user_id || "").slice(0, 2)) || "U"
-                        )
-                          .slice(0, 2)
-                          .toUpperCase()}
+                        {(displayName || "U").slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div
@@ -137,9 +139,7 @@ export function ChatSection({
                         }`}
                       >
                         <span className="text-sm font-medium text-foreground">
-                          {isMe
-                            ? msg.username || "You"
-                            : msg.username || (msg.user_id || "").slice(0, 8)}
+                          {displayName}
                         </span>
                         {isMe && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
@@ -166,7 +166,6 @@ export function ChatSection({
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}

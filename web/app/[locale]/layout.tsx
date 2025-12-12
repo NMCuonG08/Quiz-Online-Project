@@ -7,6 +7,7 @@ import "@/styles/input-selection.css";
 import { ThemeProvider } from "@/common/contexts/ThemeContext";
 import ReduxProvider from "@/common/contexts/ReduxProvider";
 import AuthRestorer from "@/common/contexts/AuthRestorer";
+import { WebSocketProvider } from "@/common/contexts/WebSocketProvider";
 import { NotificationContainer } from "@/common/components/NotificationContainer";
 import ClientOnly from "@/common/contexts/ClientOnly";
 import { WebSocketDebugger } from "@/components/WebSocketDebugger";
@@ -53,9 +54,13 @@ export default async function RootLayout({
           <NextIntlClientProvider locale={locale} messages={messages}>
             <ThemeProvider>
               <ReduxProvider>
-                <AuthRestorer>{children}</AuthRestorer>
-                <NotificationContainer />
-                <ClientOnly>{/* <WebSocketDebugger /> */}</ClientOnly>
+                <AuthRestorer>
+                  <WebSocketProvider autoConnect={true}>
+                    {children}
+                    <NotificationContainer />
+                    <ClientOnly>{/* <WebSocketDebugger /> */}</ClientOnly>
+                  </WebSocketProvider>
+                </AuthRestorer>
               </ReduxProvider>
             </ThemeProvider>
           </NextIntlClientProvider>

@@ -74,7 +74,7 @@ export interface ClientEventMap {
   messages_list: [ChatMessage[]];
   participant_joined: [Participant];
   participant_left: [string];
-  participants_list: [Participant[]];
+  participants_list: [{ roomId: string; participants: Participant[] }];
   room_updated: [RoomData];
 }
 

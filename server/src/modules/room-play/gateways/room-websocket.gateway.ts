@@ -30,6 +30,8 @@ export class RoomWebSocketGateway
   server: Server;
 
   private readonly logger = new Logger(RoomWebSocketGateway.name);
+  // Track rooms per socket manually to ensure disconnect cleanup still knows memberships
+  private socketRooms: Map<string, Set<string>> = new Map();
   // In-memory chat storage per room (ephemeral)
   private roomMessages: Map<
     string,
@@ -82,48 +84,147 @@ export class RoomWebSocketGateway
 
   async handleDisconnect(client: AuthenticatedSocket) {
     this.logger.log(`🔌 Room WebSocket disconnected: ${client.id}`);
+
+    try {
+      // Extract user ID from token
+      const userId = this.extractUserIdFromToken(client);
+
+      if (!userId || userId === 'temp-user-id') {
+        this.logger.warn(
+          `⚠️ Cannot extract user ID for disconnected client ${client.id}, skipping room cleanup`,
+        );
+        return;
+      }
+
+      // Find all rooms that this client was in (format: "room:${roomId}")
+      const roomPrefix = 'room:';
+      const joinedRooms = Array.from(
+        this.socketRooms.get(client.id) ?? new Set<string>(),
+      ).filter((room) => room.startsWith(roomPrefix));
+
+      this.logger.log(
+        `🔄 Client ${client.id} (user ${userId}) was in ${joinedRooms.length} room(s):`,
+        joinedRooms,
+      );
+
+      // Process each room the user was in
+      for (const socketRoom of joinedRooms) {
+        const roomId = socketRoom.replace(roomPrefix, '');
+
+        if (!roomId) {
+          this.logger.warn(
+            `⚠️ Invalid room format: ${socketRoom} for client ${client.id}`,
+          );
+          continue;
+        }
+
+        try {
+          this.logger.log(
+            `🔄 Processing disconnect for user ${userId} from room ${roomId}`,
+          );
+
+          // Leave room via service (update database)
+          await this.roomService.leaveRoomViaWebSocket(userId, roomId);
+
+          // Notify other participants in the room
+          this.server.to(socketRoom).emit('user_left', {
+            userId,
+            roomId,
+            message: `User left the room`,
+          });
+
+          this.logger.log(
+            `📢 Notified room ${socketRoom} about participant leaving`,
+          );
+
+          // Broadcast updated participants list to the room
+          try {
+            const participants = await this.roomService.getParticipants(roomId);
+            this.server.to(socketRoom).emit('participants_list', {
+              roomId,
+              participants: participants.participants,
+            });
+            this.logger.log(
+              `👥 Broadcasted participants_list to ${socketRoom} (${participants.participants.length} users)`,
+            );
+          } catch (err) {
+            this.logger.warn(
+              `⚠️ Failed to broadcast participants_list after disconnect:`,
+              err,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `❌ Failed to process disconnect for room ${roomId}:`,
+            error,
+          );
+          // Continue processing other rooms even if one fails
+        }
+      }
+
+      this.logger.log(
+        `✅ Completed disconnect cleanup for client ${client.id}`,
+      );
+      // Cleanup tracking map for this socket
+      this.socketRooms.delete(client.id);
+    } catch (error) {
+      this.logger.error(
+        `❌ Error handling disconnect for client ${client.id}:`,
+        error,
+      );
+    }
   }
 
   private extractUserIdFromToken(client: AuthenticatedSocket): string {
-    // Prefer deriving from rooms joined by EventRepository (auth gateway)
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const candidate = Array.from(client.rooms).find((r) => uuidRegex.test(r));
-    if (candidate) {
-      this.logger.log(
-        `✅ Derived user ID from client rooms: ${candidate} for ${client.id}`,
-      );
-      return candidate;
-    }
-
-    // Fallback: naive JWT decode from stored token
+    // 1) Try decode token first (most reliable)
     try {
       const token = (client as any).token;
-      if (!token) {
-        this.logger.warn(`❌ No token found for client ${client.id}`);
-        return 'temp-user-id';
-      }
-      const payload = JSON.parse(
-        Buffer.from(token.split('.')[1], 'base64').toString(),
-      );
-      const userId = payload.sub || payload.userId || payload.id;
-      if (!userId) {
-        this.logger.warn(
-          `❌ No user ID found in token for client ${client.id}`,
+      if (token) {
+        const payload = JSON.parse(
+          Buffer.from(token.split('.')[1], 'base64').toString(),
         );
-        return 'temp-user-id';
+        const userId = payload.sub || payload.userId || payload.id;
+        if (userId) {
+          this.logger.log(
+            `✅ Extracted user ID from token: ${userId} for client ${client.id}`,
+          );
+          return userId;
+        }
+        this.logger.warn(
+          `❌ No user ID fields (sub/userId/id) in token for client ${client.id}`,
+        );
+      } else {
+        this.logger.warn(`❌ No token found for client ${client.id}`);
       }
-      this.logger.log(
-        `✅ Extracted user ID (fallback): ${userId} for client ${client.id}`,
-      );
-      return userId;
     } catch (error) {
-      this.logger.error(
-        `❌ Failed to extract user ID for client ${client.id}:`,
+      this.logger.warn(
+        `⚠️ Failed to decode token for client ${client.id}, fallback to rooms`,
         error,
       );
-      return 'temp-user-id';
     }
+
+    // 2) Fallback: derive from joined rooms. Rooms may have prefix "room:".
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const candidate = Array.from(client.rooms).find((r) => {
+      const trimmed = r.startsWith('room:') ? r.slice(5) : r;
+      return uuidRegex.test(trimmed);
+    });
+    if (candidate) {
+      const trimmed = candidate.startsWith('room:')
+        ? candidate.slice(5)
+        : candidate;
+      this.logger.log(
+        `✅ Derived user ID from client rooms: ${trimmed} for ${client.id}`,
+      );
+      return trimmed;
+    }
+
+    // 3) Last resort
+    this.logger.warn(
+      `❌ Unable to derive user ID for client ${client.id}; using temp-user-id`,
+    );
+    return 'temp-user-id';
   }
 
   private extractUsernameFromToken(
@@ -159,7 +260,6 @@ export class RoomWebSocketGateway
 
       // Extract user ID from JWT token
       const userId = this.extractUserIdFromToken(client);
-      const usernameFromToken = this.extractUsernameFromToken(client);
 
       this.logger.log(
         `🔄 Attempting to join room ${data.roomId} for user ${userId}`,
@@ -175,6 +275,10 @@ export class RoomWebSocketGateway
 
       // Join socket to room
       await client.join(result.socket_room);
+      // Track room for this socket
+      const set = this.socketRooms.get(client.id) ?? new Set<string>();
+      set.add(result.socket_room);
+      this.socketRooms.set(client.id, set);
 
       // Emit success to client
       client.emit('room_joined', {
@@ -252,6 +356,16 @@ export class RoomWebSocketGateway
       // Leave socket from room
       const socketRoom = `room:${data.roomId}`;
       await client.leave(socketRoom);
+      // Untrack room for this socket
+      const set = this.socketRooms.get(client.id);
+      if (set) {
+        set.delete(socketRoom);
+        if (set.size === 0) {
+          this.socketRooms.delete(client.id);
+        } else {
+          this.socketRooms.set(client.id, set);
+        }
+      }
 
       this.logger.log(`✅ Successfully left room ${data.roomId}`);
 

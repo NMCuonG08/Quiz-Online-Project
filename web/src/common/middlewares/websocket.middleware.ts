@@ -192,36 +192,31 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
     isConnecting = false; // Reset flag on disconnect
     dispatch(disconnected(reason));
 
-    // Chỉ auto-reconnect nếu:
-    // 1. Không phải do user logout
-    // 2. Không phải do server force disconnect
-    // 3. Không phải do client disconnect
-    // 4. Chưa có connection attempt nào đang chạy
-    if (
-      reason !== "io server disconnect" &&
-      reason !== "User logged out" &&
-      reason !== "io client disconnect" &&
-      !wsManager.getIsConnecting() &&
-      !isConnecting
-    ) {
-      // Thêm delay để tránh reconnect quá nhanh
-      setTimeout(() => {
-        const token = localStorage.getItem("auth_token");
-        if (
-          token &&
-          !wsManager.getIsConnecting() &&
-          !wsManager.isConnected() &&
-          !isConnecting
-        ) {
-          console.log("🔌 Auto-reconnecting after disconnect...");
-          connectWebSocketWithRetry(dispatch, token);
-        }
-      }, 5000); // Tăng delay lên 5s
-    } else {
-      console.log(
-        "🔌 Server/client disconnect or logout, skipping auto-reconnect"
-      );
+    // Auto-reconnect for all cases except explicit logout
+    if (reason === "User logged out") {
+      console.log("🔌 Logout disconnect, skip auto-reconnect");
+      return;
     }
+
+    // Avoid overlapping connection attempts
+    if (wsManager.getIsConnecting() || isConnecting) {
+      console.log("🔌 Already connecting, skip auto-reconnect");
+      return;
+    }
+
+    // Quick retry with small delay to survive page reloads
+    setTimeout(() => {
+      const token = localStorage.getItem("auth_token");
+      if (
+        token &&
+        !wsManager.getIsConnecting() &&
+        !wsManager.isConnected() &&
+        !isConnecting
+      ) {
+        console.log("🔌 Auto-reconnecting after disconnect...");
+        connectWebSocketWithRetry(dispatch, token);
+      }
+    }, 1000);
   });
 
   wsManager.on("error", (error: Error) => {

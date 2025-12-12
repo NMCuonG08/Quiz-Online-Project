@@ -9,10 +9,12 @@ import { RoomLoading } from "@/modules/client/room-quiz/components/RoomLoading";
 import { RoomError } from "@/modules/client/room-quiz/components/RoomError";
 import { ChatSection } from "@/modules/client/room-quiz/components/ChatSection";
 import { ParticipantsSection } from "@/modules/client/room-quiz/components/ParticipantsSection";
+import { useWebSocketState } from "@/common/hooks/useWebSocket";
 
 const RoomQuizPage = () => {
   const params = useParams();
   const roomId = params?.id as string;
+  const { isConnected } = useWebSocketState();
 
   const {
     roomData,
@@ -59,6 +61,16 @@ const RoomQuizPage = () => {
     leaveRoom,
     clearData,
   ]);
+
+  // Ensure websocket room join even when data is cached or after reconnect
+  useEffect(() => {
+    if (!roomId) return;
+    if (!isConnected) return;
+    console.log("Ensuring WebSocket join for room:", roomId);
+    getRoomById(roomId);
+    getParticipants(roomId);
+    getChatMessages(roomId);
+  }, [roomId, isConnected, getRoomById, getParticipants, getChatMessages]);
 
   const handleRetry = () => {
     if (roomId) {

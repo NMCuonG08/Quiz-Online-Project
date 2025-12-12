@@ -140,6 +140,21 @@ const roomQuizSlice = createSlice({
     },
     addMessage: (state, action) => {
       const msg = action.payload as ChatMessage;
+      const isTemp = msg.id?.startsWith("temp_");
+
+      // Nếu là message thật (server echo), loại bỏ optimistic trùng nội dung + user
+      if (!isTemp) {
+        state.messages = state.messages.filter(
+          (m) =>
+            !(
+              m.id?.startsWith("temp_") &&
+              m.user_id === msg.user_id &&
+              m.message === msg.message
+            )
+        );
+      }
+
+      // Tránh trùng ID
       if (!state.messages.some((m) => m.id === msg.id)) {
         state.messages.push(msg);
       }
@@ -160,6 +175,12 @@ const roomQuizSlice = createSlice({
     removeParticipant: (state, action) => {
       state.participants = state.participants.filter(
         (p) => p.id !== action.payload
+      );
+    },
+    removeParticipantByUserId: (state, action) => {
+      const userId = action.payload as string;
+      state.participants = state.participants.filter(
+        (p) => p.user_id !== userId && p.id !== userId
       );
     },
     setParticipants: (state, action) => {
@@ -298,6 +319,7 @@ export const {
   setMessages,
   addParticipant,
   removeParticipant,
+  removeParticipantByUserId,
   setParticipants,
   clearMessagesError,
   clearParticipantsError,

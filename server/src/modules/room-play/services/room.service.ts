@@ -339,19 +339,6 @@ export class RoomService extends BaseService {
       `🔍 joinRoomViaWebSocket called with userId: ${userId}, roomId: ${roomId}`,
     );
 
-    // Validate UUID format
-    if (!this.isValidUUID(roomId)) {
-      console.log(`❌ Invalid room ID format: ${roomId}`);
-      throw new BadRequestException('Invalid room ID format');
-    }
-
-    if (!this.isValidUUID(userId)) {
-      console.log(`❌ Invalid user ID format: ${userId}`);
-      throw new BadRequestException('Invalid user ID format');
-    }
-
-    console.log(`✅ UUID validation passed for both IDs`);
-
     const room = await this.roomRepository.findUnique({ id: roomId });
     if (!room) {
       console.log(`❌ Room not found: ${roomId}`);
