@@ -41,7 +41,7 @@ const OffersSection = () => {
       variant="elevated"
       size="xl"
       rounded="xl"
-      className="py-16 px-4 sm:px-8 lg:px-12 bg-red-light dark:bg-gray-dark border border-border w-full"
+      className="py-16 px-4 sm:px-8 lg:px-12 bg-red-light light:bg-red-light dark:bg-gray-dark border border-border w-full"
     >
       <div className="max-w-7xl mx-auto">
         {/* Header with title and SVG stars */}
@@ -90,11 +90,10 @@ const OffersSection = () => {
           {offers.map((offer) => (
             <Card
               key={offer.id}
-              className={`relative overflow-hidden h-full flex flex-col ${
-                offer.featured
+              className={`relative overflow-hidden h-full flex flex-col ${offer.featured
                   ? "shadow-lg bg-card"
                   : "bg-card/80 backdrop-blur-sm hover:bg-card transition-all duration-300"
-              }`}
+                }`}
               style={{
                 backgroundImage: `url(${offer.image})`,
                 backgroundSize: "cover",
@@ -128,9 +127,8 @@ const OffersSection = () => {
                 <div className="flex items-center gap-3 mb-4">
                   {/* Icon */}
                   <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      offer.featured ? "bg-background" : "bg-muted"
-                    }`}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${offer.featured ? "bg-background" : "bg-muted"
+                      }`}
                   >
                     <Image
                       src={offer.icon}
@@ -143,9 +141,8 @@ const OffersSection = () => {
 
                   {/* Title */}
                   <CardTitle
-                    className={`text-lg dark:text-black font-bold ${
-                      offer.featured ? "text-foreground" : "text-foreground"
-                    }`}
+                    className={`text-lg dark:text-black font-bold ${offer.featured ? "text-foreground" : "text-foreground"
+                      }`}
                   >
                     {offer.title}
                   </CardTitle>
@@ -153,11 +150,10 @@ const OffersSection = () => {
 
                 {/* Description */}
                 <CardDescription
-                  className={`text-sm leading-relaxed dark:text-black flex-grow ${
-                    offer.featured
+                  className={`text-sm leading-relaxed dark:text-black flex-grow ${offer.featured
                       ? "text-muted-foreground"
                       : "text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {offer.description}
                 </CardDescription>

@@ -11,7 +11,27 @@ module.exports = {
   ],
   darkMode: 'class',
   theme: {
+    screens: {
+      "2xsm": "375px",
+      xsm: "425px",
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+      xl: "1280px",
+      "2xl": "1536px",
+    },
     extend: {
+      spacing: {
+        "4.5": "1.125rem",
+        "5.5": "1.375rem",
+        "7.5": "1.875rem",
+        "11": "2.75rem",
+        "11.5": "2.875rem",
+        "12.5": "3.125rem",
+        "13": "3.25rem",
+        "15": "3.75rem",
+        "100": "25rem",
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
@@ -61,6 +81,20 @@ module.exports = {
           6: "#6B7280",
           7: "#374151",
         },
+        dark: {
+          DEFAULT: "#1C2434",
+          1: "#24303E",
+          2: "#0B1521",
+          3: "#1A2E44",
+          4: "#2A3F58",
+          5: "#4B5F79",
+          6: "#6B7D93",
+          7: "#8B9CAD",
+        },
+        stroke: {
+          DEFAULT: "#E2E8F0",
+          dark: "#2E3A47",
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -86,10 +120,20 @@ module.exports = {
           600: '#FF5252',
         },
       },
+      boxShadow: {
+        card: "0px 1px 3px rgba(0, 0, 0, 0.12), 0px 1px 2px rgba(0, 0, 0, 0.24)",
+        "card-2": "0px 8px 24px rgba(149, 157, 165, 0.2)",
+        "3": "0px 1px 3px rgba(0, 0, 0, 0.12), 0px 1px 2px rgba(0, 0, 0, 0.24)",
+        datepicker: "0px 5px 15px rgba(0, 0, 0, 0.35)",
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+      },
+      dropShadow: {
+        card: "0px 1px 4px rgba(0, 0, 0, 0.12)",
+        "card-2": "0px 8px 24px rgba(149, 157, 165, 0.2)",
       },
       keyframes: {
         'accordion-down': {
@@ -134,12 +178,16 @@ module.exports = {
         'pulse-shadow': 'pulse-shadow 2s infinite ease-in-out',
         'pulse-text': 'pulse-text 2s infinite ease-in-out',
       },
+      fontSize: {
+        "body-sm": "0.875rem",
+        "body-xs": "0.75rem",
+      },
+      fontFamily: {
+        comfortaa: ['Comfortaa', '-apple-system', 'Roboto', 'Helvetica', 'sans-serif'],
+        gasoek: ['Gasoek One', '-apple-system', 'Roboto', 'Helvetica', 'sans-serif'],
+        lato: ['Lato', '-apple-system', 'Roboto', 'Helvetica', 'sans-serif'],
+      },
     },
-  },
-  fontFamily: {
-    comfortaa: ['Comfortaa', '-apple-system', 'Roboto', 'Helvetica', 'sans-serif'],
-    gasoek: ['Gasoek One', '-apple-system', 'Roboto', 'Helvetica', 'sans-serif'],
-    lato: ['Lato', '-apple-system', 'Roboto', 'Helvetica', 'sans-serif'],
   },
   plugins: [],
 };

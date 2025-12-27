@@ -1,5 +1,5 @@
 {
-  "name": "Base",
+  "name": "server",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -7,8 +7,7 @@
   "license": "UNLICENSED",
   "packageManager": "pnpm@9.12.3",
   "engines": {
-    "node": "22.x",
-    "npm": "10.x"
+    "node": ">=22"
   },
   "scripts": {
     "build": "nest build && npx tsc-alias -p tsconfig.build.json",

@@ -10,18 +10,18 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground border-1 border-primary active:translate-x-0.5 active:translate-y-0.5",
+          "bg-primary text-primary-foreground border-1 border-primary active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white dark:border-white",
         destructive:
-          "bg-destructive text-destructive-foreground border-1 border-destructive active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+          "bg-destructive text-destructive-foreground border-1 border-destructive active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-black dark:text-white",
         outline:
-          "bg-white text-foreground border-1 border-input hover:bg-muted/60 hover:text-foreground active:translate-x-0.5 active:translate-y-0.5 dark:bg-gray-dark dark:text-card-foreground dark:border-input dark:hover:bg-muted/30 dark:hover:text-card-foreground",
+          "bg-white text-foreground border-1 border-input hover:bg-muted/60 hover:text-foreground active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white dark:border-white dark:hover:bg-white/10",
         secondary:
-          "bg-secondary text-secondary-foreground border-1 border-secondary active:translate-x-0.5 active:translate-y-0.5",
+          "bg-secondary text-secondary-foreground border-1 border-secondary active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white",
         ghost:
-          "text-foreground hover:bg-muted/50 hover:text-foreground dark:text-card-foreground dark:hover:bg-muted dark:hover:text-card-foreground",
-        link: "text-primary underline-offset-4 hover:underline dark:text-primary",
+          "text-foreground hover:bg-muted/50 hover:text-foreground dark:text-white dark:hover:bg-white/10",
+        link: "text-primary underline-offset-4 hover:underline dark:text-white",
         shadowBorder:
-          "bg-background text-foreground border-1 border-border active:translate-x-0.5 active:translate-y-0.5 dark:bg-background dark:text-card-foreground dark:border-border",
+          "bg-background text-foreground border-1 border-border active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white dark:border-white",
       },
       size: {
         default: "h-9 px-6 py-4 has-[>svg]:px-6",
@@ -56,8 +56,8 @@ function Button({
   const widthClass = widthMatch
     ? widthMatch[0]
     : size === "full"
-    ? "w-full"
-    : undefined;
+      ? "w-full"
+      : undefined;
 
   // Remove width classes from button className since we apply them to wrapper
   const buttonClassName =
@@ -74,10 +74,9 @@ function Button({
         className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active:bottom-0 group-active:right-0 -z-10"
         style={{ overflow: "visible" }}
       />
-      {/* Background layer để đảm bảo button không transparent */}
       <div
         className={cn(
-          "absolute inset-0 rounded-md bg-white dark:bg-gray-dark -z-[5]",
+          "absolute inset-0 rounded-md bg-white dark:bg-black -z-[5]",
           variant === "link" && "hidden"
         )}
       />

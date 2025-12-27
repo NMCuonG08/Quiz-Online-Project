@@ -35,7 +35,7 @@ const divVariants = cva("relative inline-block", {
 
 interface DivProps
   extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof divVariants> {
+  VariantProps<typeof divVariants> {
   asChild?: boolean;
   containerClassName?: string;
 }
@@ -60,7 +60,7 @@ const Div = React.forwardRef<HTMLDivElement, DivProps>(
         {/* Shadow Layer - hiệu ứng đổ bóng đẹp */}
         <div
           className={cn(
-            "absolute bg-black/80 dark:bg-white/80 transition-all duration-300  -z-10",
+            "absolute bg-black dark:bg-white transition-all duration-300  -z-10",
             // Shadow positioning giống button
             variant === "default" && "w-full h-full -bottom-1 -right-1 ",
             variant === "elevated" && "w-full h-full -bottom-1.5 -right-1.5 ",
@@ -82,7 +82,7 @@ const Div = React.forwardRef<HTMLDivElement, DivProps>(
           ref={ref}
           className={cn(
             divVariants({ variant, size, rounded }),
-            "relative z-10 bg-white dark:bg-gray-dark border-1 border-border transition-all duration-300 ",
+            "relative z-10 bg-white text-slate-900 dark:bg-black dark:text-white border-1 border-border transition-all duration-300 ",
             className
           )}
           {...props}
