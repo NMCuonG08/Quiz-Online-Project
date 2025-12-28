@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api";
+import { apiRoutes } from "@/lib/apiRoutes";
 import { LoginFormData, RegisterFormData } from "../schema/auth";
 
 export class AuthenticationService {
@@ -8,7 +9,7 @@ export class AuthenticationService {
       console.log("Attempting login with credentials:", {
         email: credentials.email,
       });
-      const response = await apiClient.post("/api/auth/login", credentials);
+      const response = await apiClient.post(apiRoutes.AUTH.LOGIN, credentials);
       console.log("Login API response:", response.data);
       return response.data;
     } catch (error) {
@@ -28,7 +29,7 @@ export class AuthenticationService {
   // Get Google OAuth URL (server generates URL with state, etc.)
   static async getGoogleAuthUrl() {
     try {
-      const response = await apiClient.get("/api/auth/google/url");
+      const response = await apiClient.get(apiRoutes.AUTH.GOOGLE_URL);
       return response.data;
     } catch (error) {
       console.error("Get Google URL error:", error);
@@ -51,7 +52,7 @@ export class AuthenticationService {
   }) {
     try {
       const response = await apiClient.post(
-        "/api/auth/google/callback",
+        apiRoutes.AUTH.GOOGLE_CALLBACK,
         payload
       );
       return response.data;
@@ -70,7 +71,7 @@ export class AuthenticationService {
 
   static async handleRegister(credentials: RegisterFormData) {
     try {
-      const response = await apiClient.post("/api/auth/register", credentials);
+      const response = await apiClient.post(apiRoutes.AUTH.REGISTER, credentials);
       return response.data;
     } catch (error) {
       console.error("Registration error:", error);
@@ -88,7 +89,7 @@ export class AuthenticationService {
 
   static async getUserProfile() {
     try {
-      const response = await apiClient.get("/api/auth/profile");
+      const response = await apiClient.get(apiRoutes.AUTH.PROFILE);
       return response.data;
     } catch (error) {
       console.error("Get user profile error:", error);
@@ -112,7 +113,7 @@ export class AuthenticationService {
     try {
       // Expect backend to read refresh token from HttpOnly cookie
       const refreshResponse = await apiClient.post(
-        "/api/auth/refresh-cookie",
+        apiRoutes.AUTH.REFRESH,
         {},
         {
           headers: {
@@ -151,7 +152,7 @@ export class AuthenticationService {
 
   static async handleLogout() {
     try {
-      const response = await apiClient.post("/api/auth/logout");
+      const response = await apiClient.post(apiRoutes.AUTH.LOGOUT);
       return response.data;
     } catch (error) {
       console.error("Logout error:", error);

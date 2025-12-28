@@ -2,6 +2,11 @@
 
 import React from "react";
 import { Question, QuestionOption, UserAnswer } from "../types/quiz.types";
+import { RadioGroup, RadioGroupItem } from "@/common/components/ui/radio-group";
+import { Label } from "@/common/components/ui/label";
+import { Textarea } from "@/common/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { Check, Edit3 } from "lucide-react";
 
 interface AnswerOptionsProps {
   question: Question;
@@ -26,7 +31,7 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
       text_answer: undefined,
       is_correct: option.is_correct,
       points_earned: option.is_correct ? question.points : 0,
-      time_spent: 0, // This should be calculated based on timer
+      time_spent: 0,
     };
 
     onAnswerSelect(answer);
@@ -38,8 +43,8 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
     const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
       selected_option_id: undefined,
       text_answer: text,
-      is_correct: false, // Will be determined by backend
-      points_earned: 0, // Will be determined by backend
+      is_correct: false,
+      points_earned: 0,
       time_spent: 0,
     };
 
@@ -51,108 +56,153 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
   };
 
   const renderMultipleChoice = () => (
-    <div className="space-y-3">
-      {question.options
+    <div className="space-y-4">
+      {[...question.options]
         .sort((a, b) => a.sort_order - b.sort_order)
-        .map((option) => (
-          <button
-            key={option.id}
-            onClick={() => handleOptionSelect(option)}
-            disabled={isSubmitting}
-            className={`w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ${
-              isOptionSelected(option.id)
-                ? "border-blue-500 bg-blue-50 text-blue-900"
-                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-            } ${
-              isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-            }`}
-          >
-            <div className="flex items-center space-x-3">
-              <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  isOptionSelected(option.id)
-                    ? "border-blue-500 bg-blue-500"
-                    : "border-gray-300"
-                }`}
-              >
-                {isOptionSelected(option.id) && (
-                  <div className="w-2 h-2 bg-white rounded-full" />
+        .map((option, index) => {
+          const isSelected = isOptionSelected(option.id);
+          return (
+            <div
+              key={option.id}
+              onClick={() => handleOptionSelect(option)}
+              className={cn(
+                "group relative flex items-center gap-4 p-5 rounded-2xl border-2 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom duration-500",
+                isSelected
+                  ? "border-primary bg-primary/5 shadow-lg shadow-primary/5"
+                  : "border-border bg-card hover:border-primary/50 hover:bg-muted/50",
+                isSubmitting && "opacity-50 pointer-events-none"
+              )}
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className={cn(
+                "flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-300",
+                isSelected ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"
+              )}>
+                {isSelected ? (
+                  <Check className="w-6 h-6 text-primary-foreground" />
+                ) : (
+                  <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                    {String.fromCharCode(65 + index)}
+                  </span>
                 )}
               </div>
-              <span className="text-gray-900">{option.content}</span>
+              <div className="flex-1">
+                <p className={cn(
+                  "text-lg font-medium transition-colors",
+                  isSelected ? "text-primary" : "text-foreground"
+                )}>
+                  {option.content}
+                </p>
+              </div>
             </div>
-          </button>
-        ))}
+          );
+        })}
     </div>
   );
 
   const renderTrueFalse = () => (
-    <div className="space-y-3">
-      {question.options
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {[...question.options]
         .sort((a, b) => a.sort_order - b.sort_order)
-        .map((option) => (
-          <button
-            key={option.id}
-            onClick={() => handleOptionSelect(option)}
-            disabled={isSubmitting}
-            className={`w-full p-4 text-center rounded-lg border-2 transition-all duration-200 ${
-              isOptionSelected(option.id)
-                ? "border-blue-500 bg-blue-50 text-blue-900"
-                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-            } ${
-              isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-            }`}
-          >
-            <span className="text-lg font-medium">{option.content}</span>
-          </button>
-        ))}
+        .map((option) => {
+          const isSelected = isOptionSelected(option.id);
+          return (
+            <button
+              key={option.id}
+              onClick={() => handleOptionSelect(option)}
+              disabled={isSubmitting}
+              className={cn(
+                "p-8 rounded-3xl border-2 transition-all duration-300 font-bold text-2xl uppercase tracking-wider relative overflow-hidden",
+                isSelected
+                  ? option.content.toLowerCase() === 'true'
+                    ? "border-green-500 bg-green-500/10 text-green-500 shadow-xl shadow-green-500/10"
+                    : "border-destructive bg-destructive/10 text-destructive shadow-xl shadow-destructive/10"
+                  : "border-border bg-card text-muted-foreground hover:border-primary hover:text-primary hover:bg-muted",
+                isSubmitting && "opacity-50"
+              )}
+            >
+              {option.content}
+              {isSelected && (
+                <div className="absolute top-2 right-2">
+                  <Check className="w-6 h-6" />
+                </div>
+              )}
+            </button>
+          );
+        })}
     </div>
   );
 
   const renderFillBlank = () => (
-    <div className="space-y-4">
-      <textarea
-        value={userAnswer?.text_answer || ""}
-        onChange={(e) => handleTextAnswer(e.target.value)}
-        disabled={isSubmitting}
-        placeholder="Enter your answer here..."
-        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-        rows={4}
-      />
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="relative">
+        <Edit3 className="absolute top-4 left-4 w-5 h-5 text-muted-foreground" />
+        <Textarea
+          value={userAnswer?.text_answer || ""}
+          onChange={(e) => handleTextAnswer(e.target.value)}
+          disabled={isSubmitting}
+          placeholder="Type your answer here..."
+          className="min-h-[120px] pl-12 pt-4 rounded-2xl border-2 focus-visible:ring-primary/20 transition-all text-lg"
+        />
+      </div>
+      <p className="text-sm text-muted-foreground italic pl-2">
+        Tip: Your answer will be automatically saved as you type.
+      </p>
     </div>
   );
 
   const renderEssay = () => (
-    <div className="space-y-4">
-      <textarea
-        value={userAnswer?.text_answer || ""}
-        onChange={(e) => handleTextAnswer(e.target.value)}
-        disabled={isSubmitting}
-        placeholder="Write your essay answer here..."
-        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-        rows={8}
-      />
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="relative">
+        <Edit3 className="absolute top-4 left-4 w-5 h-5 text-muted-foreground" />
+        <Textarea
+          value={userAnswer?.text_answer || ""}
+          onChange={(e) => handleTextAnswer(e.target.value)}
+          disabled={isSubmitting}
+          placeholder="Compose your essay response here..."
+          className="min-h-[300px] pl-12 pt-4 rounded-2xl border-2 focus-visible:ring-primary/20 transition-all text-lg leading-relaxed"
+        />
+      </div>
+      <div className="flex justify-between items-center text-xs text-muted-foreground uppercase tracking-widest font-bold px-2">
+        <span>Format: Rich text supported</span>
+        <span>Words: {(userAnswer?.text_answer || "").split(/\s+/).filter(Boolean).length}</span>
+      </div>
     </div>
   );
 
   const renderAnswerOptions = () => {
-    switch (question.question_type) {
+    // Normalize question type to lowercase for comparison
+    const questionType = question.question_type?.toLowerCase();
+
+    switch (questionType) {
       case "multiple_choice":
         return renderMultipleChoice();
       case "true_false":
         return renderTrueFalse();
+      case "fill_in_blank":
       case "fill_blank":
         return renderFillBlank();
+      case "short_answer":
+        return renderFillBlank(); // Same UI as fill blank
       case "essay":
         return renderEssay();
       default:
-        return <div>Unsupported question type</div>;
+        return (
+          <div className="p-8 text-center bg-destructive/5 rounded-2xl border-2 border-dashed border-destructive/20 text-destructive font-medium">
+            Unsupported question type: {question.question_type}
+          </div>
+        );
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <h4 className="text-lg font-medium text-gray-900 mb-4">Your Answer:</h4>
+    <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-6 md:p-8 shadow-2xl border border-border/50 animate-in fade-in slide-in-from-bottom duration-700">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Edit3 className="w-5 h-5 text-primary" />
+        </div>
+        <h4 className="text-xl font-bold text-foreground">Write your selection:</h4>
+      </div>
       {renderAnswerOptions()}
     </div>
   );

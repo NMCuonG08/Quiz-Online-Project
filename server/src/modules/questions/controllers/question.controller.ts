@@ -9,9 +9,10 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, AnyFilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiOperation,
   ApiConsumes,
@@ -161,7 +162,7 @@ export class QuestionController {
   @Authenticated({ permission: Permission.QuizUpdate })
   @ApiOperation({ summary: 'Update a question by ID' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('media'))
+  @UseInterceptors(AnyFilesInterceptor())
   @ApiResponse({
     status: 200,
     description: 'Successfully updated question',
@@ -178,9 +179,13 @@ export class QuestionController {
   async updateQuestion(
     @Param('id') id: string,
     @Body() question: UpdateQuestionDto,
-    @UploadedFile() media?: Express.Multer.File,
+    @UploadedFiles() files?: Express.Multer.File[],
   ): Promise<QuestionResponseDto> {
-    return this.questionService.updateQuestion(id, question, media);
+    // Separate question media from option media files
+    const questionMedia = files?.find(f => f.fieldname === 'media');
+    const optionMediaFiles = files?.filter(f => f.fieldname.startsWith('option_') && f.fieldname.endsWith('_media')) || [];
+    
+    return this.questionService.updateQuestion(id, question, questionMedia, optionMediaFiles);
   }
 
   @Delete(':id')

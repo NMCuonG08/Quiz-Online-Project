@@ -162,7 +162,7 @@ const EditQuestionModal: React.FC<Props> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[80vw] h-[80vh] overflow-y-auto z-40">
+      <DialogContent className="w-[95vw] max-w-[95vw] h-[95vh] max-h-[95vh] overflow-y-auto z-40">
         <DialogHeader>
           <DialogTitle>Edit Question</DialogTitle>
         </DialogHeader>
@@ -298,17 +298,11 @@ const EditQuestionModal: React.FC<Props> = ({
             <div className="space-y-3">
               {(questionData.options || []).map((opt, index) => (
                 <div key={opt.id || index}>
-                  {renderer.render(opt, (patch) =>
-                    handleUpdateOption(index, patch)
+                  {renderer.render(
+                    opt,
+                    (patch) => handleUpdateOption(index, patch),
+                    () => handleRemoveOption(index)
                   )}
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRemoveOption(index)}
-                    className="mt-2"
-                  >
-                    Remove Option
-                  </Button>
                 </div>
               ))}
 
@@ -319,7 +313,12 @@ const EditQuestionModal: React.FC<Props> = ({
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={onClose} disabled={loading}>
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              disabled={loading}
+              className="text-red-500 hover:text-white hover:bg-red-500 dark:text-red-400 dark:hover:bg-red-600 transition-colors"
+            >
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={loading}>

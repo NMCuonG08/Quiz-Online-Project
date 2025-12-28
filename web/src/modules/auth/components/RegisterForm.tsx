@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
 import { LocalizedLink } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
@@ -18,6 +17,8 @@ import {
   type RegisterFormData,
 } from "@/modules/auth/common/schema/auth";
 import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
+import { APP_ROUTES } from "@/lib/appRoutes";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/modules/auth/common/hooks/useAuth";
 import { showError, showSuccess } from "@/lib/Notification";
@@ -29,7 +30,7 @@ const RegisterForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { register } = useAuth();
   const dispatch = useAppDispatch();
   const tAuth = useTranslations("auth");
@@ -52,7 +53,7 @@ const RegisterForm = () => {
       const result = await register(data);
       if (result.success) {
         console.log("Registration successful:", result.data);
-        router.push("/");
+        router.push(APP_ROUTES.HOME);
       } else {
         console.error("Registration failed:", result);
         showError(result || tAuth("registrationFailed"));
@@ -65,10 +66,10 @@ const RegisterForm = () => {
 
   const handleGoogleRegister = () => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const baseAuthUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+    const baseAuthUrl = APP_ROUTES.AUTH.GOOGLE_AUTH_URL;
     const redirectUri =
       process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
-      `${window.location.origin}/auth/google/callback`;
+      `${window.location.origin}${APP_ROUTES.AUTH.GOOGLE_CALLBACK}`;
 
     if (!clientId) {
       showError(tAuth("missingGoogleClientId"));
@@ -78,7 +79,7 @@ const RegisterForm = () => {
     const state = self.crypto?.randomUUID?.() || `${Date.now()}`;
     try {
       sessionStorage.setItem("google_oauth_state", state);
-    } catch {}
+    } catch { }
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -134,12 +135,12 @@ const RegisterForm = () => {
             showError(tAuth("invalidState"));
             return;
           }
-        } catch {}
+        } catch { }
 
         window.removeEventListener("message", messageHandler);
         try {
           popup.close();
-        } catch {}
+        } catch { }
 
         if (error) {
           showError(error);
@@ -153,7 +154,7 @@ const RegisterForm = () => {
         setIsLoading(true);
         const redirectUri =
           process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
-          `${window.location.origin}/auth/google/callback`;
+          `${window.location.origin}${APP_ROUTES.AUTH.GOOGLE_CALLBACK}`;
         const payload = { code, state: returnedState, redirectUri };
         dispatch(loginWithGoogleCode(payload))
           .unwrap()
@@ -170,7 +171,7 @@ const RegisterForm = () => {
               showError(msg);
             } else {
               showSuccess(tAuth("googleLoginSuccess"));
-              router.push("/");
+              router.push(APP_ROUTES.HOME);
             }
           })
           .catch(() => showError(tAuth("googleLoginFailed")))
@@ -186,7 +187,7 @@ const RegisterForm = () => {
       try {
         window.removeEventListener("message", messageHandler);
         if (!popup.closed) popup.close();
-      } catch {}
+      } catch { }
       showError(tAuth("googleLoginTimeout"));
     }, 120000);
 
@@ -329,7 +330,7 @@ const RegisterForm = () => {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 bg-yellow dark:bg-gray-dark text-primary-foreground hover:bg-primary/90 rounded-lg font-medium hover:cursor-pointer transition-colors duration-200"
+                className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium hover:cursor-pointer transition-colors duration-200"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
@@ -387,7 +388,7 @@ const RegisterForm = () => {
           <p className="text-center text-xs text-muted-foreground mt-6">
             {tAuth("alreadyHaveAccount")}{" "}
             <LocalizedLink
-              href="/auth/login"
+              href={APP_ROUTES.AUTH.LOGIN}
               className="text-foreground font-medium hover:underline"
             >
               {tAuth("signIn")}

@@ -1,6 +1,9 @@
 "use client";
 
 import React from "react";
+import { Button } from "@/common/components/ui/button";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface QuizNavigationProps {
   currentQuestion: number;
@@ -26,53 +29,77 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
   hasAnswered,
 }) => {
   return (
-    <div className="bg-white border-t border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
+    <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t border-border px-6 py-6 z-40 animate-in slide-in-from-bottom duration-500">
+      <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
         {/* Previous Button */}
-        <button
+        <Button
+          variant="outline"
+          size="lg"
           onClick={onPrevious}
           disabled={isFirstQuestion || isSubmitting}
-          className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-            isFirstQuestion || isSubmitting
-              ? "border-gray-200 text-gray-400 cursor-not-allowed"
-              : "border-gray-300 text-gray-700 hover:bg-gray-50"
-          }`}
+          className="h-14 px-8 rounded-2xl border-2 hover:bg-muted font-bold transition-all"
         >
-          ← Previous
-        </button>
+          <ArrowLeft className="w-5 h-5 mr-3" />
+          <span className="hidden sm:inline">Previous</span>
+        </Button>
 
-        {/* Question Progress */}
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600">
-            {currentQuestion} of {totalQuestions}
+        {/* Question Progress (Mobile friendly) */}
+        <div className="flex flex-col items-center">
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">
+            Step
           </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-2xl font-black text-primary leading-none">{currentQuestion}</span>
+            <span className="text-lg font-bold text-muted-foreground/30">/</span>
+            <span className="text-lg font-bold text-muted-foreground leading-none">{totalQuestions}</span>
+          </div>
         </div>
 
         {/* Next/Submit Button */}
         {isLastQuestion ? (
-          <button
+          <Button
+            size="lg"
             onClick={onSubmit}
             disabled={!hasAnswered || isSubmitting}
-            className={`px-6 py-2 text-sm font-medium rounded-lg transition-colors ${
-              !hasAnswered || isSubmitting
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-green-600 text-white hover:bg-green-700"
-            }`}
+            className={cn(
+              "h-14 px-10 rounded-2xl font-black transition-all shadow-xl shadow-primary/20",
+              hasAnswered && !isSubmitting ? "bg-primary hover:scale-105" : ""
+            )}
           >
-            {isSubmitting ? "Submitting..." : "Submit Quiz"}
-          </button>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-6 h-6 mr-3 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                Finish Quiz
+                <CheckCircle2 className="w-6 h-6 ml-3" />
+              </>
+            )}
+          </Button>
         ) : (
-          <button
+          <Button
+            size="lg"
             onClick={onNext}
             disabled={!hasAnswered || isSubmitting}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              !hasAnswered || isSubmitting
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
+            className={cn(
+              "h-14 px-10 rounded-2xl font-black transition-all",
+              hasAnswered && !isSubmitting ? "bg-primary hover:scale-105" : ""
+            )}
           >
-            {isSubmitting ? "Saving..." : "Next →"}
-          </button>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-6 h-6 mr-3 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                Next
+                <ArrowRight className="w-6 h-6 ml-3" />
+              </>
+            )}
+          </Button>
         )}
       </div>
     </div>

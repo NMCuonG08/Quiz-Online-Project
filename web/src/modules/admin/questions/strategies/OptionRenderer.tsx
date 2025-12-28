@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 import { Input } from "@/common/components/ui/input";
 import { Checkbox } from "@/common/components/ui/checkbox";
 import { Textarea } from "@/common/components/ui/textarea";
@@ -10,7 +11,8 @@ import type { QuestionOption } from "../types/admin.question";
 export interface OptionRenderer {
   render(
     option: QuestionOption,
-    onChange: (patch: Partial<QuestionOption>) => void
+    onChange: (patch: Partial<QuestionOption>) => void,
+    onRemove?: () => void
   ): React.ReactNode;
 }
 
@@ -18,10 +20,21 @@ export interface OptionRenderer {
 export class MultipleChoiceOptionRenderer implements OptionRenderer {
   render(
     option: QuestionOption,
-    onChange: (patch: Partial<QuestionOption>) => void
+    onChange: (patch: Partial<QuestionOption>) => void,
+    onRemove?: () => void
   ): React.ReactNode {
     return (
-      <div className="rounded-md border p-3">
+      <div className="relative rounded-md border dark:border-dark-4 p-3">
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-1 right-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors z-10 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            title="Remove Option"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <div className="flex items-start gap-3">
           <Checkbox
             checked={!!option.is_correct}
@@ -76,10 +89,21 @@ export class MultipleChoiceOptionRenderer implements OptionRenderer {
 export class TrueFalseOptionRenderer implements OptionRenderer {
   render(
     option: QuestionOption,
-    onChange: (patch: Partial<QuestionOption>) => void
+    onChange: (patch: Partial<QuestionOption>) => void,
+    onRemove?: () => void
   ): React.ReactNode {
     return (
-      <div className="rounded-md border p-3">
+      <div className="relative rounded-md border dark:border-dark-4 p-3">
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-1 right-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors z-10 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            title="Remove Option"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <div className="flex items-center gap-3">
           <Checkbox
             checked={!!option.is_correct}
@@ -127,10 +151,21 @@ export class TrueFalseOptionRenderer implements OptionRenderer {
 export class FillInBlankOptionRenderer implements OptionRenderer {
   render(
     option: QuestionOption,
-    onChange: (patch: Partial<QuestionOption>) => void
+    onChange: (patch: Partial<QuestionOption>) => void,
+    onRemove?: () => void
   ): React.ReactNode {
     return (
-      <div className="rounded-md border p-3">
+      <div className="relative rounded-md border dark:border-dark-4 p-3">
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-1 right-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors z-10 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            title="Remove Option"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <div className="space-y-2">
           <Input
             value={option.option_text || ""}
@@ -161,10 +196,21 @@ export class FillInBlankOptionRenderer implements OptionRenderer {
 export class ShortAnswerOptionRenderer implements OptionRenderer {
   render(
     option: QuestionOption,
-    onChange: (patch: Partial<QuestionOption>) => void
+    onChange: (patch: Partial<QuestionOption>) => void,
+    onRemove?: () => void
   ): React.ReactNode {
     return (
-      <div className="rounded-md border p-3">
+      <div className="relative rounded-md border dark:border-dark-4 p-3">
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-1 right-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors z-10 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            title="Remove Option"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <div className="space-y-2">
           <Textarea
             value={option.option_text || ""}
@@ -196,10 +242,21 @@ export class ShortAnswerOptionRenderer implements OptionRenderer {
 export class EssayOptionRenderer implements OptionRenderer {
   render(
     option: QuestionOption,
-    onChange: (patch: Partial<QuestionOption>) => void
+    onChange: (patch: Partial<QuestionOption>) => void,
+    onRemove?: () => void
   ): React.ReactNode {
     return (
-      <div className="rounded-md border p-3">
+      <div className="relative rounded-md border dark:border-dark-4 p-3">
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-1 right-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors z-10 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            title="Remove Option"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <div className="space-y-2">
           <Textarea
             value={option.option_text || ""}

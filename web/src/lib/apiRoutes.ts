@@ -62,4 +62,13 @@ export const apiRoutes = {
       `/api/quiz-sessions/${sessionId}/complete/public`,
     GET_RESULT: (sessionId: string) => `/api/quiz-sessions/${sessionId}/result`,
   },
+  AUTH: {
+    LOGIN: "/api/auth/login",
+    REGISTER: "/api/auth/register",
+    LOGOUT: "/api/auth/logout",
+    PROFILE: "/api/auth/profile",
+    REFRESH: "/api/auth/refresh-cookie",
+    GOOGLE_URL: "/api/auth/google/url",
+    GOOGLE_CALLBACK: "/api/auth/google/callback",
+  },
 };

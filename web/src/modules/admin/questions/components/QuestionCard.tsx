@@ -36,24 +36,26 @@ const QuestionCard: React.FC<Props> = ({ question, onRefresh }) => {
 
   const handleDeleteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    const confirmed = await showConfirm(
-      "Delete Question",
-      `Are you sure you want to delete this question: "${titleText}"?`,
-      "Delete",
-      "Cancel",
-      "warning"
-    );
 
-    if (confirmed) {
+    const result = await showConfirm({
+      title: "Delete Question",
+      text: `Are you sure you want to delete this question: "${titleText}"?`,
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
+      icon: "warning",
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+    });
+
+    if (result.isConfirmed) {
       try {
-        const result = await removeQuestion(question.id);
-        
-        if (result.success) {
+        const deleteResult = await removeQuestion(question.id);
+
+        if (deleteResult.success) {
           showSuccess("Question deleted successfully!");
           onRefresh?.();
         } else {
-          showError(String(result.error || "Failed to delete question"));
+          showError(String(deleteResult.error || "Failed to delete question"));
         }
       } catch (error) {
         showError("An unexpected error occurred");

@@ -5,3 +5,4 @@ export { default as QuizNavigation } from "./QuizNavigation";
 export { default as QuizResults } from "./QuizResults";
 export { default as QuizLoading } from "./QuizLoading";
 export { default as QuizError } from "./QuizError";
+export { default as QuestionNavigator } from "./QuestionNavigator";

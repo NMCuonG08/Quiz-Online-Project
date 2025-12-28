@@ -119,14 +119,30 @@ export class QuestionService extends BaseService {
       mediaId = uploadResult?.id;
     }
 
-    // Prepare question data without options (options handled via separate API)
+    // Parse options if provided
+    let optionsData: any[] | undefined;
+    if (question.options) {
+      try {
+        optionsData =
+          typeof question.options === 'string'
+            ? JSON.parse(question.options)
+            : question.options;
+      } catch (e) {
+        console.error('Failed to parse options:', e);
+      }
+    }
+
+    // Prepare question data without options
+    const { options, ...restOfQuestion } = question;
     const questionData: Record<string, any> = {
-      ...question,
+      ...restOfQuestion,
       media_id: mediaId || null,
     };
 
-    const created =
-      await this.questionRepository.createWithOptions(questionData);
+    const created = await this.questionRepository.createWithOptions(
+      questionData,
+      optionsData,
+    );
     await this.eventRepository.emit('QuestionCreated', {
       id: created.id,
       quizId: created.quiz_id,
@@ -138,6 +154,7 @@ export class QuestionService extends BaseService {
     id: string,
     updateData: UpdateQuestionDto,
     media?: Express.Multer.File,
+    optionMediaFiles?: Express.Multer.File[],
   ): Promise<QuestionResponseDto> {
     const existingQuestion = await this.questionRepository.findByIdRaw(id);
     if (!existingQuestion) {
@@ -155,22 +172,94 @@ export class QuestionService extends BaseService {
       }
     }
 
-    // Handle media upload if provided
+    // Handle question media upload if provided
     let mediaId: string | undefined;
     if (media) {
       const uploadResult = await this.cloudinaryService.uploadImage(media);
       mediaId = uploadResult?.id;
     }
 
-    // Prepare update data without options (options handled via separate API)
-    const dataToUpdate: Record<string, any> = {
-      ...updateData,
-      ...(mediaId ? { media_id: mediaId } : {}),
-    };
+    // Parse options if provided
+    let optionsData: any[] | undefined;
+    if (updateData.options) {
+      try {
+        optionsData =
+          typeof updateData.options === 'string'
+            ? JSON.parse(updateData.options)
+            : updateData.options;
+      } catch (e) {
+        console.error('Failed to parse options:', e);
+      }
+    }
+
+    // Handle option media files if provided
+    if (optionsData && optionMediaFiles && optionMediaFiles.length > 0) {
+      for (const file of optionMediaFiles) {
+        // Extract option index from fieldname (e.g., "option_0_media" -> 0)
+        const match = file.fieldname.match(/option_(\d+)_media/);
+        if (match) {
+          const optionIndex = parseInt(match[1], 10);
+          if (optionsData[optionIndex]) {
+            // Upload the option media file
+            const optionUploadResult = await this.cloudinaryService.uploadImage(file);
+            if (optionUploadResult?.url) {
+              // QuestionOption uses media_url field, not media_id
+              optionsData[optionIndex].media_url = optionUploadResult.url;
+            }
+          }
+        }
+      }
+    }
+
+    // Prepare update data without options - only include valid question fields
+    const { options, ...restOfUpdateData } = updateData;
+    
+    // Clean and convert the update data
+    const dataToUpdate: Record<string, any> = {};
+    
+    if (restOfUpdateData.question_text !== undefined) {
+      dataToUpdate.question_text = String(restOfUpdateData.question_text);
+    }
+    if (restOfUpdateData.slug !== undefined) {
+      dataToUpdate.slug = String(restOfUpdateData.slug);
+    }
+    if (restOfUpdateData.question_type !== undefined) {
+      dataToUpdate.question_type = String(restOfUpdateData.question_type);
+    }
+    if (restOfUpdateData.points !== undefined) {
+      dataToUpdate.points = Number(restOfUpdateData.points);
+    }
+    if (restOfUpdateData.time_limit !== undefined) {
+      dataToUpdate.time_limit = Number(restOfUpdateData.time_limit);
+    }
+    if (restOfUpdateData.explanation !== undefined) {
+      dataToUpdate.explanation = restOfUpdateData.explanation ? String(restOfUpdateData.explanation) : null;
+    }
+    if (restOfUpdateData.difficulty_level !== undefined) {
+      dataToUpdate.difficulty_level = String(restOfUpdateData.difficulty_level);
+    }
+    if (restOfUpdateData.sort_order !== undefined) {
+      dataToUpdate.sort_order = Number(restOfUpdateData.sort_order);
+    }
+    if (restOfUpdateData.is_required !== undefined) {
+      dataToUpdate.is_required = restOfUpdateData.is_required === true || String(restOfUpdateData.is_required) === 'true';
+    }
+    if (restOfUpdateData.settings !== undefined) {
+      dataToUpdate.settings = restOfUpdateData.settings;
+    }
+    if (mediaId) {
+      dataToUpdate.media_id = mediaId;
+    }
+    
+    console.log('=== UPDATE QUESTION DEBUG ===');
+    console.log('dataToUpdate:', JSON.stringify(dataToUpdate, null, 2));
+    console.log('optionsData:', JSON.stringify(optionsData, null, 2));
+    console.log('=============================');
 
     const updated = await this.questionRepository.updateQuestion(
       id,
       dataToUpdate,
+      optionsData,
     );
     await this.eventRepository.emit('QuestionUpdated', {
       id,

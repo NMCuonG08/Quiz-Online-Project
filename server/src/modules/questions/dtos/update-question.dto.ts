@@ -97,4 +97,12 @@ export class UpdateQuestionDto {
   })
   @IsOptional()
   media?: any;
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'object' },
+    description: 'Options for the question',
+  })
+  @IsOptional()
+  options?: any;
 }

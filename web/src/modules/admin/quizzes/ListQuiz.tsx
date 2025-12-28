@@ -1,10 +1,10 @@
 import React from "react";
-import ListQuizTable from "./components/ListQuizTable";
+import ListQuizGrid from "./components/ListQuizGrid";
 
 const ListQuiz = () => {
   return (
     <div>
-      <ListQuizTable />
+      <ListQuizGrid />
     </div>
   );
 };

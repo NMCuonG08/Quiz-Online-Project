@@ -9,7 +9,7 @@ type Props = {
 const AddOptionCard: React.FC<Props> = ({ onClick }) => {
   return (
     <div
-      className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition-colors min-h-[120px]"
+      className="border-2 border-dashed border-gray-300 dark:border-dark-4 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 dark:hover:border-dark-5 transition-colors min-h-[120px] bg-gray-50 dark:bg-dark-3/30"
       onClick={onClick}
     >
       <div className="flex flex-col items-center gap-2">

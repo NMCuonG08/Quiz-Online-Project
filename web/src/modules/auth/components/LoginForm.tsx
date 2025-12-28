@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
+import { LocalizedLink } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
 import {
@@ -17,6 +17,8 @@ import {
   type LoginFormData,
 } from "@/modules/auth/common/schema/auth";
 import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
+import { APP_ROUTES } from "@/lib/appRoutes";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useAppDispatch } from "@/hooks/useRedux";
 import { useSelector } from "react-redux";
@@ -30,7 +32,7 @@ import { useTranslations } from "next-intl";
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const dispatch = useAppDispatch();
   const tAuth = useTranslations("auth");
   const tCommon = useTranslations("common");
@@ -58,7 +60,7 @@ const LoginForm = () => {
       console.log("Login result:", result);
       if (result.success) {
         showSuccess(tAuth("loginSuccess"));
-        router.push("/");
+        router.push(APP_ROUTES.HOME);
       } else {
         showError(result.error);
       }
@@ -75,7 +77,7 @@ const LoginForm = () => {
       showSuccess(tAuth("loginSuccess"));
       // Add delay để user thấy success message
       setTimeout(() => {
-        router.push("/");
+        router.push(APP_ROUTES.HOME);
       }, 1000);
     }
   }, [isAuthenticated, router]);
@@ -84,10 +86,10 @@ const LoginForm = () => {
     console.log("Google login clicked");
 
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const baseAuthUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+    const baseAuthUrl = APP_ROUTES.AUTH.GOOGLE_AUTH_URL;
     const redirectUri =
       process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
-      `${window.location.origin}/auth/google/callback`;
+      `${window.location.origin}${APP_ROUTES.AUTH.GOOGLE_CALLBACK}`;
 
     if (!clientId) {
       showError(tAuth("missingGoogleClientId"));
@@ -97,7 +99,7 @@ const LoginForm = () => {
     const state = self.crypto?.randomUUID?.() || `${Date.now()}`;
     try {
       sessionStorage.setItem("google_oauth_state", state);
-    } catch {}
+    } catch { }
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -154,12 +156,12 @@ const LoginForm = () => {
             showError(tAuth("invalidState"));
             return;
           }
-        } catch {}
+        } catch { }
 
         window.removeEventListener("message", messageHandler);
         try {
           popup.close();
-        } catch {}
+        } catch { }
 
         if (error) {
           showError(error);
@@ -173,7 +175,7 @@ const LoginForm = () => {
         setIsLoading(true);
         const redirectUri =
           process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
-          `${window.location.origin}/auth/google/callback`;
+          `${window.location.origin}${APP_ROUTES.AUTH.GOOGLE_CALLBACK}`;
         const payload = { code, state: returnedState, redirectUri };
         dispatch(loginWithGoogleCode(payload))
           .unwrap()
@@ -190,7 +192,7 @@ const LoginForm = () => {
               showError(msg);
             } else {
               showSuccess(tAuth("googleLoginSuccess"));
-              router.push("/");
+              router.push(APP_ROUTES.HOME);
             }
           })
           .catch(() => showError(tAuth("googleLoginFailed")))
@@ -206,7 +208,7 @@ const LoginForm = () => {
       try {
         window.removeEventListener("message", messageHandler);
         if (!popup.closed) popup.close();
-      } catch {}
+      } catch { }
       showError(tAuth("googleLoginTimeout"));
     }, 120000);
 
@@ -302,19 +304,19 @@ const LoginForm = () => {
 
               {/* Forgot Password */}
               <div className="text-right">
-                <Link
-                  href="/auth/forgot-password"
+                <LocalizedLink
+                  href={APP_ROUTES.AUTH.FORGOT_PASSWORD}
                   className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300"
                 >
                   {tAuth("forgotPassword")}
-                </Link>
+                </LocalizedLink>
               </div>
 
               {/* Sign In Button */}
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 bg-blue-green dark:bg-gray-dark text-primary-foreground hover:bg-primary/90 hover:cursor-pointer rounded-lg font-medium transition-colors"
+                className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 hover:cursor-pointer rounded-lg font-medium transition-colors"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
@@ -363,12 +365,12 @@ const LoginForm = () => {
           {/* Bottom Text */}
           <p className="text-center text-xs text-muted-foreground mt-6">
             {tAuth("dontHaveAccount")}{" "}
-            <Link
-              href="/auth/register"
+            <LocalizedLink
+              href={APP_ROUTES.AUTH.REGISTER}
               className="text-foreground font-medium hover:underline"
             >
               {tAuth("signUp")}
-            </Link>
+            </LocalizedLink>
           </p>
         </div>
       </div>

@@ -195,10 +195,27 @@ export class QuestionRepository extends BaseRepository<Question> {
       // Create options if provided
       if (optionsData && optionsData.length > 0) {
         await tx.questionOption.createMany({
-          data: optionsData.map((option) => ({
-            ...option,
-            question_id: question.id,
-          })),
+          data: optionsData.map((option, index) => {
+            const cleanOption: any = {
+              question_id: question.id,
+              sort_order: typeof option.sort_order === 'number' ? option.sort_order : index + 1,
+            };
+            
+            if (option.option_text !== undefined) {
+              cleanOption.option_text = String(option.option_text || '');
+            }
+            if (option.explanation !== undefined && option.explanation !== null) {
+              cleanOption.explanation = String(option.explanation);
+            }
+            if (option.is_correct !== undefined) {
+              cleanOption.is_correct = option.is_correct === true || option.is_correct === 'true';
+            }
+            if (option.media_url) {
+              cleanOption.media_url = option.media_url;
+            }
+            
+            return cleanOption;
+          }),
         });
 
         // Fetch the question again with options
@@ -275,12 +292,35 @@ export class QuestionRepository extends BaseRepository<Question> {
           where: { question_id: id },
         });
 
-        // Create new options
+        // Create new options with proper type conversion
         await tx.questionOption.createMany({
-          data: optionsData.map((option) => ({
-            ...option,
-            question_id: id,
-          })),
+          data: optionsData.map((option, index) => {
+            // Clean and convert option data to correct types
+            const cleanOption: any = {
+              question_id: id,
+              sort_order: typeof option.sort_order === 'number' ? option.sort_order : index + 1,
+            };
+            
+            // String fields
+            if (option.option_text !== undefined) {
+              cleanOption.option_text = String(option.option_text || '');
+            }
+            if (option.explanation !== undefined && option.explanation !== null) {
+              cleanOption.explanation = String(option.explanation);
+            }
+            
+            // Boolean field
+            if (option.is_correct !== undefined) {
+              cleanOption.is_correct = option.is_correct === true || option.is_correct === 'true';
+            }
+            
+            // Media URL field
+            if (option.media_url) {
+              cleanOption.media_url = option.media_url;
+            }
+            
+            return cleanOption;
+          }),
         });
 
         // Fetch the question again with updated options

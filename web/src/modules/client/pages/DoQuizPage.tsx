@@ -14,7 +14,8 @@ import {
 } from "../do-quiz/components";
 import { Button } from "@/common/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/common/components/ui/card";
-import { AlertTriangle, ArrowLeft, RefreshCw, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, RefreshCw, CheckCircle2, Ghost } from "lucide-react";
+import { APP_ROUTES } from "@/lib/appRoutes";
 
 interface DoQuizPageProps {
   slug: string;
@@ -35,16 +36,30 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
     progress,
     timeRemaining,
     timerActive,
+    userAnswers,
     startQuiz,
     handleSubmitAnswer,
     handleNextQuestion,
     handlePreviousQuestion,
     handleCompleteQuiz,
+    goToQuestion,
     getCurrentQuestion,
     getUserAnswer,
     clearQuizError,
     resetQuizState,
   } = useQuiz(slug);
+
+  // Track answered question indices
+  const answeredQuestions = React.useMemo(() => {
+    const answered = new Set<number>();
+    userAnswers.forEach(answer => {
+      const index = questions.findIndex(q => q.id === answer.question_id);
+      if (index !== -1) {
+        answered.add(index);
+      }
+    });
+    return answered;
+  }, [userAnswers, questions]);
 
   const [hasAnswered, setHasAnswered] = useState(false);
 
@@ -65,25 +80,25 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   // Validate slug
   if (!slug || slug.trim() === '') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-destructive/10 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-8 h-8 text-destructive" />
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
+        <Card className="w-full max-w-md border-none shadow-2xl bg-card/60 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
+          <CardHeader className="text-center pt-10">
+            <div className="w-20 h-20 mx-auto mb-6 bg-destructive/10 rounded-3xl flex items-center justify-center animate-pulse">
+              <AlertTriangle className="w-10 h-10 text-destructive" />
             </div>
-            <CardTitle className="text-2xl">Slug không hợp lệ</CardTitle>
-            <CardDescription>
-              Slug của quiz không được để trống hoặc không hợp lệ.
+            <CardTitle className="text-3xl font-black tracking-tighter">Invalid Identifier</CardTitle>
+            <CardDescription className="text-base font-medium mt-2">
+              The quiz slug provided is either empty or structurally incorrect.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-10">
             <Button
               onClick={() => router.back()}
-              className="w-full"
-              variant="default"
+              className="w-full h-12 rounded-2xl font-black bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Quay lại
+              <ArrowLeft className="w-5 h-5 mr-3" />
+              Go Back
             </Button>
           </CardContent>
         </Card>
@@ -131,8 +146,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
 
   // Handle view answers
   const handleViewAnswers = () => {
-    // Navigate to answers review page
-    router.push(`/quiz/${slug}/review`);
+    router.push(`${APP_ROUTES.QUIZZES.LIST}/${slug}/review`);
   };
 
   // Handle go back
@@ -157,39 +171,39 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
 
   // Loading state
   if (loading && questions.length === 0) {
-    return <QuizLoading message="Loading quiz questions..." />;
+    return <QuizLoading message="Fetching questions..." />;
   }
 
   // No questions found
   if (!loading && questions.length === 0 && !error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-muted/50 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
+        <Card className="w-full max-w-md border-none shadow-2xl bg-card/60 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
+          <CardHeader className="text-center pt-10">
+            <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-3xl flex items-center justify-center opacity-50">
+              <Ghost className="w-10 h-10 text-muted-foreground" />
             </div>
-            <CardTitle className="text-2xl">Không tìm thấy câu hỏi</CardTitle>
-            <CardDescription>
-              Quiz này chưa có câu hỏi nào hoặc không tồn tại. Vui lòng kiểm tra lại.
+            <CardTitle className="text-3xl font-black tracking-tighter">Empty Quiz</CardTitle>
+            <CardDescription className="text-base font-medium mt-2">
+              This quiz doesn't contain any questions yet. Maybe check back later?
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="px-8 pb-10 space-y-4">
             <Button
               onClick={handleGoBack}
-              className="w-full"
-              variant="default"
+              className="w-full h-12 rounded-2xl font-black bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Quay lại
+              <ArrowLeft className="w-5 h-5 mr-3" />
+              Go Back
             </Button>
             <Button
               onClick={handleRetry}
-              className="w-full"
+              className="w-full h-12 rounded-2xl font-bold border-2 hover:bg-muted transition-all"
               variant="outline"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Thử lại
+              <RefreshCw className="w-5 h-5 mr-3" />
+              Try Again
             </Button>
           </CardContent>
         </Card>
@@ -207,7 +221,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   // Quiz completed - show results
   if (isQuizCompleted && result) {
     return (
-      <div className="min-h-screen bg-background py-8">
+      <div className="min-h-screen bg-background/50 py-12 px-4 selection:bg-primary/20">
         <QuizResults
           result={result}
           onRetakeQuiz={handleRetakeQuiz}
@@ -220,30 +234,36 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   // Quiz in progress
   if (isQuizStarted && currentQuestion) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col selection:bg-primary/20">
+        {/* Background Gradients */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] -mr-64 -mt-64 animate-pulse" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-500/5 rounded-full blur-[100px] -ml-64 -mb-64 animate-pulse duration-1000" />
+        </div>
+
         <QuizHeader
           title={`Quiz: ${currentQuestion.content.slice(0, 50)}...`}
           progress={progress}
           timeRemaining={timeRemaining}
           timerActive={timerActive}
+          answeredQuestions={answeredQuestions}
+          onQuestionSelect={goToQuestion}
         />
 
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="space-y-6">
-            <QuestionCard
-              question={currentQuestion}
-              questionNumber={currentQuestionIndex + 1}
-              totalQuestions={questions.length}
-            />
+        <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8 pb-32 relative z-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <QuestionCard
+            question={currentQuestion}
+            questionNumber={currentQuestionIndex + 1}
+            totalQuestions={questions.length}
+          />
 
-            <AnswerOptions
-              question={currentQuestion}
-              userAnswer={currentUserAnswer}
-              onAnswerSelect={handleAnswerSubmit}
-              isSubmitting={isSubmitting}
-            />
-          </div>
-        </div>
+          <AnswerOptions
+            question={currentQuestion}
+            userAnswer={currentUserAnswer}
+            onAnswerSelect={handleAnswerSubmit}
+            isSubmitting={isSubmitting}
+          />
+        </main>
 
         <QuizNavigation
           currentQuestion={currentQuestionIndex + 1}
@@ -261,7 +281,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   }
 
   // Default loading state
-  return <QuizLoading message="Preparing quiz..." />;
+  return <QuizLoading message="Spinning up your session..." />;
 };
 
 export default DoQuizPage;
