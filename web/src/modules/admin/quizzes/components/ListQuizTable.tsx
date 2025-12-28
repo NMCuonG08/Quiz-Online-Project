@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import dayjs from "dayjs";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/common/i18n/navigation";
 import {
   Table,
   TableBody,

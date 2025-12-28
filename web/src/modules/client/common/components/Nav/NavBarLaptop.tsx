@@ -1,8 +1,7 @@
 "use client";
-import Link from "next/link";
+import { Link, usePathname } from "@/common/i18n/navigation";
 import { LocalizedLink } from "@/common/components/ui";
 import React from "react";
-import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
 import { LanguageSwitcher } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
@@ -26,8 +25,7 @@ const NavBarLaptop = () => {
   const tAuth = useTranslations("auth");
   const locale = useLocale();
 
-  const withLocale = (href: string) =>
-    href.startsWith("/") ? `/${locale}${href}` : href;
+
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -58,41 +56,36 @@ const NavBarLaptop = () => {
         <nav className="hidden gap-8  md:flex">
           <LocalizedLink
             href="/"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("/") ? "active" : "hover:text-[#FDD239]"
-            }`}
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/") ? "active" : "hover:text-[#FDD239]"
+              }`}
           >
             {tNav("home")}
           </LocalizedLink>
           <LocalizedLink
             href="/category"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("/category") ? "active" : "hover:text-[#FDD239]"
-            }`}
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/category") ? "active" : "hover:text-[#FDD239]"
+              }`}
           >
             {tNav("quizzes")}
           </LocalizedLink>
           <Link
             href="#courses"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("#courses") ? "active" : "hover:text-[#FDD239]"
-            }`}
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("#courses") ? "active" : "hover:text-[#FDD239]"
+              }`}
           >
             {tNav("courses")}
           </Link>
           <Link
             href="#community"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("#community") ? "active" : "hover:text-[#FDD239]"
-            }`}
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("#community") ? "active" : "hover:text-[#FDD239]"
+              }`}
           >
             {tNav("community")}
           </Link>
           <Link
             href="#about"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${
-              isActive("#about") ? "active" : "hover:text-[#FDD239]"
-            }`}
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("#about") ? "active" : "hover:text-[#FDD239]"
+              }`}
           >
             {tNav("about")}
           </Link>

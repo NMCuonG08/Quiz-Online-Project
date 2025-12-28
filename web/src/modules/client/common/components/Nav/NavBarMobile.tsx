@@ -1,9 +1,8 @@
 "use client";
-import Link from "next/link";
+import { Link, usePathname } from "@/common/i18n/navigation";
 import { LocalizedLink } from "@/common/components/ui";
 import React from "react";
 import { createPortal } from "react-dom";
-import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
 import { LanguageSwitcher } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
@@ -28,8 +27,7 @@ const NavBarMobile = () => {
   const tAuth = useTranslations("auth");
   const locale = useLocale();
 
-  const withLocale = (href: string) =>
-    href.startsWith("/") ? `/${locale}${href}` : href;
+
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -87,46 +85,41 @@ const NavBarMobile = () => {
 
           <nav className="flex flex-col gap-3">
             <Link
-              href={withLocale("/")}
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
-                isActive("/") ? "active" : "hover:text-yellow-500"
-              }`}
+              href="/"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/") ? "active" : "hover:text-yellow-500"
+                }`}
               onClick={() => setOpen(false)}
             >
               {tNav("home")}
             </Link>
             <Link
-              href={withLocale("/category")}
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
-                isActive("/category") ? "active" : "hover:text-yellow-500"
-              }`}
+              href="/category"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/category") ? "active" : "hover:text-yellow-500"
+                }`}
               onClick={() => setOpen(false)}
             >
               {tNav("quizzes")}
             </Link>
             <Link
               href="#courses"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
-                isActive("#courses") ? "active" : "hover:text-yellow-500"
-              }`}
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("#courses") ? "active" : "hover:text-yellow-500"
+                }`}
               onClick={() => setOpen(false)}
             >
               {tNav("courses")}
             </Link>
             <Link
               href="#community"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
-                isActive("#community") ? "active" : "hover:text-yellow-500"
-              }`}
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("#community") ? "active" : "hover:text-yellow-500"
+                }`}
               onClick={() => setOpen(false)}
             >
               {tNav("community")}
             </Link>
             <Link
               href="#about"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${
-                isActive("#about") ? "active" : "hover:text-yellow-500"
-              }`}
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("#about") ? "active" : "hover:text-yellow-500"
+                }`}
               onClick={() => setOpen(false)}
             >
               {tNav("about")}
@@ -187,7 +180,7 @@ const NavBarMobile = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
-                  <LocalizedLink href="/user" className="flex items-center gap-2">
+                    <LocalizedLink href="/user" className="flex items-center gap-2">
                       <LayoutDashboard className="h-4 w-4" />
                       {tNav("dashboard")}
                     </LocalizedLink>

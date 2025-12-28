@@ -2,7 +2,7 @@
 
 import { SearchIcon } from "../../components/icons";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/common/i18n/navigation";
 import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
 import { Notification } from "./notification";
@@ -16,8 +16,6 @@ export function Header() {
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
   const locale = useLocale();
-  const withLocale = (href: string) =>
-    href.startsWith("/") ? `/${locale}${href}` : href;
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-stroke  dark:bg-[#122031] bg-white px-4 py-5 shadow-1 dark:border-stroke-dark dark:bg-[#122031] md:px-5 2xl:px-10">
@@ -31,7 +29,7 @@ export function Header() {
 
       {isMobile && (
         <Link
-          href={withLocale("/")}
+          href="/"
           className="ml-2 max-[430px]:hidden min-[375px]:ml-4"
         >
           <Image

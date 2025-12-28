@@ -2,7 +2,8 @@
 
 import { ChevronUpIcon } from "@/modules/admin/common/components/icons";
 import { cn } from "@/lib/utils";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "@/common/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
   Dropdown,
@@ -37,7 +38,7 @@ export function PeriodPicker<TItem extends string>({
         className={cn(
           "flex h-8 w-full items-center justify-between gap-x-1 rounded-md border border-[#E8E8E8] bg-white px-3 py-2 text-sm font-medium text-dark-5 outline-none ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-neutral-500 dark:border-dark-3 dark:bg-[#122031] dark:text-white dark:ring-offset-neutral-950 dark:focus:ring-neutral-300 dark:data-[placeholder]:text-neutral-400 [&>span]:line-clamp-1 [&[data-state='open']>svg]:rotate-0",
           minimal &&
-            "border-none bg-transparent p-0 text-dark dark:bg-transparent dark:text-white"
+          "border-none bg-transparent p-0 text-dark dark:bg-transparent dark:text-white"
         )}
       >
         <span className="capitalize">{defaultValue || "Time Period"}</span>

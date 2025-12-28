@@ -8,7 +8,7 @@ import {
 } from "@/common/components/ui/dropdown";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/common/i18n/navigation";
 import { useState } from "react";
 import { LogOutIcon, SettingsIcon, UserIcon } from "./icons";
 

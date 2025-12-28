@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { cva } from "class-variance-authority";
-import Link from "next/link";
+import { Link } from "@/common/i18n/navigation";
 import { useSidebarContext } from "./sidebar-context";
 
 const menuItemBaseStyles = cva(

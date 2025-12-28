@@ -15,7 +15,7 @@ import TagInput from "@/modules/admin/common/components/TagInput";
 import { cn } from "@/lib/utils";
 import { useAdminQuiz } from "./hooks/useAdminQuiz";
 import { useAdminCategory } from "@/modules/admin/categories/hooks/useAdminCategory";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/common/i18n/navigation";
 import { quizSchema, type QuizFormData } from "./schema/quiz";
 import type { Category } from "@/modules/admin/categories/services/admin.category.service";
 import {
@@ -178,10 +178,10 @@ const AddQuiz = () => {
         // Try to extract server validation errors
         const err = res.error as
           | {
-              message?: string;
-              code?: string;
-              details?: Array<{ field?: string; message?: string }>;
-            }
+            message?: string;
+            code?: string;
+            details?: Array<{ field?: string; message?: string }>;
+          }
           | string
           | undefined;
 
@@ -212,7 +212,7 @@ const AddQuiz = () => {
           showError(
             String(
               (typeof err === "string" ? err : err?.message) ||
-                "Failed to create quiz"
+              "Failed to create quiz"
             )
           );
         }
@@ -383,10 +383,10 @@ const AddQuiz = () => {
               setValue(
                 "quiz_type",
                 e.target.value as
-                  | "MULTIPLE_CHOICE"
-                  | "TRUE_FALSE"
-                  | "FILL_IN_THE_BLANK"
-                  | "ESSAY",
+                | "MULTIPLE_CHOICE"
+                | "TRUE_FALSE"
+                | "FILL_IN_THE_BLANK"
+                | "ESSAY",
                 { shouldDirty: true, shouldValidate: true }
               )
             }

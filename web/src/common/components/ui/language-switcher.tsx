@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useLocale } from "next-intl";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "@/common/i18n/navigation";
 import {
   Select,
   SelectContent,
@@ -16,23 +16,8 @@ export function LanguageSwitcher() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextLocale = e.target.value as "en" | "vi";
-    // Ensure we always have a leading slash path
-    const current = pathname.startsWith("/") ? pathname : `/${pathname}`;
-    const parts = current.split("/");
-    // parts[0] = "" due to leading slash; parts[1] should be current locale
-    if (parts.length > 1) {
-      parts[1] = nextLocale;
-    }
-    const nextPath = parts.join("/") || `/${nextLocale}`;
-    router.replace(nextPath);
-  };
-
-  const onValueChange = (val: string) => {
-    handleChange({
-      target: { value: val },
-    } as unknown as React.ChangeEvent<HTMLSelectElement>);
+  const onValueChange = (nextLocale: string) => {
+    router.replace(pathname, { locale: nextLocale as "en" | "vi" });
   };
 
   return (
