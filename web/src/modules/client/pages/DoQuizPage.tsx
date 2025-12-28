@@ -77,7 +77,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
+            <Button
               onClick={() => router.back()}
               className="w-full"
               variant="default"
@@ -150,10 +150,10 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
 
   // Start quiz when questions are loaded
   useEffect(() => {
-    if (questions.length > 0 && !isQuizStarted && !loading) {
+    if (questions.length > 0 && !isQuizStarted && !loading && !error) {
       startQuiz();
     }
-  }, [questions, isQuizStarted, loading, startQuiz]);
+  }, [questions, isQuizStarted, loading, error, startQuiz]);
 
   // Loading state
   if (loading && questions.length === 0) {
@@ -175,7 +175,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button 
+            <Button
               onClick={handleGoBack}
               className="w-full"
               variant="default"
@@ -183,7 +183,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Quay lại
             </Button>
-            <Button 
+            <Button
               onClick={handleRetry}
               className="w-full"
               variant="outline"

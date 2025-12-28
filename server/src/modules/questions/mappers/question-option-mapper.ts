@@ -1,6 +1,6 @@
 import { QuestionOptionResponseDto } from '../dtos/question-option-response.dto';
 
-interface QuestionOptionWithRelations {
+export interface QuestionOptionWithRelations {
   id: string;
   question_id: string;
   option_text: string;
@@ -23,6 +23,7 @@ export function mapQuestionOptionToResponseDto(
     id: option.id,
     question_id: option.question_id,
     option_text: option.option_text,
+    content: option.option_text,
     is_correct: option.is_correct,
     sort_order: option.sort_order,
     explanation: option.explanation || undefined,

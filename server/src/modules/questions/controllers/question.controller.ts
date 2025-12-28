@@ -61,6 +61,32 @@ export class QuestionController {
     return this.questionService.getQuestionsByQuiz(quizId, paginationQuery);
   }
 
+  @Get('quiz/:quizId/public')
+  @ApiOperation({ summary: 'Get public questions by quiz ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved questions for public view',
+    type: [QuestionResponseDto],
+  })
+  async getPublicQuestionsByQuiz(
+    @Param('quizId') quizId: string,
+  ): Promise<QuestionResponseDto[]> {
+    return this.questionService.getQuestionsByQuizId(quizId);
+  }
+
+  @Get('quiz/slug/:slug/public')
+  @ApiOperation({ summary: 'Get public questions by quiz slug' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved questions by quiz slug for public view',
+    type: [QuestionResponseDto],
+  })
+  async getPublicQuestionsByQuizSlug(
+    @Param('slug') slug: string,
+  ): Promise<QuestionResponseDto[]> {
+    return this.questionService.getQuestionsByQuizId(slug);
+  }
+
   @Get('quiz/:quizId/all')
   @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.QuizRead })

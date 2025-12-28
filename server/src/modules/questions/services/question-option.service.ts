@@ -28,6 +28,7 @@ import { EventRepository } from '@/common/repositories/event.repository';
 import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { RoomRepository } from '@/modules/room-play/repositories/room.repository';
+import { mapQuestionOptionToResponseDto } from '../mappers/question-option-mapper';
 
 @Injectable()
 export class QuestionOptionService extends BaseService {
@@ -150,19 +151,7 @@ export class QuestionOptionService extends BaseService {
     });
 
     // Map to DTO
-    const dto = {
-      id: createdOption.id,
-      question_id: createdOption.question_id,
-      option_text: createdOption.option_text,
-      is_correct: createdOption.is_correct,
-      sort_order: createdOption.sort_order,
-      explanation: createdOption.explanation || undefined,
-      media_url: createdOption.media_url || undefined,
-      created_at: createdOption.created_at,
-      updated_at: createdOption.updated_at,
-      question_text: createdOption.question.question_text,
-      question_type: createdOption.question.question_type,
-    };
+    const dto = mapQuestionOptionToResponseDto(createdOption);
     await this.eventRepository.emit('QuestionOptionCreated', {
       id: createdOption.id,
       questionId: createdOption.question_id,
@@ -324,19 +313,7 @@ export class QuestionOptionService extends BaseService {
     );
 
     // Map to DTOs
-    return createdOptions.map((option) => ({
-      id: option.id,
-      question_id: option.question_id,
-      option_text: option.option_text,
-      is_correct: option.is_correct,
-      sort_order: option.sort_order,
-      explanation: option.explanation || undefined,
-      media_url: option.media_url || undefined,
-      created_at: option.created_at,
-      updated_at: option.updated_at,
-      question_text: option.question.question_text,
-      question_type: option.question.question_type,
-    }));
+    return createdOptions.map((option) => mapQuestionOptionToResponseDto(option));
   }
 
   async bulkUpdateQuestionOptions(
@@ -381,18 +358,6 @@ export class QuestionOptionService extends BaseService {
     );
 
     // Map to DTOs
-    return updatedOptions.map((option) => ({
-      id: option.id,
-      question_id: option.question_id,
-      option_text: option.option_text,
-      is_correct: option.is_correct,
-      sort_order: option.sort_order,
-      explanation: option.explanation || undefined,
-      media_url: option.media_url || undefined,
-      created_at: option.created_at,
-      updated_at: option.updated_at,
-      question_text: option.question.question_text,
-      question_type: option.question.question_type,
-    }));
+    return updatedOptions.map((option) => mapQuestionOptionToResponseDto(option));
   }
 }

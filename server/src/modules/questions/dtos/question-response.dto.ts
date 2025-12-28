@@ -11,6 +11,9 @@ export class QuestionResponseDto {
   @ApiProperty({ description: 'Question text' })
   question_text: string;
 
+  @ApiProperty({ description: 'Question content (alias for question_text)' })
+  content: string;
+
   @ApiProperty({ description: 'Question slug', required: false })
   slug?: string;
 

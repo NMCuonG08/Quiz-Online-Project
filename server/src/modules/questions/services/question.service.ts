@@ -49,15 +49,24 @@ export class QuestionService extends BaseService {
     quizId: string,
     paginationQuery: QuestionPaginationQueryDto,
   ): Promise<PaginatedResponseDto<QuestionResponseDto>> {
-    // Verify quiz exists
-    const quiz = await this.quizRepository.findByIdRaw(quizId);
+    // Verify quiz exists - check both ID and slug
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        quizId,
+      );
+    const quiz = isUUID
+      ? await this.quizRepository.findByIdRaw(quizId)
+      : await this.quizRepository.findBySlug(quizId);
+
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
     }
 
+    const targetQuizId = quiz.id;
+
     const result = await this.questionRepository.paginateWithRelations(
       paginationQuery,
-      { quiz_id: quizId },
+      { quiz_id: targetQuizId },
     );
     return new PaginatedResponseDto(
       result.data,
@@ -184,13 +193,20 @@ export class QuestionService extends BaseService {
   }
 
   async getQuestionsByQuizId(quizId: string): Promise<QuestionResponseDto[]> {
-    // Verify quiz exists
-    const quiz = await this.quizRepository.findByIdRaw(quizId);
+    // Verify quiz exists - support both ID and slug
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        quizId,
+      );
+    const quiz = isUUID
+      ? await this.quizRepository.findByIdRaw(quizId)
+      : await this.quizRepository.findBySlug(quizId);
+
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
     }
 
-    return await this.questionRepository.getQuestionsByQuiz(quizId);
+    return await this.questionRepository.getQuestionsByQuiz(quiz.id);
   }
 
   async reorderQuestions(

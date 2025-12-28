@@ -10,6 +10,9 @@ export class QuestionOptionResponseDto {
   @ApiProperty({ description: 'Option text' })
   option_text: string;
 
+  @ApiProperty({ description: 'Option content (alias for option_text)' })
+  content: string;
+
   @ApiProperty({ description: 'Is this option correct' })
   is_correct: boolean;
 
