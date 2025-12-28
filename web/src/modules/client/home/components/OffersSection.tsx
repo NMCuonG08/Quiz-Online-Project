@@ -41,7 +41,7 @@ const OffersSection = () => {
       variant="elevated"
       size="xl"
       rounded="xl"
-      className="py-16 px-4 sm:px-8 lg:px-12 bg-red-light light:bg-red-light dark:bg-gray-dark border border-border w-full"
+      className=" py-16 px-4 sm:px-8 lg:px-12 bg-[#FFF5F5] dark:bg-gray-dark border border-border w-full"
     >
       <div className="max-w-7xl mx-auto">
         {/* Header with title and SVG stars */}
@@ -91,8 +91,8 @@ const OffersSection = () => {
             <Card
               key={offer.id}
               className={`relative overflow-hidden h-full flex flex-col ${offer.featured
-                  ? "shadow-lg bg-card"
-                  : "bg-card/80 backdrop-blur-sm hover:bg-card transition-all duration-300"
+                ? "shadow-lg bg-card"
+                : "bg-card/80 backdrop-blur-sm hover:bg-card transition-all duration-300"
                 }`}
               style={{
                 backgroundImage: `url(${offer.image})`,
@@ -112,16 +112,7 @@ const OffersSection = () => {
 
               <CardContent className="p-4 relative z-10 flex flex-col flex-grow">
                 {/* Featured Badge */}
-                {offer.featured && (
-                  <div className="absolute top-4 right-4">
-                    <Badge
-                      variant="default"
-                      className="bg-primary text-primary-foreground"
-                    >
-                      Featured
-                    </Badge>
-                  </div>
-                )}
+
 
                 {/* Icon and Title in same row */}
                 <div className="flex items-center gap-3 mb-4">
@@ -151,8 +142,8 @@ const OffersSection = () => {
                 {/* Description */}
                 <CardDescription
                   className={`text-sm leading-relaxed dark:text-black flex-grow ${offer.featured
-                      ? "text-muted-foreground"
-                      : "text-muted-foreground"
+                    ? "text-muted-foreground"
+                    : "text-muted-foreground"
                     }`}
                 >
                   {offer.description}

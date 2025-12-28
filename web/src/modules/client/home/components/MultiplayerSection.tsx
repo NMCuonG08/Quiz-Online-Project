@@ -47,8 +47,12 @@ const MultiplayerSection = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-row gap-4 items-center mt-6">
-              <Button className="px-6 py-3 bg-yellow dark:bg-gray-dark text-gray-dark dark:text-primary-foreground hover:opacity-90">
+            <div className="flex flex-row gap-4 items-center mt-6 isolate">
+              <Button
+                variant="shadowBorder"
+                size="lg"
+                className=" bg-yellow text-gray-dark border-black hover:bg-yellow font-bold"
+              >
                 Join now
               </Button>
               <Link
