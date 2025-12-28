@@ -28,6 +28,43 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   const router = useRouter();
   const [showDetails, setShowDetails] = React.useState(true);
 
+  // Calculate stats locally from questions and userAnswers
+  const calculatedStats = React.useMemo(() => {
+    let correctCount = 0;
+    let totalScore = 0;
+    let maxScore = 0;
+
+    questions.forEach(question => {
+      maxScore += question.points || 1;
+
+      const userAnswer = userAnswers.find(a => a.question_id === question.id);
+      if (userAnswer?.selected_option_id) {
+        const selectedOption = question.options.find(o => o.id === userAnswer.selected_option_id);
+        if (selectedOption?.is_correct) {
+          correctCount++;
+          totalScore += question.points || 1;
+        }
+      }
+    });
+
+    const totalQuestions = questions.length || result.total_questions;
+    const percentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+    const passed = percentage >= 60; // 60% to pass
+
+    return {
+      correct_answers: correctCount,
+      total_questions: totalQuestions,
+      total_score: totalScore,
+      max_score: maxScore,
+      percentage,
+      passed,
+      time_spent: result.time_spent || 0,
+    };
+  }, [questions, userAnswers, result]);
+
+  // Use calculated stats if we have questions data, otherwise fallback to result
+  const stats = questions.length > 0 ? calculatedStats : result;
+
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -81,7 +118,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
             </div>
           </div>
           <CardTitle className="text-4xl font-black tracking-tighter sm:text-5xl">Quiz Completed!</CardTitle>
-          <CardDescription className="text-xl font-medium mt-4 text-muted-foreground">{getScoreMessage(result.percentage)}</CardDescription>
+          <CardDescription className="text-xl font-medium mt-4 text-muted-foreground">{getScoreMessage(stats.percentage)}</CardDescription>
         </CardHeader>
 
         <CardContent className="px-6 md:px-12 pb-12 space-y-10">
@@ -91,17 +128,17 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
             <div className={cn(
               "text-7xl md:text-8xl font-black tracking-tighter mb-4 drop-shadow-2xl transition-transform duration-500 group-hover:scale-110",
-              getScoreColor(result.percentage)
+              getScoreColor(stats.percentage)
             )}>
-              {result.percentage}%
+              {stats.percentage}%
             </div>
 
             <div className="flex flex-col gap-2 relative z-10">
               <p className="text-xl font-bold text-foreground">
-                Score: <span className="text-primary">{result.correct_answers}</span> / {result.total_questions}
+                Score: <span className="text-primary">{stats.correct_answers}</span> / {stats.total_questions}
               </p>
               <Badge variant="outline" className="mx-auto px-4 py-1.5 rounded-full bg-background/50 border-primary/20 backdrop-blur-md">
-                Total points: {result.total_score}
+                Total points: {stats.total_score}
               </Badge>
             </div>
           </div>
@@ -109,12 +146,12 @@ const QuizResults: React.FC<QuizResultsProps> = ({
           {/* Detailed Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: CheckCircle2, label: "Correct", value: result.correct_answers, color: "text-green-500", bg: "bg-green-500/10" },
-              { icon: XCircle, label: "Wrong", value: result.total_questions - result.correct_answers, color: "text-red-500", bg: "bg-red-500/10" },
-              { icon: Clock, label: "Time Taken", value: formatTime(result.time_spent), color: "text-blue-500", bg: "bg-blue-500/10" },
-              { icon: Target, label: "Status", value: result.passed ? "PASSED" : "FAILED", color: result.passed ? "text-green-500" : "text-destructive", bg: result.passed ? "bg-green-500/10" : "bg-destructive/10" }
+              { icon: CheckCircle2, label: "Correct", value: stats.correct_answers, color: "text-green-500", bg: "bg-green-500/10" },
+              { icon: XCircle, label: "Wrong", value: stats.total_questions - stats.correct_answers, color: "text-red-500", bg: "bg-red-500/10" },
+              { icon: Clock, label: "Time Taken", value: formatTime(stats.time_spent), color: "text-blue-500", bg: "bg-blue-500/10" },
+              { icon: Target, label: "Status", value: stats.passed ? "PASSED" : "FAILED", color: stats.passed ? "text-green-500" : "text-destructive", bg: stats.passed ? "bg-green-500/10" : "bg-destructive/10" }
             ].map((stat, i) => (
-              <div key={i} className="p-4 rounded-2xl bg-card border border-border shadow-sm flex flex-col items-center justify-center gap-2 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+              <div key={i} className="p-4  bg-card border border-border shadow-sm flex flex-col items-center justify-center gap-2 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
                 <div className={cn("p-2 rounded-xl mb-1", stat.bg)}>
                   <stat.icon className={cn("w-5 h-5", stat.color)} />
                 </div>
@@ -126,15 +163,15 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
           {/* Action Row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-            <Button onClick={onRetakeQuiz} variant="outline" size="lg" className="h-14 rounded-2xl font-bold border-2 hover:bg-muted group">
+            <Button onClick={onRetakeQuiz} variant="outline" size="lg" className="h-14 font-bold border-2 hover:bg-muted group">
               <RotateCcw className="w-5 h-5 mr-3 group-hover:rotate-180 transition-transform duration-500" />
               Try Again
             </Button>
-            <Button variant="outline" size="lg" className="h-14 rounded-2xl font-bold border-2 hover:bg-muted" onClick={() => router.push(APP_ROUTES.HOME)}>
+            <Button variant="outline" size="lg" className="h-14 font-bold border-2 hover:bg-muted" onClick={() => router.push(APP_ROUTES.HOME)}>
               <Home className="w-5 h-5 mr-3" />
               Home
             </Button>
-            <Button size="lg" className="h-14 rounded-2xl font-black bg-primary text-primary-foreground shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+            <Button size="lg" className="h-14  font-black bg-primary text-primary-foreground shadow-xl shadow-primary/20 hover:scale-105 transition-all">
               <Share2 className="w-5 h-5 mr-3" />
               Share result
             </Button>
@@ -173,7 +210,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                   <div
                     key={question.id}
                     className={cn(
-                      "p-5 rounded-2xl border-2 transition-all",
+                      "p-5  border-2 transition-all",
                       isCorrect
                         ? "border-green-500/30 bg-green-500/5"
                         : wasAnswered

@@ -107,7 +107,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
           <CardContent className="px-8 pb-10">
             <Button
               onClick={() => router.back()}
-              className="w-full h-12 rounded-2xl font-black bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+              className="w-full h-12  font-black bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
             >
               <ArrowLeft className="w-5 h-5 mr-3" />
               Go Back
@@ -203,14 +203,14 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
           <CardContent className="px-8 pb-10 space-y-4">
             <Button
               onClick={handleGoBack}
-              className="w-full h-12 rounded-2xl font-black bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+              className="w-full h-12  font-black bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
             >
               <ArrowLeft className="w-5 h-5 mr-3" />
               Go Back
             </Button>
             <Button
               onClick={handleRetry}
-              className="w-full h-12 rounded-2xl font-bold border-2 hover:bg-muted transition-all"
+              className="w-full h-12  font-bold border-2 hover:bg-muted transition-all"
               variant="outline"
             >
               <RefreshCw className="w-5 h-5 mr-3" />

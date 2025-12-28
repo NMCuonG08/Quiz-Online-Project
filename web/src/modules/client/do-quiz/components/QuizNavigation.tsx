@@ -34,7 +34,7 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
           size="lg"
           onClick={onPrevious}
           disabled={isFirstQuestion || isSubmitting}
-          className="h-14 px-8 rounded-2xl border-2 hover:bg-muted font-bold transition-all"
+          className="h-14 px-8  border-2 hover:bg-muted font-bold transition-all"
         >
           <ArrowLeft className="w-5 h-5 mr-3" />
           <span className="hidden sm:inline">Previous</span>
@@ -58,7 +58,7 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
             size="lg"
             onClick={onSubmit}
             disabled={isSubmitting}
-            className="h-14 px-10 rounded-2xl font-black transition-all shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700 hover:scale-105"
+            className="h-14 px-10  font-black transition-all shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700 hover:scale-105"
           >
             {isSubmitting ? (
               <>
@@ -77,7 +77,7 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
             size="lg"
             onClick={onNext}
             disabled={isSubmitting}
-            className="h-14 px-10 rounded-2xl font-black transition-all bg-primary hover:scale-105"
+            className="h-14 px-10  font-black transition-all bg-primary hover:scale-105"
           >
             {isSubmitting ? (
               <>
