@@ -14,6 +14,7 @@ import {
   resetQuiz,
   clearError,
   setCurrentQuestion,
+  setUserAnswer,
 } from "../slices/quiz.slice";
 import { UserAnswer } from "../types/quiz.types";
 
@@ -48,31 +49,59 @@ export const useQuiz = (slug: string) => {
     };
   }, [dispatch, slug]);
 
-  const handleSubmitAnswer = useCallback(
-    async (answer: Omit<UserAnswer, "question_id" | "answered_at">) => {
-      if (!session) return;
 
+  // Save answer locally (no API call)
+  const saveAnswer = useCallback(
+    (answer: Omit<UserAnswer, "question_id" | "answered_at">) => {
       const userAnswer: UserAnswer = {
         ...answer,
         question_id: questions[currentQuestionIndex].id,
         answered_at: new Date().toISOString(),
       };
+      
+      dispatch(setUserAnswer(userAnswer));
+    },
+    [dispatch, questions, currentQuestionIndex]
+  );
 
+  // Submit current answer to API
+  const submitCurrentAnswer = useCallback(
+    async () => {
+      if (!session) return;
+      
+      const currentQuestion = questions[currentQuestionIndex];
+      if (!currentQuestion) return;
+      
+      const existingAnswer = userAnswers.find(
+        (a) => a.question_id === currentQuestion.id
+      );
+      
+      // Only submit if there's an actual answer (not empty)
+      const hasActualAnswer = existingAnswer && (
+        existingAnswer.selected_option_id !== undefined ||
+        (existingAnswer.text_answer !== undefined && existingAnswer.text_answer.trim() !== '')
+      );
+      
+      if (!hasActualAnswer) return; // No actual answer to submit
+      
       try {
         await dispatch(
           submitAnswer({
             sessionId: session.id,
-            questionId: questions[currentQuestionIndex].id,
-            answer: userAnswer,
+            questionId: currentQuestion.id,
+            answer: existingAnswer,
           })
         ).unwrap();
       } catch (error) {
-        console.error("Failed to submit answer:", error);
-        // Don't throw the error, just log it
+        // Ignore 409 Conflict (already submitted)
+        console.log("Answer submission:", error);
       }
     },
-    [dispatch, session, questions, currentQuestionIndex]
+    [dispatch, session, questions, currentQuestionIndex, userAnswers]
   );
+
+  // Keep for backward compatibility
+  const handleSubmitAnswer = saveAnswer;
 
   // Update ref whenever handleSubmitAnswer changes
   useEffect(() => {
@@ -127,22 +156,28 @@ export const useQuiz = (slug: string) => {
     if (!session) return;
 
     try {
+      // Submit current answer before completing
+      await submitCurrentAnswer();
+      
       dispatch(setTimerActive(false));
       await dispatch(completeQuiz(session.id)).unwrap();
     } catch (error) {
       console.error("Failed to complete quiz:", error);
       // Don't rethrow the error
     }
-  }, [dispatch, session]);
+  }, [dispatch, session, submitCurrentAnswer]);
 
-  const handleNextQuestion = useCallback(() => {
+  const handleNextQuestion = useCallback(async () => {
+    // Submit current answer before moving to next
+    await submitCurrentAnswer();
+    
     if (currentQuestionIndex < questions.length - 1) {
       dispatch(nextQuestion());
     } else {
       // Last question - complete quiz
       handleCompleteQuiz();
     }
-  }, [dispatch, currentQuestionIndex, questions.length, handleCompleteQuiz]);
+  }, [dispatch, currentQuestionIndex, questions.length, handleCompleteQuiz, submitCurrentAnswer]);
 
   const handlePreviousQuestion = useCallback(() => {
     dispatch(previousQuestion());
@@ -194,7 +229,9 @@ export const useQuiz = (slug: string) => {
 
     // Actions
     startQuiz,
+    saveAnswer,
     handleSubmitAnswer,
+    submitCurrentAnswer,
     handleNextQuestion,
     handlePreviousQuestion,
     handleCompleteQuiz,

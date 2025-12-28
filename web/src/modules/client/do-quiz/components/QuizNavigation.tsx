@@ -3,7 +3,6 @@
 import React from "react";
 import { Button } from "@/common/components/ui/button";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface QuizNavigationProps {
   currentQuestion: number;
@@ -14,7 +13,6 @@ interface QuizNavigationProps {
   isFirstQuestion: boolean;
   isLastQuestion: boolean;
   isSubmitting: boolean;
-  hasAnswered: boolean;
 }
 
 const QuizNavigation: React.FC<QuizNavigationProps> = ({
@@ -26,7 +24,6 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
   isFirstQuestion,
   isLastQuestion,
   isSubmitting,
-  hasAnswered,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t border-border px-6 py-6 z-40 animate-in slide-in-from-bottom duration-500">
@@ -60,11 +57,8 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
           <Button
             size="lg"
             onClick={onSubmit}
-            disabled={!hasAnswered || isSubmitting}
-            className={cn(
-              "h-14 px-10 rounded-2xl font-black transition-all shadow-xl shadow-primary/20",
-              hasAnswered && !isSubmitting ? "bg-primary hover:scale-105" : ""
-            )}
+            disabled={isSubmitting}
+            className="h-14 px-10 rounded-2xl font-black transition-all shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700 hover:scale-105"
           >
             {isSubmitting ? (
               <>
@@ -82,11 +76,8 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
           <Button
             size="lg"
             onClick={onNext}
-            disabled={!hasAnswered || isSubmitting}
-            className={cn(
-              "h-14 px-10 rounded-2xl font-black transition-all",
-              hasAnswered && !isSubmitting ? "bg-primary hover:scale-105" : ""
-            )}
+            disabled={isSubmitting}
+            className="h-14 px-10 rounded-2xl font-black transition-all bg-primary hover:scale-105"
           >
             {isSubmitting ? (
               <>
@@ -107,3 +98,4 @@ const QuizNavigation: React.FC<QuizNavigationProps> = ({
 };
 
 export default QuizNavigation;
+

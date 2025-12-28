@@ -49,13 +49,20 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
     resetQuizState,
   } = useQuiz(slug);
 
-  // Track answered question indices
+  // Track answered question indices - only count if actually answered
   const answeredQuestions = React.useMemo(() => {
     const answered = new Set<number>();
     userAnswers.forEach(answer => {
-      const index = questions.findIndex(q => q.id === answer.question_id);
-      if (index !== -1) {
-        answered.add(index);
+      // Only count as answered if there's an actual selection or text
+      const hasActualAnswer =
+        answer.selected_option_id !== undefined ||
+        (answer.text_answer !== undefined && answer.text_answer.trim() !== '');
+
+      if (hasActualAnswer) {
+        const index = questions.findIndex(q => q.id === answer.question_id);
+        if (index !== -1) {
+          answered.add(index);
+        }
       }
     });
     return answered;
@@ -73,7 +80,12 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   useEffect(() => {
     if (currentQuestion) {
       const answer = getUserAnswer(currentQuestion.id);
-      setHasAnswered(!!answer);
+      // Check if answer exists AND has actual content (not just empty/undefined values)
+      const hasActualAnswer = !!answer && (
+        answer.selected_option_id !== undefined ||
+        (answer.text_answer !== undefined && answer.text_answer.trim() !== '')
+      );
+      setHasAnswered(hasActualAnswer);
     }
   }, [currentQuestion, getUserAnswer]);
 
@@ -116,26 +128,25 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
     if (!currentQuestion) return;
 
     handleSubmitAnswer(answer);
-    setHasAnswered(true);
+
+    // Check if answer actually has content (support for toggle/deselect)
+    const hasActualAnswer =
+      answer.selected_option_id !== undefined ||
+      (answer.text_answer !== undefined && answer.text_answer.trim() !== '');
+    setHasAnswered(hasActualAnswer);
   };
 
-  // Handle navigation
+  // Handle navigation - allow navigation without requiring answer
   const handleNext = () => {
-    if (hasAnswered) {
-      handleNextQuestion();
-      setHasAnswered(false);
-    }
+    handleNextQuestion();
   };
 
   const handlePrevious = () => {
     handlePreviousQuestion();
-    setHasAnswered(false);
   };
 
   const handleSubmit = () => {
-    if (hasAnswered) {
-      handleCompleteQuiz();
-    }
+    handleCompleteQuiz();
   };
 
   // Handle retake quiz
@@ -224,6 +235,8 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
       <div className="min-h-screen bg-background/50 py-12 px-4 selection:bg-primary/20">
         <QuizResults
           result={result}
+          questions={questions}
+          userAnswers={userAnswers}
           onRetakeQuiz={handleRetakeQuiz}
           onViewAnswers={handleViewAnswers}
         />
@@ -242,7 +255,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
         </div>
 
         <QuizHeader
-          title={`Quiz: ${currentQuestion.content.slice(0, 50)}...`}
+          title="Quiz"
           progress={progress}
           timeRemaining={timeRemaining}
           timerActive={timerActive}
@@ -274,7 +287,6 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
           isFirstQuestion={currentQuestionIndex === 0}
           isLastQuestion={currentQuestionIndex === questions.length - 1}
           isSubmitting={isSubmitting}
-          hasAnswered={hasAnswered}
         />
       </div>
     );

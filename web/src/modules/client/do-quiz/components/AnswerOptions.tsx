@@ -26,15 +26,30 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
   const handleOptionSelect = (option: QuestionOption) => {
     if (isSubmitting) return;
 
-    const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
-      selected_option_id: option.id,
-      text_answer: undefined,
-      is_correct: option.is_correct,
-      points_earned: option.is_correct ? question.points : 0,
-      time_spent: 0,
-    };
+    // Toggle: if clicking on already selected option, deselect it
+    const isAlreadySelected = userAnswer?.selected_option_id === option.id;
 
-    onAnswerSelect(answer);
+    if (isAlreadySelected) {
+      // Deselect - clear the answer
+      const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
+        selected_option_id: undefined,
+        text_answer: undefined,
+        is_correct: false,
+        points_earned: 0,
+        time_spent: 0,
+      };
+      onAnswerSelect(answer);
+    } else {
+      // Select new option
+      const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
+        selected_option_id: option.id,
+        text_answer: undefined,
+        is_correct: option.is_correct,
+        points_earned: option.is_correct ? question.points : 0,
+        time_spent: 0,
+      };
+      onAnswerSelect(answer);
+    }
   };
 
   const handleTextAnswer = (text: string) => {
@@ -66,7 +81,7 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
               key={option.id}
               onClick={() => handleOptionSelect(option)}
               className={cn(
-                "group relative flex items-center gap-4 p-5 rounded-2xl border-2 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom duration-500",
+                "group relative flex items-start gap-4 p-5 rounded-2xl border-2 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom duration-500",
                 isSelected
                   ? "border-primary bg-primary/5 shadow-lg shadow-primary/5"
                   : "border-border bg-card hover:border-primary/50 hover:bg-muted/50",
@@ -75,7 +90,7 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
               style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-300",
+                "flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-300 flex-shrink-0 mt-1",
                 isSelected ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"
               )}>
                 {isSelected ? (
@@ -87,6 +102,19 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
                 )}
               </div>
               <div className="flex-1">
+                {/* Option Image */}
+                {option.media_url && (
+                  <div className="mb-3">
+                    <img
+                      src={option.media_url}
+                      alt={`Option ${String.fromCharCode(65 + index)}`}
+                      className="max-w-full max-h-40 rounded-lg object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
                 <p className={cn(
                   "text-lg font-medium transition-colors",
                   isSelected ? "text-primary" : "text-foreground"
@@ -112,7 +140,7 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
               onClick={() => handleOptionSelect(option)}
               disabled={isSubmitting}
               className={cn(
-                "p-8 rounded-3xl border-2 transition-all duration-300 font-bold text-2xl uppercase tracking-wider relative overflow-hidden",
+                "p-8 rounded-3xl border-2 transition-all duration-300 font-bold text-2xl uppercase tracking-wider relative overflow-hidden flex flex-col items-center gap-4",
                 isSelected
                   ? option.content.toLowerCase() === 'true'
                     ? "border-green-500 bg-green-500/10 text-green-500 shadow-xl shadow-green-500/10"
@@ -121,6 +149,17 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
                 isSubmitting && "opacity-50"
               )}
             >
+              {/* Option Image */}
+              {option.media_url && (
+                <img
+                  src={option.media_url}
+                  alt={option.content}
+                  className="max-w-full max-h-32 rounded-lg object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              )}
               {option.content}
               {isSelected && (
                 <div className="absolute top-2 right-2">

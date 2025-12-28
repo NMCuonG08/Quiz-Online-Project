@@ -1,28 +1,32 @@
 "use client";
 
 import React from "react";
-import { QuizResult } from "../types/quiz.types";
+import { QuizResult, Question, UserAnswer } from "../types/quiz.types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/common/components/ui/card";
 import { Button } from "@/common/components/ui/button";
 import { Badge } from "@/common/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/common/components/ui/alert";
-import { CheckCircle2, Trophy, Clock, Target, RotateCcw, Eye, Star, Share2, Home } from "lucide-react";
+import { CheckCircle2, XCircle, Trophy, Clock, Target, RotateCcw, Star, Share2, Home, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { APP_ROUTES } from "@/lib/appRoutes";
 
 interface QuizResultsProps {
   result: QuizResult;
+  questions?: Question[];
+  userAnswers?: UserAnswer[];
   onRetakeQuiz: () => void;
   onViewAnswers: () => void;
 }
 
 const QuizResults: React.FC<QuizResultsProps> = ({
   result,
+  questions = [],
+  userAnswers = [],
   onRetakeQuiz,
   onViewAnswers,
 }) => {
   const router = useRouter();
+  const [showDetails, setShowDetails] = React.useState(true);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -48,8 +52,22 @@ const QuizResults: React.FC<QuizResultsProps> = ({
     return "Time to hit the books again! 📚";
   };
 
+  const getUserAnswerForQuestion = (questionId: string) => {
+    return userAnswers.find(a => a.question_id === questionId);
+  };
+
+  const getCorrectOption = (question: Question) => {
+    return question.options.find(o => o.is_correct);
+  };
+
+  const getSelectedOption = (question: Question, userAnswer?: UserAnswer) => {
+    if (!userAnswer?.selected_option_id) return null;
+    return question.options.find(o => o.id === userAnswer.selected_option_id);
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8 animate-in fade-in zoom-in-95 duration-700">
+      {/* Summary Card */}
       <Card className="overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-md">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-violet-500 to-primary" />
 
@@ -92,9 +110,9 @@ const QuizResults: React.FC<QuizResultsProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { icon: CheckCircle2, label: "Correct", value: result.correct_answers, color: "text-green-500", bg: "bg-green-500/10" },
-              { icon: Target, label: "Efficiency", value: `${result.percentage}%`, color: "text-violet-500", bg: "bg-violet-500/10" },
+              { icon: XCircle, label: "Wrong", value: result.total_questions - result.correct_answers, color: "text-red-500", bg: "bg-red-500/10" },
               { icon: Clock, label: "Time Taken", value: formatTime(result.time_spent), color: "text-blue-500", bg: "bg-blue-500/10" },
-              { icon: Star, label: "Status", value: result.passed ? "PASSED" : "FAILED", color: result.passed ? "text-primary" : "text-destructive", bg: result.passed ? "bg-primary/10" : "bg-destructive/10" }
+              { icon: Target, label: "Status", value: result.passed ? "PASSED" : "FAILED", color: result.passed ? "text-green-500" : "text-destructive", bg: result.passed ? "bg-green-500/10" : "bg-destructive/10" }
             ].map((stat, i) => (
               <div key={i} className="p-4 rounded-2xl bg-card border border-border shadow-sm flex flex-col items-center justify-center gap-2 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
                 <div className={cn("p-2 rounded-xl mb-1", stat.bg)}>
@@ -106,42 +124,11 @@ const QuizResults: React.FC<QuizResultsProps> = ({
             ))}
           </div>
 
-          {/* Feedback & Ranking Section */}
-          <div className="space-y-4">
-            {result.rank && (
-              <div className="p-5 rounded-2xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-yellow-500 flex items-center justify-center text-white shadow-lg">
-                  <Trophy className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="font-black text-yellow-700 dark:text-yellow-400">Global Rank: #{result.rank}</h4>
-                  <p className="text-sm text-yellow-800/70 dark:text-yellow-400/70">Outstanding performance in the community!</p>
-                </div>
-              </div>
-            )}
-
-            {result.feedback && (
-              <div className="p-5 rounded-2xl bg-muted/50 border border-border flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center text-violet-500">
-                  <Target className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="font-bold">Master's Feedback</h4>
-                  <p className="text-sm text-muted-foreground">{result.feedback}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Action Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
             <Button onClick={onRetakeQuiz} variant="outline" size="lg" className="h-14 rounded-2xl font-bold border-2 hover:bg-muted group">
               <RotateCcw className="w-5 h-5 mr-3 group-hover:rotate-180 transition-transform duration-500" />
               Try Again
-            </Button>
-            <Button onClick={onViewAnswers} variant="outline" size="lg" className="h-14 rounded-2xl font-bold border-2 hover:bg-muted">
-              <Eye className="w-5 h-5 mr-3" />
-              Review
             </Button>
             <Button variant="outline" size="lg" className="h-14 rounded-2xl font-bold border-2 hover:bg-muted" onClick={() => router.push(APP_ROUTES.HOME)}>
               <Home className="w-5 h-5 mr-3" />
@@ -154,8 +141,115 @@ const QuizResults: React.FC<QuizResultsProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Questions Review Section */}
+      {questions.length > 0 && (
+        <Card className="overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <div>
+              <CardTitle className="text-2xl font-bold">Answer Review</CardTitle>
+              <CardDescription>See how you answered each question</CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDetails(!showDetails)}
+              className="rounded-xl"
+            >
+              {showDetails ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </Button>
+          </CardHeader>
+
+          {showDetails && (
+            <CardContent className="space-y-4 pb-8">
+              {questions.map((question, index) => {
+                const userAnswer = getUserAnswerForQuestion(question.id);
+                const correctOption = getCorrectOption(question);
+                const selectedOption = getSelectedOption(question, userAnswer);
+                const isCorrect = userAnswer?.is_correct || false;
+                const wasAnswered = !!selectedOption;
+
+                return (
+                  <div
+                    key={question.id}
+                    className={cn(
+                      "p-5 rounded-2xl border-2 transition-all",
+                      isCorrect
+                        ? "border-green-500/30 bg-green-500/5"
+                        : wasAnswered
+                          ? "border-red-500/30 bg-red-500/5"
+                          : "border-yellow-500/30 bg-yellow-500/5"
+                    )}
+                  >
+                    {/* Question Header */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className={cn(
+                        "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
+                        isCorrect
+                          ? "bg-green-500 text-white"
+                          : wasAnswered
+                            ? "bg-red-500 text-white"
+                            : "bg-yellow-500 text-white"
+                      )}>
+                        {isCorrect ? (
+                          <CheckCircle2 className="w-5 h-5" />
+                        ) : wasAnswered ? (
+                          <XCircle className="w-5 h-5" />
+                        ) : (
+                          <span className="text-sm font-bold">?</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                          Question {index + 1}
+                        </p>
+                        <p className="font-semibold text-foreground">{question.content}</p>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "text-xs",
+                        isCorrect ? "text-green-600 border-green-500" : wasAnswered ? "text-red-600 border-red-500" : "text-yellow-600 border-yellow-500"
+                      )}>
+                        {isCorrect ? "Correct" : wasAnswered ? "Wrong" : "Skipped"}
+                      </Badge>
+                    </div>
+
+                    {/* Answers */}
+                    <div className="ml-11 space-y-2">
+                      {wasAnswered && !isCorrect && selectedOption && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          <span className="text-red-600 dark:text-red-400">Your answer: {selectedOption.content}</span>
+                        </div>
+                      )}
+                      {correctOption && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <span className="text-green-600 dark:text-green-400">Correct answer: {correctOption.content}</span>
+                        </div>
+                      )}
+                      {!wasAnswered && (
+                        <div className="text-sm text-yellow-600 dark:text-yellow-400 italic">
+                          You didn't answer this question
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Explanation */}
+                    {question.explanation && (
+                      <div className="mt-3 ml-11 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                        <strong>Explanation:</strong> {question.explanation}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 };
 
 export default QuizResults;
+

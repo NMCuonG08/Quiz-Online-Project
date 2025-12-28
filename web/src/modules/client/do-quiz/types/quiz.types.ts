@@ -17,6 +17,7 @@ export interface QuestionOption {
   content: string;
   is_correct: boolean;
   sort_order: number;
+  media_url?: string;
 }
 
 export interface QuizSession {
