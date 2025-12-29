@@ -2,11 +2,10 @@
 
 import React from "react";
 import { Question, QuestionOption, UserAnswer } from "../types/quiz.types";
-import { RadioGroup, RadioGroupItem } from "@/common/components/ui/radio-group";
-import { Label } from "@/common/components/ui/label";
 import { Textarea } from "@/common/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Check, Edit3 } from "lucide-react";
+import MatchingGame from "./MatchingGame";
 
 interface AnswerOptionsProps {
   question: Question;
@@ -26,11 +25,9 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
   const handleOptionSelect = (option: QuestionOption) => {
     if (isSubmitting) return;
 
-    // Toggle: if clicking on already selected option, deselect it
     const isAlreadySelected = userAnswer?.selected_option_id === option.id;
 
     if (isAlreadySelected) {
-      // Deselect - clear the answer
       const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
         selected_option_id: undefined,
         text_answer: undefined,
@@ -40,7 +37,6 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
       };
       onAnswerSelect(answer);
     } else {
-      // Select new option
       const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
         selected_option_id: option.id,
         text_answer: undefined,
@@ -102,7 +98,6 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
                 )}
               </div>
               <div className="flex-1">
-                {/* Option Image */}
                 {option.media_url && (
                   <div className="mb-3">
                     <img
@@ -149,7 +144,6 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
                 isSubmitting && "opacity-50"
               )}
             >
-              {/* Option Image */}
               {option.media_url && (
                 <img
                   src={option.media_url}
@@ -209,8 +203,81 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
     </div>
   );
 
+  // Parse matching pair from option content (JSON format: { left, right })
+  const parseMatchingPair = (content: string): { left: string; right: string } => {
+    try {
+      const parsed = JSON.parse(content);
+      return { left: parsed.left || content, right: parsed.right || "" };
+    } catch {
+      return { left: content, right: "" };
+    }
+  };
+
+  const renderMatching = () => {
+    // Parse pairs from question options
+    const pairs = question.options.map(opt => ({
+      id: opt.id,
+      ...parseMatchingPair(opt.content),
+    }));
+
+    // Parse user's matching answers (stored as JSON in text_answer)
+    const getUserMatches = (): Record<string, string> => {
+      if (!userAnswer?.text_answer) return {};
+      try {
+        return JSON.parse(userAnswer.text_answer);
+      } catch {
+        return {};
+      }
+    };
+
+    const userMatches = getUserMatches();
+
+    const handleMatchChange = (leftId: string, rightId: string) => {
+      if (isSubmitting) return;
+
+      const newMatches = { ...userMatches };
+
+      // Toggle: if same selection, remove it
+      if (newMatches[leftId] === rightId) {
+        delete newMatches[leftId];
+      } else {
+        // Remove any existing match for this left item
+        delete newMatches[leftId];
+        // Remove any existing match that uses this right item
+        Object.keys(newMatches).forEach(key => {
+          if (newMatches[key] === rightId) {
+            delete newMatches[key];
+          }
+        });
+        // Add new match
+        newMatches[leftId] = rightId;
+      }
+
+      // Calculate if all matches are correct
+      const allCorrect = pairs.every(p => newMatches[p.id] === p.id);
+
+      const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
+        selected_option_id: undefined,
+        text_answer: JSON.stringify(newMatches),
+        is_correct: allCorrect,
+        points_earned: allCorrect ? question.points : 0,
+        time_spent: 0,
+      };
+
+      onAnswerSelect(answer);
+    };
+
+    return (
+      <MatchingGame
+        pairs={pairs}
+        userMatches={userMatches}
+        onMatchChange={handleMatchChange}
+        isSubmitting={isSubmitting}
+      />
+    );
+  };
+
   const renderAnswerOptions = () => {
-    // Normalize question type to lowercase for comparison
     const questionType = question.question_type?.toLowerCase();
 
     switch (questionType) {
@@ -222,9 +289,11 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
       case "fill_blank":
         return renderFillBlank();
       case "short_answer":
-        return renderFillBlank(); // Same UI as fill blank
+        return renderFillBlank();
       case "essay":
         return renderEssay();
+      case "matching":
+        return renderMatching();
       default:
         return (
           <div className="p-8 text-center bg-destructive/5 rounded-2xl border-2 border-dashed border-destructive/20 text-destructive font-medium">
@@ -240,7 +309,7 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <Edit3 className="w-5 h-5 text-primary" />
         </div>
-        <h4 className="text-xl font-bold text-foreground">Write your selection:</h4>
+        <h4 className="text-xl font-bold text-foreground">Chọn câu trả lời:</h4>
       </div>
       {renderAnswerOptions()}
     </div>

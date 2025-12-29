@@ -30,7 +30,7 @@ class WebSocketManager {
     // Check debounce - prevent too frequent connection attempts
     const now = Date.now();
     if (now - this.lastConnectionAttempt < this.connectionDebounceMs) {
-      console.log("🔌 Connection attempt too soon, debouncing...");
+      // Debouncing connection attempt
       // Schedule connection for later
       this.connectionTimeout = setTimeout(() => {
         this.connect(token);
@@ -41,19 +41,19 @@ class WebSocketManager {
 
     // Check if we've exceeded max connection attempts
     if (this.connectionAttempts >= this.maxConnectionAttempts) {
-      console.warn("🔌 Max connection attempts reached, skipping connection");
+      // Max connection attempts reached
       return;
     }
 
     // Nếu đã connected với cùng token, không cần connect lại
     if (this.socket?.connected && this.currentToken === token) {
-      console.log("🔌 Already connected with same token, skipping");
+      // Already connected with same token
       return;
     }
 
     // Luôn disconnect trước khi connect mới
     if (this.socket) {
-      console.log("🔌 Disconnecting previous WebSocket before connecting mới");
+      // Disconnecting previous WebSocket before connecting
       this.socket.disconnect();
       this.socket = null;
     }
@@ -62,7 +62,7 @@ class WebSocketManager {
 
     // Nếu đang connecting, đợi hoặc cancel connection cũ
     if (this.isConnecting) {
-      console.log("🔌 WebSocket connection in progress, waiting...");
+      // WebSocket connection in progress
       return new Promise((resolve, reject) => {
         let attempts = 0;
         const maxAttempts = 30; // 3 seconds max wait
@@ -72,7 +72,7 @@ class WebSocketManager {
           if (!this.isConnecting) {
             this.connect(token).then(resolve).catch(reject);
           } else if (attempts >= maxAttempts) {
-            console.warn("🔌 Connection timeout, forcing new connection");
+            // Connection timeout, forcing new connection
             this.isConnecting = false;
             // Disconnect existing socket before new connection
             if (this.socket) {
@@ -102,7 +102,7 @@ class WebSocketManager {
       );
 
       this.socket.on("connect", () => {
-        console.log("🔌 WebSocket connected");
+        // WebSocket connected
         this.isConnecting = false;
         this.connectionAttempts = 0; // Reset on successful connection
         this.startHeartbeat();
@@ -140,14 +140,14 @@ class WebSocketManager {
       });
 
       this.socket.on("disconnect", (reason) => {
-        console.log("🔌 WebSocket disconnected:", reason);
+        // WebSocket disconnected
         this.isConnecting = false; // Đảm bảo luôn reset trạng thái
         this.stopHeartbeat();
         this.emit("disconnected", reason);
       });
 
       this.socket.on("connect_error", (error) => {
-        console.error("🔌 WebSocket connection error:", error);
+        // WebSocket connection error (silent)
         this.isConnecting = false;
 
         // Handle specific error types
@@ -350,7 +350,7 @@ class WebSocketManager {
 
   // Method để force reconnect với token mới
   async reconnectWithNewToken(token: string): Promise<void> {
-    console.log("🔌 Force reconnecting with new token");
+    // Force reconnecting with new token
     this.disconnect();
 
     // Đợi một chút để đảm bảo disconnect hoàn toàn
@@ -364,7 +364,7 @@ class WebSocketManager {
   }
 
   clearListeners(): void {
-    console.log("🔌 Clearing WebSocket listeners");
+    // Clearing WebSocket listeners
     this.eventCallbacks.clear();
   }
 
@@ -397,7 +397,7 @@ class WebSocketManager {
     this.clearReconnectTimeout();
     this.reconnectTimeout = setTimeout(() => {
       if (this.currentToken && !this.isConnecting) {
-        console.log("🔌 Scheduled reconnect triggered");
+        // Scheduled reconnect triggered
         this.connect(this.currentToken).catch(console.error);
       }
     }, delay);
@@ -417,7 +417,7 @@ class WebSocketManager {
 
   // Method để force setup listeners (for debugging)
   forceSetupListeners() {
-    console.log("🔌 Force setting up WebSocket listeners");
+    // Force setting up WebSocket listeners
     this.clearListeners();
     // This will be called from middleware
     return true;

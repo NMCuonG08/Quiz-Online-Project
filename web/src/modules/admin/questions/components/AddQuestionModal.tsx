@@ -57,6 +57,60 @@ const AddQuestionModal: React.FC<Props> = ({
     media_url: null,
   });
 
+  // Auto-generate options for TRUE_FALSE when type changes
+  const handleTypeChange = (value: string) => {
+    const newType = value as QuestionItem["question_type"];
+
+    if (newType === "TRUE_FALSE") {
+      // Auto-create True and False options
+      const trueOption: QuestionOption = {
+        id: `temp-true-${Date.now()}`,
+        question_id: "",
+        option_text: "True",
+        is_correct: false,
+        sort_order: 1,
+        explanation: "",
+        media_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        question_text: "",
+        question_type: "",
+      };
+      const falseOption: QuestionOption = {
+        id: `temp-false-${Date.now()}`,
+        question_id: "",
+        option_text: "False",
+        is_correct: false,
+        sort_order: 2,
+        explanation: "",
+        media_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        question_text: "",
+        question_type: "",
+      };
+      setQuestionData((prev) => ({
+        ...prev,
+        question_type: newType,
+        options: [trueOption, falseOption],
+      }));
+    } else if (newType === "ESSAY") {
+      // ESSAY doesn't need options
+      setQuestionData((prev) => ({
+        ...prev,
+        question_type: newType,
+        options: [],
+      }));
+    } else {
+      // Reset options for other types
+      setQuestionData((prev) => ({
+        ...prev,
+        question_type: newType,
+        options: [],
+      }));
+    }
+  };
+
   const handleAddOption = () => {
     const newOption: QuestionOption = {
       id: `temp-${Math.random().toString(36).substr(2, 9)}`,
@@ -65,7 +119,7 @@ const AddQuestionModal: React.FC<Props> = ({
       is_correct: false,
       sort_order: (questionData.options?.length || 0) + 1,
       explanation: "",
-      media_url: null, // Set to null instead of empty string
+      media_url: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       question_text: "",
@@ -82,13 +136,28 @@ const AddQuestionModal: React.FC<Props> = ({
     index: number,
     patch: Partial<QuestionOption>
   ) => {
-    setQuestionData((prev) => ({
-      ...prev,
-      options:
-        prev.options?.map((opt, i) =>
-          i === index ? { ...opt, ...patch } : opt
-        ) || [],
-    }));
+    setQuestionData((prev) => {
+      // For TRUE_FALSE, only one option can be correct
+      if (prev.question_type === "TRUE_FALSE" && patch.is_correct === true) {
+        return {
+          ...prev,
+          options:
+            prev.options?.map((opt, i) => ({
+              ...opt,
+              is_correct: i === index, // Only the clicked one is correct
+            })) || [],
+        };
+      }
+
+      // Default behavior for other question types
+      return {
+        ...prev,
+        options:
+          prev.options?.map((opt, i) =>
+            i === index ? { ...opt, ...patch } : opt
+          ) || [],
+      };
+    });
   };
 
   const handleRemoveOption = (index: number) => {
@@ -233,14 +302,7 @@ const AddQuestionModal: React.FC<Props> = ({
                 <label className="text-sm font-medium">Type</label>
                 <Select
                   value={questionData.question_type || "MULTIPLE_CHOICE"}
-                  onValueChange={(value) =>
-                    setQuestionData((prev) => ({
-                      ...prev,
-                      question_type: value as QuestionItem["question_type"],
-                      // Reset options when type changes
-                      options: [],
-                    }))
-                  }
+                  onValueChange={handleTypeChange}
                 >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select question type" />
@@ -279,31 +341,53 @@ const AddQuestionModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Options */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Options</h3>
+          {/* Options - Hide for ESSAY */}
+          {questionData.question_type !== "ESSAY" && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">
+                {questionData.question_type === "TRUE_FALSE"
+                  ? "Select the correct answer"
+                  : "Options"}
+              </h3>
 
-            <div className="space-y-3">
-              {(questionData.options || []).map((opt, index) => (
-                <div key={opt.id}>
-                  {renderer.render(opt, (patch) =>
-                    handleUpdateOption(index, patch)
+              <div className="space-y-3">
+                {(questionData.options || []).map((opt, index) => (
+                  <div key={opt.id}>
+                    {renderer.render(opt, (patch) =>
+                      handleUpdateOption(index, patch)
+                    )}
+                    {/* Hide Remove button for TRUE_FALSE since options are fixed */}
+                    {questionData.question_type !== "TRUE_FALSE" && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleRemoveOption(index)}
+                        className="mt-2"
+                      >
+                        Remove Option
+                      </Button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Add Option Card - Only show for MULTIPLE_CHOICE, FILL_BLANK, and MATCHING */}
+                {(questionData.question_type === "MULTIPLE_CHOICE" ||
+                  questionData.question_type === "FILL_BLANK" ||
+                  questionData.question_type === "MATCHING") && (
+                    <AddOptionCard onClick={handleAddOption} />
                   )}
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRemoveOption(index)}
-                    className="mt-2"
-                  >
-                    Remove Option
-                  </Button>
-                </div>
-              ))}
-
-              {/* Add Option Card */}
-              <AddOptionCard onClick={handleAddOption} />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Info message for ESSAY */}
+          {questionData.question_type === "ESSAY" && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Essay questions are open-ended and will be graded manually.
+              </p>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3">

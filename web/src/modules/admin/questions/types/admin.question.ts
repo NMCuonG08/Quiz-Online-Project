@@ -6,6 +6,11 @@ export type QuestionOption = {
   sort_order: number;
   explanation?: string | null;
   media_url?: string | File | null;
+  created_at?: string;
+  updated_at?: string;
+  // These are sometimes used for display purposes
+  question_text?: string;
+  question_type?: string;
 };
 
 export type QuestionItem = {

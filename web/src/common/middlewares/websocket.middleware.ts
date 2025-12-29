@@ -40,38 +40,34 @@ export const forceReconnectWebSocket = createAction(
 websocketMiddleware.startListening({
   actionCreator: initWebSocket,
   effect: async (action, listenerApi) => {
-    console.log("🔌 WebSocket middleware triggered:", action.type);
+    // WebSocket middleware triggered
 
     // Get token from auth state (đã được restore)
     const state = listenerApi.getState() as RootState;
     const token = state.auth?.token || localStorage.getItem("auth_token") || "";
 
-    console.log("🔌 Auth state:", {
-      isAuthenticated: state.auth?.isAuthenticated,
-      hasToken: !!token,
-      tokenLength: token?.length || 0,
-    });
+
 
     if (!token) {
-      console.warn("🔌 No auth token found, skipping WebSocket connection");
+      // No auth token found, skipping WebSocket connection
       return;
     }
 
     // Prevent multiple simultaneous connection attempts
     if (wsManager.getIsConnecting() || isConnecting) {
-      console.log("🔌 WebSocket already connecting, skipping...");
+      // WebSocket already connecting, skipping
       return;
     }
 
     // Setup WebSocket event listeners (chỉ setup 1 lần)
     if (!listenersSetup) {
-      console.log("🔌 Setting up WebSocket listeners");
+      // Setting up WebSocket listeners
       setupWebSocketListeners(listenerApi.dispatch);
       listenersSetup = true;
     }
 
     // Connect với retry logic
-    console.log("🔌 Attempting WebSocket connection...");
+    // Attempting WebSocket connection
     await connectWebSocketWithRetry(listenerApi.dispatch, token);
   },
 });
@@ -84,14 +80,14 @@ websocketMiddleware.startListening({
     const token = state.auth?.token;
 
     if (token) {
-      console.log("🔌 User logged in, connecting WebSocket...");
+      // User logged in, connecting WebSocket
 
       // Luôn force reconnect khi user đăng nhập để đảm bảo sync
       if (wsManager.isConnected()) {
-        console.log("🔌 User logged in, force reconnecting with new token...");
+        // User logged in, force reconnecting with new token
         await wsManager.reconnectWithNewToken(token);
       } else {
-        console.log("🔌 User logged in, connecting WebSocket...");
+        // User logged in, connecting WebSocket
         await connectWebSocketWithRetry(listenerApi.dispatch, token);
       }
     }
@@ -106,16 +102,14 @@ websocketMiddleware.startListening({
     const token = state.auth?.token;
 
     if (token) {
-      console.log("🔌 Google login successful, connecting WebSocket...");
+      // Google login successful, connecting WebSocket
 
       // Luôn force reconnect khi user đăng nhập để đảm bảo sync
       if (wsManager.isConnected()) {
-        console.log(
-          "🔌 Google login successful, force reconnecting with new token..."
-        );
+        // Google login successful, force reconnecting with new token
         await wsManager.reconnectWithNewToken(token);
       } else {
-        console.log("🔌 Google login successful, connecting WebSocket...");
+        // Google login successful, connecting WebSocket
         await connectWebSocketWithRetry(listenerApi.dispatch, token);
       }
     }
@@ -130,7 +124,7 @@ websocketMiddleware.startListening({
     const token = state.auth?.token || localStorage.getItem("auth_token") || "";
 
     if (token) {
-      console.log("🔌 Force reconnecting WebSocket...");
+      // Force reconnecting WebSocket
       await wsManager.reconnectWithNewToken(token);
     }
   },
@@ -159,7 +153,7 @@ websocketMiddleware.startListening({
       !wsManager.getIsConnecting() &&
       !isConnecting
     ) {
-      console.log("🔌 Auth state changed, ensuring WebSocket connection...");
+      // Auth state changed, ensuring WebSocket connection
       await connectWebSocketWithRetry(listenerApi.dispatch, token);
     }
   },
@@ -169,7 +163,7 @@ websocketMiddleware.startListening({
 websocketMiddleware.startListening({
   actionCreator: logout.fulfilled,
   effect: async (action, listenerApi) => {
-    console.log("🔌 User logged out, disconnecting WebSocket");
+    // User logged out, disconnecting WebSocket
     wsManager.disconnect();
     listenersSetup = false; // Reset flag on logout
     listenerApi.dispatch(disconnected("User logged out"));
@@ -177,30 +171,30 @@ websocketMiddleware.startListening({
 });
 
 function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
-  console.log("🔌 Setting up WebSocket listeners (clearing old ones first)");
+  // Setting up WebSocket listeners (clearing old ones first)
   // Clear all existing listeners first to prevent duplicates
   wsManager.clearListeners();
 
   wsManager.on("connected", () => {
-    console.log("🔌 WebSocket connected successfully");
+    // WebSocket connected successfully
     isConnecting = false; // Reset flag on successful connection
     dispatch(connected());
   });
 
   wsManager.on("disconnected", (reason: string) => {
-    console.log("🔌 WebSocket disconnected:", reason);
+    // WebSocket disconnected
     isConnecting = false; // Reset flag on disconnect
     dispatch(disconnected(reason));
 
     // Auto-reconnect for all cases except explicit logout
     if (reason === "User logged out") {
-      console.log("🔌 Logout disconnect, skip auto-reconnect");
+      // Logout disconnect, skip auto-reconnect
       return;
     }
 
     // Avoid overlapping connection attempts
     if (wsManager.getIsConnecting() || isConnecting) {
-      console.log("🔌 Already connecting, skip auto-reconnect");
+      // Already connecting, skip auto-reconnect
       return;
     }
 
@@ -213,14 +207,14 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
         !wsManager.isConnected() &&
         !isConnecting
       ) {
-        console.log("🔌 Auto-reconnecting after disconnect...");
+        // Auto-reconnecting after disconnect
         connectWebSocketWithRetry(dispatch, token);
       }
     }, 1000);
   });
 
   wsManager.on("error", (error: Error) => {
-    console.error("🔌 WebSocket error:", error);
+    // WebSocket error (silent)
     dispatch(connectionError(error.message || "Connection failed"));
   });
 
@@ -262,17 +256,17 @@ async function connectWebSocketWithRetry(
     await wsManager.connect(token);
     isConnecting = false; // Reset flag on success
   } catch (error: unknown) {
-    console.error(`🔌 Connection attempt ${attempt} failed:`, error);
+    // Connection attempt failed (silent)
 
     if (attempt < maxAttempts) {
       const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
-      console.log(`🔌 Retrying connection in ${delay}ms...`);
+      // Retrying connection
 
       setTimeout(() => {
         connectWebSocketWithRetry(dispatch, token, attempt + 1);
       }, delay);
     } else {
-      console.error("🔌 Max reconnection attempts reached");
+      // Max reconnection attempts reached
       isConnecting = false; // Reset flag on failure
       dispatch(
         connectionError(

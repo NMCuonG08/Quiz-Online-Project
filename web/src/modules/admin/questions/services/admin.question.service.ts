@@ -56,7 +56,7 @@ export class AdminQuestionService {
       console.log("hasQuestionFile:", hasQuestionFile);
       console.log("hasOptionFiles:", hasOptionFiles);
 
-      let body: FormData | CreateQuestionInput;
+      let body: FormData | Record<string, unknown>;
       
       if (hasQuestionFile || hasOptionFiles) {
         console.log("Creating FormData with file uploads");
@@ -76,11 +76,27 @@ export class AdminQuestionService {
             const processedOptions = value.map((option, index) => {
               const processedOption = { ...option };
               
+              // Remove metadata fields that backend doesn't expect
+              delete (processedOption as Record<string, unknown>).id;
+              delete (processedOption as Record<string, unknown>).question_id;
+              delete (processedOption as Record<string, unknown>).created_at;
+              delete (processedOption as Record<string, unknown>).updated_at;
+              delete (processedOption as Record<string, unknown>).question_text;
+              delete (processedOption as Record<string, unknown>).question_type;
+              
               // If option has a file, add it to FormData and remove from option object
               if (option.media_url && (option.media_url instanceof File)) {
                 console.log(`Adding option ${index} media file:`, option.media_url);
                 form.append(`option_${index}_media`, option.media_url as File);
                 delete processedOption.media_url;
+              } else {
+                // Remove null/empty media_url
+                delete processedOption.media_url;
+              }
+              
+              // Remove null/undefined explanation
+              if (processedOption.explanation === null || processedOption.explanation === undefined || processedOption.explanation === '') {
+                delete processedOption.explanation;
               }
               
               return processedOption;
@@ -90,8 +106,8 @@ export class AdminQuestionService {
             return;
           }
           
-          // Regular field
-          if (value !== null && value !== undefined) {
+          // Regular field - skip null/undefined/empty values
+          if (value !== null && value !== undefined && value !== '') {
             const v = Array.isArray(value) ? JSON.stringify(value) : String(value);
             form.append(key, v);
           }
@@ -106,7 +122,50 @@ export class AdminQuestionService {
         }
       } else {
         console.log("Creating JSON body without files");
-        body = payload;
+        
+        // Clean the payload - remove null/undefined values and metadata fields
+        const cleanPayload: Record<string, unknown> = {};
+        
+        Object.entries(payload).forEach(([key, value]) => {
+          // Skip null, undefined, empty string values
+          if (value === null || value === undefined || value === '') {
+            return;
+          }
+          
+          // Skip media_url if it's not a File (we don't have files in this branch)
+          if (key === 'media_url') {
+            return;
+          }
+          
+          // Clean options array
+          if (key === 'options' && Array.isArray(value)) {
+            cleanPayload[key] = value.map(option => {
+              const cleanOption: Record<string, unknown> = {};
+              
+              // Only include expected fields
+              if (option.option_text !== undefined && option.option_text !== null) {
+                cleanOption.option_text = option.option_text;
+              }
+              if (option.is_correct !== undefined) {
+                cleanOption.is_correct = option.is_correct;
+              }
+              if (option.sort_order !== undefined) {
+                cleanOption.sort_order = option.sort_order;
+              }
+              if (option.explanation && option.explanation.trim() !== '') {
+                cleanOption.explanation = option.explanation;
+              }
+              
+              return cleanOption;
+            });
+            return;
+          }
+          
+          cleanPayload[key] = value;
+        });
+        
+        console.log("Clean payload:", cleanPayload);
+        body = cleanPayload;
       }
 
       const response = await apiClient.post(apiRoutes.QUESTIONS.CREATE, body);

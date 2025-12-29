@@ -148,15 +148,28 @@ const quizSlice = createSlice({
     },
 
     setUserAnswer: (state, action: PayloadAction<UserAnswer>) => {
+      console.log("REDUX setUserAnswer:", {
+        questionId: action.payload.question_id,
+        selectedOptionId: action.payload.selected_option_id,
+        currentAnswersCount: state.userAnswers.length,
+      });
+      
       const existingAnswerIndex = state.userAnswers.findIndex(
         (answer) => answer.question_id === action.payload.question_id
       );
 
       if (existingAnswerIndex >= 0) {
         state.userAnswers[existingAnswerIndex] = action.payload;
+        console.log("REDUX: Updated existing answer at index", existingAnswerIndex);
       } else {
         state.userAnswers.push(action.payload);
+        console.log("REDUX: Pushed new answer, new count:", state.userAnswers.length);
       }
+    },
+
+    // Set all user answers at once (for loading from localStorage)
+    setUserAnswers: (state, action: PayloadAction<UserAnswer[]>) => {
+      state.userAnswers = action.payload;
     },
 
     setTimeRemaining: (state, action: PayloadAction<number>) => {
@@ -293,6 +306,7 @@ const quizSlice = createSlice({
 export const {
   setCurrentQuestion,
   setUserAnswer,
+  setUserAnswers,
   setTimeRemaining,
   setTimerActive,
   nextQuestion,

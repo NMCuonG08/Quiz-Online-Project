@@ -15,8 +15,41 @@ import {
   clearError,
   setCurrentQuestion,
   setUserAnswer,
+  setUserAnswers,
 } from "../slices/quiz.slice";
 import { UserAnswer } from "../types/quiz.types";
+
+// LocalStorage keys
+const getStorageKey = (slug: string) => `quiz_answers_${slug}`;
+const getProgressKey = (slug: string) => `quiz_progress_${slug}`;
+
+// Helper to safely access localStorage (SSR-safe)
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage errors (quota exceeded, etc.)
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore errors
+    }
+  },
+};
 
 export const useQuiz = (slug: string) => {
   const dispatch = useAppDispatch();
@@ -38,6 +71,7 @@ export const useQuiz = (slug: string) => {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const handleSubmitAnswerRef = useRef<typeof handleSubmitAnswer | null>(null);
+  const hasLoadedFromStorage = useRef(false);
 
   // Initialize quiz
   useEffect(() => {
@@ -49,19 +83,88 @@ export const useQuiz = (slug: string) => {
     };
   }, [dispatch, slug]);
 
+  // Load saved answers from localStorage when questions are loaded
+  useEffect(() => {
+    if (questions.length > 0 && !hasLoadedFromStorage.current && slug) {
+      hasLoadedFromStorage.current = true;
+      
+      const key = getStorageKey(slug);
+      console.log("📂 Trying to load from localStorage:", { key, questionsCount: questions.length });
+      
+      // Load saved answers
+      const savedAnswersJson = safeLocalStorage.getItem(key);
+      console.log("📂 localStorage data:", savedAnswersJson ? `Found ${savedAnswersJson.length} chars` : "NOT FOUND");
+      
+      if (savedAnswersJson) {
+        try {
+          const savedAnswers = JSON.parse(savedAnswersJson) as UserAnswer[];
+          if (Array.isArray(savedAnswers) && savedAnswers.length > 0) {
+            dispatch(setUserAnswers(savedAnswers));
+            console.log("📂 LOADED saved answers from localStorage:", savedAnswers.length, savedAnswers);
+          }
+        } catch (e) {
+          console.error("Failed to parse saved answers:", e);
+        }
+      }
+      
+      // Load saved progress (current question index)
+      const savedProgressJson = safeLocalStorage.getItem(getProgressKey(slug));
+      if (savedProgressJson) {
+        try {
+          const savedProgress = JSON.parse(savedProgressJson);
+          if (typeof savedProgress.currentIndex === "number" && savedProgress.currentIndex >= 0) {
+            dispatch(setCurrentQuestion(Math.min(savedProgress.currentIndex, questions.length - 1)));
+            console.log("Loaded saved progress from localStorage:", savedProgress.currentIndex);
+          }
+        } catch (e) {
+          console.error("Failed to parse saved progress:", e);
+        }
+      }
+    }
+  }, [questions, slug, dispatch]);
+
+  // Save answers to localStorage whenever they change
+  useEffect(() => {
+    if (slug && userAnswers.length > 0 && isQuizStarted) {
+      const key = getStorageKey(slug);
+      const data = JSON.stringify(userAnswers);
+      safeLocalStorage.setItem(key, data);
+      console.log("💾 SAVED to localStorage:", { key, answersCount: userAnswers.length, isQuizStarted });
+    }
+  }, [userAnswers, slug, isQuizStarted]);
+
+  // Save current question index to localStorage
+  useEffect(() => {
+    if (slug && isQuizStarted && questions.length > 0) {
+      safeLocalStorage.setItem(
+        getProgressKey(slug),
+        JSON.stringify({ currentIndex: currentQuestionIndex, timestamp: Date.now() })
+      );
+    }
+  }, [currentQuestionIndex, slug, isQuizStarted, questions.length]);
+
+  // Clear localStorage when quiz is completed
+  useEffect(() => {
+    if (isQuizCompleted && slug) {
+      safeLocalStorage.removeItem(getStorageKey(slug));
+      safeLocalStorage.removeItem(getProgressKey(slug));
+      console.log("Cleared saved quiz data from localStorage");
+    }
+  }, [isQuizCompleted, slug]);
 
   // Save answer locally (no API call)
+  // Now accepts complete UserAnswer (with question_id already set)
   const saveAnswer = useCallback(
-    (answer: Omit<UserAnswer, "question_id" | "answered_at">) => {
-      const userAnswer: UserAnswer = {
-        ...answer,
-        question_id: questions[currentQuestionIndex].id,
-        answered_at: new Date().toISOString(),
-      };
+    (answer: UserAnswer) => {
+      console.log("saveAnswer dispatching:", {
+        questionId: answer.question_id,
+        selectedOptionId: answer.selected_option_id,
+        textAnswer: answer.text_answer,
+      });
       
-      dispatch(setUserAnswer(userAnswer));
+      dispatch(setUserAnswer(answer));
     },
-    [dispatch, questions, currentQuestionIndex]
+    [dispatch]
   );
 
   // Submit current answer to API
@@ -119,24 +222,35 @@ export const useQuiz = (slug: string) => {
   }, [dispatch, slug]);
 
   // Timer effect
+  // Track if timer was ever initialized (to prevent auto-submit on initial load)
+  const timerInitializedRef = useRef(false);
+  
   useEffect(() => {
+    // Only run timer logic if timeRemaining > 0 (timer was set)
     if (timerActive && timeRemaining > 0) {
+      timerInitializedRef.current = true;  // Timer has been initialized
       timerRef.current = setInterval(() => {
         dispatch(setTimeRemaining(timeRemaining - 1));
       }, 1000);
-    } else if (timeRemaining === 0 && timerActive) {
+    } else if (timeRemaining === 0 && timerActive && timerInitializedRef.current) {
       // Time's up - auto submit current question
+      // ONLY if timer was actually initialized (countdown from > 0 to 0)
       const currentQuestion = questions[currentQuestionIndex];
       if (currentQuestion && session && handleSubmitAnswerRef.current) {
-        handleSubmitAnswerRef.current({
+        // Create complete UserAnswer with question_id
+        const emptyAnswer: UserAnswer = {
+          question_id: currentQuestion.id,
           selected_option_id: undefined,
           text_answer: "",
           is_correct: false,
           points_earned: 0,
           time_spent: currentQuestion.time_limit || 0,
-        });
+          answered_at: new Date().toISOString(),
+        };
+        handleSubmitAnswerRef.current(emptyAnswer);
       }
     }
+    // Note: If timeRemaining === 0 && !timerInitializedRef.current, do nothing (initial state)
 
     return () => {
       if (timerRef.current) {
@@ -161,11 +275,17 @@ export const useQuiz = (slug: string) => {
       
       dispatch(setTimerActive(false));
       await dispatch(completeQuiz(session.id)).unwrap();
+      
+      // Clear localStorage after successful completion
+      if (slug) {
+        safeLocalStorage.removeItem(getStorageKey(slug));
+        safeLocalStorage.removeItem(getProgressKey(slug));
+      }
     } catch (error) {
       console.error("Failed to complete quiz:", error);
       // Don't rethrow the error
     }
-  }, [dispatch, session, submitCurrentAnswer]);
+  }, [dispatch, session, submitCurrentAnswer, slug]);
 
   const handleNextQuestion = useCallback(async () => {
     // Submit current answer before moving to next
@@ -208,8 +328,14 @@ export const useQuiz = (slug: string) => {
   }, [dispatch]);
 
   const resetQuizState = useCallback(() => {
+    // Clear localStorage when resetting
+    if (slug) {
+      safeLocalStorage.removeItem(getStorageKey(slug));
+      safeLocalStorage.removeItem(getProgressKey(slug));
+    }
+    hasLoadedFromStorage.current = false;
     dispatch(resetQuiz());
-  }, [dispatch]);
+  }, [dispatch, slug]);
 
   return {
     // State

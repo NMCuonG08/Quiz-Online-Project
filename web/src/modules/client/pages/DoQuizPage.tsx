@@ -70,24 +70,33 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
 
   const [hasAnswered, setHasAnswered] = useState(false);
 
-  // Get current question
-  const currentQuestion = getCurrentQuestion();
-  const currentUserAnswer = currentQuestion
-    ? getUserAnswer(currentQuestion.id)
-    : undefined;
+  // Get current question - use useMemo to ensure proper dependency tracking
+  const currentQuestion = React.useMemo(() => {
+    if (questions.length === 0) return undefined;
+    return questions[currentQuestionIndex];
+  }, [questions, currentQuestionIndex]);
+
+  // Use useMemo to ensure currentUserAnswer updates when userAnswers changes
+  const currentUserAnswer = React.useMemo(() => {
+    if (!currentQuestion) return undefined;
+    const answer = userAnswers.find(a => a.question_id === currentQuestion.id);
+    console.log("currentUserAnswer recalculated:", {
+      questionId: currentQuestion.id,
+      selectedOptionId: answer?.selected_option_id,
+      totalAnswers: userAnswers.length,
+    });
+    return answer;
+  }, [currentQuestion, userAnswers]);
 
   // Check if current question has been answered
   useEffect(() => {
-    if (currentQuestion) {
-      const answer = getUserAnswer(currentQuestion.id);
-      // Check if answer exists AND has actual content (not just empty/undefined values)
-      const hasActualAnswer = !!answer && (
-        answer.selected_option_id !== undefined ||
-        (answer.text_answer !== undefined && answer.text_answer.trim() !== '')
-      );
-      setHasAnswered(hasActualAnswer);
-    }
-  }, [currentQuestion, getUserAnswer]);
+    // Check if answer exists AND has actual content (not just empty/undefined values)
+    const hasActualAnswer = !!currentUserAnswer && (
+      currentUserAnswer.selected_option_id !== undefined ||
+      (currentUserAnswer.text_answer !== undefined && currentUserAnswer.text_answer.trim() !== '')
+    );
+    setHasAnswered(hasActualAnswer);
+  }, [currentUserAnswer]);
 
   // Validate slug
   if (!slug || slug.trim() === '') {
@@ -127,7 +136,20 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   ) => {
     if (!currentQuestion) return;
 
-    handleSubmitAnswer(answer);
+    // Create complete answer with question_id here, not in hook
+    // This avoids stale closure issues
+    const completeAnswer = {
+      ...answer,
+      question_id: currentQuestion.id,
+      answered_at: new Date().toISOString(),
+    };
+
+    console.log("handleAnswerSubmit:", {
+      questionId: completeAnswer.question_id,
+      selectedOptionId: completeAnswer.selected_option_id,
+    });
+
+    handleSubmitAnswer(completeAnswer as import("../do-quiz/types/quiz.types").UserAnswer);
 
     // Check if answer actually has content (support for toggle/deselect)
     const hasActualAnswer =
@@ -271,6 +293,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
           />
 
           <AnswerOptions
+            key={currentQuestion.id}
             question={currentQuestion}
             userAnswer={currentUserAnswer}
             onAnswerSelect={handleAnswerSubmit}
