@@ -2,10 +2,10 @@
 
 import React from "react";
 import { QuizResult, Question, UserAnswer } from "../types/quiz.types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/common/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/common/components/ui/card";
 import { Button } from "@/common/components/ui/button";
 import { Badge } from "@/common/components/ui/badge";
-import { CheckCircle2, XCircle, Trophy, Clock, Target, RotateCcw, Star, Share2, Home, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, XCircle, Trophy, Clock, RotateCcw, Home, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { APP_ROUTES } from "@/lib/appRoutes";
@@ -23,13 +23,12 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   questions = [],
   userAnswers = [],
   onRetakeQuiz,
-  onViewAnswers,
 }) => {
   const router = useRouter();
   const [showDetails, setShowDetails] = React.useState(true);
 
-  // Calculate stats locally from questions and userAnswers
-  const calculatedStats = React.useMemo(() => {
+  // Calculate stats locally
+  const stats = React.useMemo(() => {
     let correctCount = 0;
     let totalScore = 0;
     let maxScore = 0;
@@ -49,45 +48,37 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
     const totalQuestions = questions.length || result.total_questions;
     const percentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-    const passed = percentage >= 60; // 60% to pass
+    const passed = percentage >= 60;
 
     return {
-      correct_answers: correctCount,
-      total_questions: totalQuestions,
-      total_score: totalScore,
-      max_score: maxScore,
+      correct: correctCount,
+      wrong: totalQuestions - correctCount,
+      total: totalQuestions,
+      score: totalScore,
+      maxScore,
       percentage,
       passed,
-      time_spent: result.time_spent || 0,
+      time: result.time_spent || 0,
     };
   }, [questions, userAnswers, result]);
 
-  // Use calculated stats if we have questions data, otherwise fallback to result
-  const stats = questions.length > 0 ? calculatedStats : result;
-
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-
-    if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
-    if (minutes > 0) return `${minutes}m ${secs}s`;
+    if (mins > 0) return `${mins}m ${secs}s`;
     return `${secs}s`;
   };
 
-  const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return "text-green-500 shadow-green-500/20";
-    if (percentage >= 60) return "text-yellow-500 shadow-yellow-500/20";
-    return "text-destructive shadow-destructive/20";
+  const getGrade = (percentage: number) => {
+    if (percentage >= 90) return { grade: "A+", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900" };
+    if (percentage >= 80) return { grade: "A", color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-900" };
+    if (percentage >= 70) return { grade: "B", color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900" };
+    if (percentage >= 60) return { grade: "C", color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-900" };
+    if (percentage >= 50) return { grade: "D", color: "text-orange-600", bg: "bg-orange-100 dark:bg-orange-900" };
+    return { grade: "F", color: "text-rose-600", bg: "bg-rose-100 dark:bg-rose-900" };
   };
 
-  const getScoreMessage = (percentage: number) => {
-    if (percentage >= 90) return "Legendary! You're a quiz master! 🎉";
-    if (percentage >= 80) return "Brilliant! Almost perfect! 👏";
-    if (percentage >= 70) return "Solid effort! Good job! 👍";
-    if (percentage >= 60) return "Decent, but you can do better! 💪";
-    return "Time to hit the books again! 📚";
-  };
+  const gradeInfo = getGrade(stats.percentage);
 
   const getUserAnswerForQuestion = (questionId: string) => {
     return userAnswers.find(a => a.question_id === questionId);
@@ -103,180 +94,180 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-8 animate-in fade-in zoom-in-95 duration-700">
-      {/* Summary Card */}
-      <Card className="overflow-hidden border-none shadow-2xl bg-card/50 backdrop-blur-md">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-violet-500 to-primary" />
+    <div className="max-w-3xl mx-auto p-4 space-y-6">
+      {/* Header */}
+      <div className="text-center space-y-4">
+        <div className={cn(
+          "inline-flex items-center justify-center w-20 h-20 rounded-full",
+          stats.passed ? "bg-emerald-100 dark:bg-emerald-900" : "bg-rose-100 dark:bg-rose-900"
+        )}>
+          <Trophy className={cn(
+            "w-10 h-10",
+            stats.passed ? "text-emerald-600" : "text-rose-600"
+          )} />
+        </div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Quiz Completed!</h1>
+        <Badge
+          className={cn(
+            "text-base px-5 py-1.5 font-semibold",
+            stats.passed
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+              : "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300 border-rose-200 dark:border-rose-800"
+          )}
+          variant="outline"
+        >
+          {stats.passed ? "🎉 PASSED" : "😢 FAILED"}
+        </Badge>
+      </div>
 
-        <CardHeader className="text-center pt-12 pb-8">
-          <div className="relative inline-block mb-6">
-            <div className="w-24 h-24 mx-auto rounded-3xl bg-primary/10 flex items-center justify-center animate-bounce shadow-xl">
-              <Trophy className="w-12 h-12 text-primary" />
-            </div>
-            <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center animate-pulse">
-              <Star className="w-5 h-5 text-white fill-white" />
-            </div>
-          </div>
-          <CardTitle className="text-4xl font-black tracking-tighter sm:text-5xl">Quiz Completed!</CardTitle>
-          <CardDescription className="text-xl font-medium mt-4 text-muted-foreground">{getScoreMessage(stats.percentage)}</CardDescription>
-        </CardHeader>
-
-        <CardContent className="px-6 md:px-12 pb-12 space-y-10">
-          {/* Main Score Display */}
-          <div className="relative group p-10 rounded-3xl bg-muted/30 border border-border/50 text-center overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 opacity-50" />
-
-            <div className={cn(
-              "text-7xl md:text-8xl font-black tracking-tighter mb-4 drop-shadow-2xl transition-transform duration-500 group-hover:scale-110",
-              getScoreColor(stats.percentage)
-            )}>
-              {stats.percentage}%
-            </div>
-
-            <div className="flex flex-col gap-2 relative z-10">
-              <p className="text-xl font-bold text-foreground">
-                Score: <span className="text-primary">{stats.correct_answers}</span> / {stats.total_questions}
-              </p>
-              <Badge variant="outline" className="mx-auto px-4 py-1.5 rounded-full bg-background/50 border-primary/20 backdrop-blur-md">
-                Total points: {stats.total_score}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Detailed Stats Cards */}
+      {/* Score Card */}
+      <Card className="border shadow-lg bg-white dark:bg-gray-900">
+        <CardContent className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { icon: CheckCircle2, label: "Correct", value: stats.correct_answers, color: "text-green-500", bg: "bg-green-500/10" },
-              { icon: XCircle, label: "Wrong", value: stats.total_questions - stats.correct_answers, color: "text-red-500", bg: "bg-red-500/10" },
-              { icon: Clock, label: "Time Taken", value: formatTime(stats.time_spent), color: "text-blue-500", bg: "bg-blue-500/10" },
-              { icon: Target, label: "Status", value: stats.passed ? "PASSED" : "FAILED", color: stats.passed ? "text-green-500" : "text-destructive", bg: stats.passed ? "bg-green-500/10" : "bg-destructive/10" }
-            ].map((stat, i) => (
-              <div key={i} className="p-4  bg-card border border-border shadow-sm flex flex-col items-center justify-center gap-2 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-                <div className={cn("p-2 rounded-xl mb-1", stat.bg)}>
-                  <stat.icon className={cn("w-5 h-5", stat.color)} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{stat.label}</span>
-                <span className="text-lg font-bold text-foreground">{stat.value}</span>
+            {/* Grade */}
+            <div className={cn("text-center p-4 rounded-xl", gradeInfo.bg)}>
+              <div className={cn("text-4xl font-black mb-1", gradeInfo.color)}>
+                {gradeInfo.grade}
               </div>
-            ))}
+              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Grade</div>
+            </div>
+
+            {/* Percentage */}
+            <div className="text-center p-4 rounded-xl bg-indigo-100 dark:bg-indigo-900">
+              <div className="text-4xl font-black text-indigo-600 dark:text-indigo-400 mb-1">
+                {stats.percentage}%
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Score</div>
+            </div>
+
+            {/* Correct/Wrong */}
+            <div className="text-center p-4 rounded-xl bg-violet-100 dark:bg-violet-900">
+              <div className="text-3xl font-black mb-1">
+                <span className="text-emerald-600 dark:text-emerald-400">{stats.correct}</span>
+                <span className="text-gray-400 mx-1">/</span>
+                <span className="text-rose-600 dark:text-rose-400">{stats.wrong}</span>
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Right / Wrong</div>
+            </div>
+
+            {/* Time */}
+            <div className="text-center p-4 rounded-xl bg-cyan-100 dark:bg-cyan-900">
+              <div className="text-3xl font-black text-cyan-600 dark:text-cyan-400 mb-1">
+                {formatTime(stats.time)}
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Time</div>
+            </div>
           </div>
 
-          {/* Action Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-            <Button onClick={onRetakeQuiz} variant="outline" size="lg" className="h-14 font-bold border-2 hover:bg-muted group">
-              <RotateCcw className="w-5 h-5 mr-3 group-hover:rotate-180 transition-transform duration-500" />
-              Try Again
-            </Button>
-            <Button variant="outline" size="lg" className="h-14 font-bold border-2 hover:bg-muted" onClick={() => router.push(APP_ROUTES.HOME)}>
-              <Home className="w-5 h-5 mr-3" />
-              Home
-            </Button>
-            <Button size="lg" className="h-14  font-black bg-primary text-primary-foreground shadow-xl shadow-primary/20 hover:scale-105 transition-all">
-              <Share2 className="w-5 h-5 mr-3" />
-              Share result
-            </Button>
+          {/* Points */}
+          <div className="mt-4 text-center">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 font-semibold text-sm">
+              ⭐ Points: {stats.score} / {stats.maxScore}
+            </span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Questions Review Section */}
+      {/* Actions */}
+      <div className="grid grid-cols-2 gap-3">
+        <Button
+          onClick={onRetakeQuiz}
+          variant="outline"
+          size="lg"
+          className="h-12 font-semibold border-2 hover:bg-violet-50 dark:hover:bg-violet-950 hover:border-violet-300 dark:hover:border-violet-700"
+        >
+          <RotateCcw className="w-4 h-4 mr-2" />
+          Try Again
+        </Button>
+        <Button
+          onClick={() => router.push(APP_ROUTES.HOME)}
+          size="lg"
+          className="h-12 font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          <Home className="w-4 h-4 mr-2" />
+          Go Home
+        </Button>
+      </div>
+
+      {/* Answer Review */}
       {questions.length > 0 && (
-        <Card className="overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-4">
-            <div>
-              <CardTitle className="text-2xl font-bold">Answer Review</CardTitle>
-              <CardDescription>See how you answered each question</CardDescription>
+        <Card className="border shadow-lg bg-white dark:bg-gray-900">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">📝 Answer Review</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDetails(!showDetails)}
+                className="h-8 px-3"
+              >
+                {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                <span className="ml-1 text-xs">{showDetails ? "Hide" : "Show"}</span>
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDetails(!showDetails)}
-              className="rounded-xl"
-            >
-              {showDetails ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-            </Button>
           </CardHeader>
 
           {showDetails && (
-            <CardContent className="space-y-4 pb-8">
+            <CardContent className="pt-0 space-y-3">
               {questions.map((question, index) => {
                 const userAnswer = getUserAnswerForQuestion(question.id);
                 const correctOption = getCorrectOption(question);
                 const selectedOption = getSelectedOption(question, userAnswer);
-                const isCorrect = userAnswer?.is_correct || false;
+                const isCorrect = selectedOption?.is_correct || false;
                 const wasAnswered = !!selectedOption;
 
                 return (
                   <div
                     key={question.id}
                     className={cn(
-                      "p-5  border-2 transition-all",
+                      "p-4 rounded-xl border-2 transition-all",
                       isCorrect
-                        ? "border-green-500/30 bg-green-500/5"
+                        ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/50"
                         : wasAnswered
-                          ? "border-red-500/30 bg-red-500/5"
-                          : "border-yellow-500/30 bg-yellow-500/5"
+                          ? "border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/50"
+                          : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50"
                     )}
                   >
                     {/* Question Header */}
-                    <div className="flex items-start gap-3 mb-3">
+                    <div className="flex items-start gap-3">
                       <div className={cn(
-                        "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
-                        isCorrect
-                          ? "bg-green-500 text-white"
-                          : wasAnswered
-                            ? "bg-red-500 text-white"
-                            : "bg-yellow-500 text-white"
+                        "flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold",
+                        isCorrect ? "bg-emerald-500" : wasAnswered ? "bg-rose-500" : "bg-amber-500"
                       )}>
-                        {isCorrect ? (
-                          <CheckCircle2 className="w-5 h-5" />
-                        ) : wasAnswered ? (
-                          <XCircle className="w-5 h-5" />
-                        ) : (
-                          <span className="text-sm font-bold">?</span>
-                        )}
+                        {index + 1}
                       </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                          Question {index + 1}
-                        </p>
-                        <p className="font-semibold text-foreground">{question.content}</p>
-                      </div>
-                      <Badge variant="outline" className={cn(
-                        "text-xs",
-                        isCorrect ? "text-green-600 border-green-500" : wasAnswered ? "text-red-600 border-red-500" : "text-yellow-600 border-yellow-500"
-                      )}>
-                        {isCorrect ? "Correct" : wasAnswered ? "Wrong" : "Skipped"}
-                      </Badge>
-                    </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-900 dark:text-white">{question.content}</p>
 
-                    {/* Answers */}
-                    <div className="ml-11 space-y-2">
-                      {wasAnswered && !isCorrect && selectedOption && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                          <span className="text-red-600 dark:text-red-400">Your answer: {selectedOption.content}</span>
+                        {/* Answers */}
+                        <div className="mt-2 space-y-1 text-xs">
+                          {wasAnswered && !isCorrect && selectedOption && (
+                            <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Your answer: <strong>{selectedOption.content}</strong></span>
+                            </div>
+                          )}
+                          {correctOption && (
+                            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Correct: <strong>{correctOption.content}</strong></span>
+                            </div>
+                          )}
+                          {!wasAnswered && (
+                            <div className="text-amber-600 dark:text-amber-400 italic">
+                              ⚠️ Question was skipped
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {correctOption && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span className="text-green-600 dark:text-green-400">Correct answer: {correctOption.content}</span>
-                        </div>
-                      )}
-                      {!wasAnswered && (
-                        <div className="text-sm text-yellow-600 dark:text-yellow-400 italic">
-                          You didn't answer this question
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Explanation */}
-                    {question.explanation && (
-                      <div className="mt-3 ml-11 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-                        <strong>Explanation:</strong> {question.explanation}
                       </div>
-                    )}
+
+                      {/* Status Icon */}
+                      {isCorrect ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                      ) : wasAnswered ? (
+                        <XCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
+                      ) : null}
+                    </div>
                   </div>
                 );
               })}
@@ -289,4 +280,3 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 };
 
 export default QuizResults;
-

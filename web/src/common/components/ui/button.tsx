@@ -66,12 +66,12 @@ function Button({
 
   return (
     <div
-      className={cn("relative group inline-block", widthClass)}
+      className={cn("relative group/button inline-block", widthClass)}
       style={{ overflow: "visible" }}
     >
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
       <div
-        className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active:bottom-0 group-active:right-0 -z-10"
+        className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active/button:bottom-0 group-active/button:right-0 -z-10"
         style={{ overflow: "visible" }}
       />
       <div
