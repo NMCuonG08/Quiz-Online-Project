@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuiz } from "../do-quiz/hooks/useQuiz";
 import {
@@ -190,14 +190,19 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   // Handle retry
   const handleRetry = () => {
     clearQuizError();
+    hasStartedQuizRef.current = false; // Reset to allow retry
     if (slug) {
       startQuiz();
     }
   };
 
+  // Ref to prevent duplicate startQuiz calls (React StrictMode)
+  const hasStartedQuizRef = useRef(false);
+
   // Start quiz when questions are loaded
   useEffect(() => {
-    if (questions.length > 0 && !isQuizStarted && !loading && !error) {
+    if (questions.length > 0 && !isQuizStarted && !loading && !error && !hasStartedQuizRef.current) {
+      hasStartedQuizRef.current = true;
       startQuiz();
     }
   }, [questions, isQuizStarted, loading, error, startQuiz]);

@@ -61,6 +61,9 @@ export const apiRoutes = {
     COMPLETE_PUBLIC: (sessionId: string) =>
       `/api/quiz-sessions/${sessionId}/complete/public`,
     GET_RESULT: (sessionId: string) => `/api/quiz-sessions/${sessionId}/result`,
+    USER_HISTORY: "/api/quiz-sessions/user/history",
+    USER_IN_PROGRESS: "/api/quiz-sessions/user/in-progress",
+    USER_ALL_ATTEMPTS: "/api/quiz-sessions/user/all-attempts",
   },
   AUTH: {
     LOGIN: "/api/auth/login",

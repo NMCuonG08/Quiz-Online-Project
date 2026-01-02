@@ -212,8 +212,10 @@ export const useQuiz = (slug: string) => {
   }, [handleSubmitAnswer]);
 
   const startQuiz = useCallback(async () => {
+    console.log('🚀 startQuiz called for slug:', slug);
     try {
-      await dispatch(startQuizSession(slug)).unwrap();
+      const result = await dispatch(startQuizSession(slug)).unwrap();
+      console.log('✅ Quiz session started:', result);
       dispatch(setTimerActive(true));
     } catch (error) {
       console.error("Failed to start quiz:", error);
@@ -267,14 +269,20 @@ export const useQuiz = (slug: string) => {
   ]);
 
   const handleCompleteQuiz = useCallback(async () => {
-    if (!session) return;
+    console.log('🏁 handleCompleteQuiz called, session:', session);
+    if (!session) {
+      console.error('❌ Cannot complete quiz: session is null');
+      return;
+    }
 
     try {
       // Submit current answer before completing
       await submitCurrentAnswer();
       
       dispatch(setTimerActive(false));
+      console.log('📤 Calling completeQuiz with sessionId:', session.id);
       await dispatch(completeQuiz(session.id)).unwrap();
+      console.log('✅ Quiz completed successfully');
       
       // Clear localStorage after successful completion
       if (slug) {

@@ -152,4 +152,172 @@ export class QuizService {
       );
     }
   }
+
+  static async getUserQuizHistory(
+    page = 1,
+    limit = 10
+  ): Promise<QuizHistoryResponse> {
+    try {
+      const response = await apiClient.get(
+        `${apiRoutes.QUIZ_SESSIONS.USER_HISTORY}?page=${page}&limit=${limit}`
+      );
+      const responseData = response.data;
+      // Handle both { data, meta } and direct response
+      const data = Array.isArray(responseData?.data) ? responseData.data : [];
+      const meta = responseData?.meta;
+      return {
+        success: true,
+        data,
+        meta,
+      };
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: unknown } };
+      return (
+        (err.response?.data as QuizHistoryResponse) || {
+          success: false,
+          message: "Failed to fetch quiz history",
+          data: [],
+        }
+      );
+    }
+  }
+
+  static async getUserInProgressQuizzes(): Promise<InProgressQuizzesResponse> {
+    try {
+      const response = await apiClient.get(
+        apiRoutes.QUIZ_SESSIONS.USER_IN_PROGRESS
+      );
+      // Handle both direct array and wrapped response
+      const responseData = response.data;
+      const data = Array.isArray(responseData) 
+        ? responseData 
+        : (responseData?.data ?? []);
+      return {
+        success: true,
+        data,
+      };
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: unknown } };
+      return (
+        (err.response?.data as InProgressQuizzesResponse) || {
+          success: false,
+          message: "Failed to fetch in-progress quizzes",
+          data: [],
+        }
+      );
+    }
+  }
+
+  static async getAllUserAttempts(
+    page = 1,
+    limit = 10
+  ): Promise<AllAttemptsResponse> {
+    try {
+      const response = await apiClient.get(
+        `${apiRoutes.QUIZ_SESSIONS.USER_ALL_ATTEMPTS}?page=${page}&limit=${limit}`
+      );
+      // Response is wrapped: { success, statusCode, message, data: { data: [...], meta: {...} } }
+      const responseData = response.data?.data || response.data;
+      const data = Array.isArray(responseData?.data) ? responseData.data : (Array.isArray(responseData) ? responseData : []);
+      const meta = responseData?.meta;
+      return {
+        success: true,
+        data,
+        meta,
+      };
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: unknown } };
+      return (
+        (err.response?.data as AllAttemptsResponse) || {
+          success: false,
+          message: "Failed to fetch all attempts",
+          data: [],
+        }
+      );
+    }
+  }
 }
+
+// Additional types for history
+export interface QuizHistoryItem {
+  id: string;
+  quiz_id: string;
+  quiz_title: string;
+  quiz_slug: string;
+  quiz_thumbnail: string | null;
+  category_name: string | null;
+  total_questions: number;
+  correct_answers: number;
+  score: number;
+  max_score: number;
+  percentage: number;
+  passed: boolean;
+  time_taken: number | null;
+  completed_at: string | null;
+  attempt_number: number;
+}
+
+export interface QuizHistoryResponse {
+  success: boolean;
+  data?: QuizHistoryItem[];
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  message?: string;
+}
+
+export interface InProgressQuiz {
+  id: string;
+  quiz_id: string;
+  quiz_title: string;
+  quiz_slug: string;
+  quiz_thumbnail: string | null;
+  total_questions: number;
+  answered_questions: number;
+  started_at: string;
+}
+
+export interface InProgressQuizzesResponse {
+  success: boolean;
+  data?: InProgressQuiz[];
+  message?: string;
+}
+
+// Combined attempt type (both IN_PROGRESS and COMPLETED)
+export interface QuizAttemptItem {
+  id: string;
+  quiz_id: string;
+  quiz_title: string;
+  quiz_slug: string;
+  quiz_thumbnail: string | null;
+  category_name: string | null;
+  total_questions: number;
+  answered_questions: number;
+  correct_answers: number;
+  score: number;
+  max_score: number;
+  percentage: number;
+  passed: boolean;
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
+  time_taken: number | null;
+  started_at: string;
+  completed_at: string | null;
+  attempt_number: number;
+}
+
+export interface AllAttemptsResponse {
+  success: boolean;
+  data?: QuizAttemptItem[];
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  message?: string;
+}
+
+
