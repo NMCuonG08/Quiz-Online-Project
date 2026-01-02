@@ -11,7 +11,7 @@ import { Button } from "@/common/components/ui/button";
 import { Progress } from "@/common/components/ui/progress";
 import { Badge } from "@/common/components/ui/badge";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { APP_ROUTES } from "@/lib/appRoutes";
 import {
   QuizService,
@@ -26,16 +26,32 @@ import {
   Clock,
   Trophy,
   RotateCcw,
+
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/common/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const HistoryQuizes = () => {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [attempts, setAttempts] = useState<QuizAttemptItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchAttempts = async () => {
@@ -63,9 +79,9 @@ const HistoryQuizes = () => {
 
   const handleQuizAction = (quizSlug: string, status: string) => {
     if (status === "IN_PROGRESS") {
-      router.push(`${APP_ROUTES.QUIZ.LIST}/${quizSlug}/do-quiz`);
+      router.push(APP_ROUTES.QUIZ.DO_QUIZ(quizSlug));
     } else {
-      router.push(`${APP_ROUTES.QUIZ.LIST}/${quizSlug}`);
+      router.push(APP_ROUTES.QUIZ.DETAIL(quizSlug));
     }
   };
 
@@ -74,6 +90,23 @@ const HistoryQuizes = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
+  };
+
+  const handleDeleteAttempt = async () => {
+    if (!deletingId) return;
+    setIsDeleting(true);
+    try {
+      await QuizService.deleteAttempt(deletingId);
+      setAttempts((prev) => prev.filter((a) => a.id !== deletingId));
+      setTotal((prev) => prev - 1);
+      toast.success("Attempt deleted successfully");
+    } catch (error) {
+      console.error("Failed to delete attempt:", error);
+      toast.error("Failed to delete attempt");
+    } finally {
+      setIsDeleting(false);
+      setDeletingId(null);
+    }
   };
 
   if (loading) {
@@ -251,12 +284,14 @@ const HistoryQuizes = () => {
                     </div>
                   )}
 
+
                   {/* Actions */}
                   <div className="flex items-center gap-2 mt-3">
                     <Button
                       size="sm"
                       variant={isInProgress ? "default" : "outline"}
                       className="h-7 text-xs gap-1.5"
+                      disableShadow
                       onClick={(e) => {
                         e.stopPropagation();
                         handleQuizAction(attempt.quiz_slug, attempt.status);
@@ -274,8 +309,20 @@ const HistoryQuizes = () => {
                         </>
                       )}
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                      disableShadow
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingId(attempt.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                     {attempt.attempt_number > 1 && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground ml-auto">
                         Attempt #{attempt.attempt_number}
                       </span>
                     )}
@@ -298,6 +345,41 @@ const HistoryQuizes = () => {
           </Button>
         </div>
       )}
+
+      <AlertDialog
+        open={!!deletingId}
+        onOpenChange={(open) => !open && !isDeleting && setDeletingId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Attempt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your quiz
+              attempt and remove it from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteAttempt();
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 };

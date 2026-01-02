@@ -128,7 +128,7 @@ const NavBarLaptop = () => {
             </DropdownMenu>
           ) : (
             <LocalizedLink href="/auth/login">
-              <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground transition-colors">
+              <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground text-black dark:text-white transition-colors">
                 {tAuth("signIn")}
               </Button>
             </LocalizedLink>

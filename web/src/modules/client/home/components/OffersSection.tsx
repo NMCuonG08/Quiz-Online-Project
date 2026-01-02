@@ -41,7 +41,7 @@ const OffersSection = () => {
       variant="elevated"
       size="xl"
       rounded="xl"
-      className=" py-16 px-4 sm:px-8 lg:px-12 bg-[#FFF5F5] dark:bg-gray-dark border border-border w-full"
+      className=" py-16 px-4 sm:px-8 lg:px-12 bg-[#FFF5F5] dark:bg-gray-dark  w-full"
     >
       <div className="max-w-7xl mx-auto">
         {/* Header with title and SVG stars */}

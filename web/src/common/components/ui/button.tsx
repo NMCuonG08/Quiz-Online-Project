@@ -44,10 +44,12 @@ function Button({
   variant,
   size,
   asChild = false,
+  disableShadow = false,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    disableShadow?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
 
@@ -70,14 +72,16 @@ function Button({
       style={{ overflow: "visible" }}
     >
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
-      <div
-        className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active/button:bottom-0 group-active/button:right-0 -z-10"
-        style={{ overflow: "visible" }}
-      />
+      {!disableShadow && (
+        <div
+          className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active/button:bottom-0 group-active/button:right-0 -z-10"
+          style={{ overflow: "visible" }}
+        />
+      )}
       <div
         className={cn(
           "absolute inset-0 rounded-md bg-white dark:bg-black -z-[5]",
-          variant === "link" && "hidden"
+          (variant === "link" || variant === "ghost") && "hidden"
         )}
       />
       <Comp

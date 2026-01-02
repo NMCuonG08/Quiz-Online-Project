@@ -236,6 +236,17 @@ export class QuizService {
       );
     }
   }
+
+  static async deleteAttempt(attemptId: string) {
+    try {
+      const response = await apiClient.delete(
+        apiRoutes.QUIZ_SESSIONS.DELETE_ATTEMPT(attemptId)
+      );
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 // Additional types for history

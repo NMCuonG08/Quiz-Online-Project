@@ -239,10 +239,43 @@ const quizSlice = createSlice({
       .addCase(startQuizSession.fulfilled, (state, action) => {
         state.loading = false;
         state.session = action.payload;
+        
+        // If resuming, populate existing answers
+        if (action.payload.answers && action.payload.answers.length > 0) {
+          state.userAnswers = action.payload.answers.map((a: any) => ({
+             question_id: a.question_id,
+             selected_option_id: a.selected_option_id,
+             text_answer: a.text_answer,
+             answered_at: new Date().toISOString(), // Fallback time
+             is_correct: false, // Default, not shown explicitly during quiz
+             points_earned: 0, // Default
+             time_spent: 0 // Default
+          }));
+          
+          // Set current question to the next unanswered one
+          // Find first question that doesn't have an answer
+          const firstUnansweredIndex = state.questions.findIndex(
+            q => !state.userAnswers.some(a => a.question_id === q.id)
+          );
+          
+          // If found, go to that index. If all answered, go to last one.
+          state.currentQuestionIndex = firstUnansweredIndex !== -1 
+            ? firstUnansweredIndex 
+            : Math.min(state.userAnswers.length, state.questions.length - 1);
+            
+        } else {
+          // New session
+          state.userAnswers = [];
+          state.currentQuestionIndex = 0;
+        }
+
         state.isQuizStarted = true;
-        state.progress.current_question = 1;
+        
+        // Update progress based on current index
+        const currentQ = state.currentQuestionIndex + 1;
+        state.progress.current_question = currentQ;
         state.progress.percentage = Math.round(
-          (1 / state.questions.length) * 100
+          (currentQ / (state.questions.length || 1)) * 100
         );
       })
       .addCase(startQuizSession.rejected, (state, action) => {

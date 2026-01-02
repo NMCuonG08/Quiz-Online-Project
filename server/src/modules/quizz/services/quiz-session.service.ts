@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { AttemptStatus } from '@prisma/client';
 import { BaseService } from '@/common/base/base.service';
 import { CreateQuizSessionDto } from '../dtos/create-quiz-session.dto';
 import { QuizRepository } from '../repositories/quiz.repository';
@@ -66,7 +67,8 @@ export class QuizSessionService extends BaseService {
 
   async startSession(userId: string | undefined, dto: CreateQuizSessionDto) {
     let targetUserId = userId;
-    console.log(targetUserId);
+    console.log('🚀 startSession called with:', { userId, dto });
+    
     // Fallback: If no userId (public session), use the first user in the DB
     if (!targetUserId) {
       const user = await this.prisma.user.findFirst({ select: { id: true } });
@@ -74,6 +76,7 @@ export class QuizSessionService extends BaseService {
         throw new NotFoundException('No users found in system to assign session');
       }
       targetUserId = user.id;
+      console.log('⚠️ No userId provided, falling back to system user:', targetUserId);
     }
 
     let quizId = dto.quiz_id;
@@ -89,6 +92,50 @@ export class QuizSessionService extends BaseService {
     if (!quizId) {
       throw new NotFoundException('Quiz identifier missing');
     }
+    
+    console.log('🔍 Checking for existing attempt:', { quizId, targetUserId });
+
+    // Check for existing IN_PROGRESS attempt
+    const existingAttempt = await this.prisma.quizAttempt.findFirst({
+      where: {
+        quiz_id: quizId,
+        user_id: targetUserId,
+        status: 'IN_PROGRESS' as AttemptStatus,
+      },
+      include: {
+        quiz: {
+          include: {
+            _count: {
+              select: { questions: true },
+            },
+          },
+        },
+        responses: true,
+      },
+    });
+
+    if (existingAttempt) {
+      console.log('✅ [Service] Found existing attempt:', existingAttempt.id);
+      // Resume existing session
+      return {
+        id: existingAttempt.id,
+        quiz_id: existingAttempt.quiz_id,
+        user_id: existingAttempt.user_id,
+        started_at: existingAttempt.started_at.toISOString(),
+        current_question_index: existingAttempt.responses.length, // Rough estimate, frontend handles actual navigation
+        total_questions: existingAttempt.quiz?._count?.questions || 0,
+        score: existingAttempt.score,
+        time_spent: existingAttempt.time_taken || 0,
+        answers: existingAttempt.responses.map(r => ({
+          question_id: r.question_id,
+          selected_option_id: r.selected_options[0] || undefined,
+          text_answer: r.text_answer
+        })),
+        is_resume: true
+      };
+    }
+    
+    console.log('⚠️ No existing attempt found, creating new one.');
 
     // Determine next attempt number
     const lastAttempt = await this.prisma.quizAttempt.findFirst({
@@ -128,6 +175,7 @@ export class QuizSessionService extends BaseService {
       score: 0,
       time_spent: 0,
       answers: [],
+      is_resume: false
     };
   }
 
@@ -443,5 +491,25 @@ export class QuizSessionService extends BaseService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async deleteAttempt(userId: string, attemptId: string) {
+    const attempt = await this.prisma.quizAttempt.findUnique({
+      where: { id: attemptId },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException('Attempt not found');
+    }
+
+    if (attempt.user_id !== userId) {
+      throw new NotFoundException('Attempt not found'); // Hide existence if not owner
+    }
+
+    await this.prisma.quizAttempt.delete({
+      where: { id: attemptId },
+    });
+
+    return { success: true, message: 'Attempt deleted successfully' };
   }
 }

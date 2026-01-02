@@ -28,7 +28,7 @@ function Card({ className, disableHover, tightShadow, ...props }: CardProps) {
       <div
         data-slot="card"
         className={cn(
-          "bg-white dark:bg-gray-dark border-border p-4 text-card-foreground flex flex-col gap-6 rounded-xl border-1 py-6 relative z-10 transition-all duration-300",
+          "bg-white dark:bg-gray-dark border-black dark:border-white p-4 text-card-foreground flex flex-col gap-6 rounded-xl border py-6 relative z-10 transition-all duration-300",
           contentHover,
           className
         )}

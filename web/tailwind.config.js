@@ -65,11 +65,14 @@ module.exports = {
           foreground: 'hsl(var(--destructive-foreground))',
         },
         green: {
-          DEFAULT: "#EFF4FB",
+          DEFAULT: "#5fd5cb",
           1: "#F3F4F6",
         },
         yellow: {
-          DEFAULT: "#FDD239",
+          DEFAULT: "#f5de74",
+        },
+        red: {
+          DEFAULT: "#f44837b5",
         },
         gray: {
           DEFAULT: "#EFF4FB",

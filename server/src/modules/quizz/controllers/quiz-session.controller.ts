@@ -7,6 +7,7 @@ import {
   Get,
   Param,
   Query,
+  Delete,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { QuizSessionService } from '../services/quiz-session.service';
@@ -97,13 +98,24 @@ export class QuizSessionController {
     try {
       const authHeader = req.headers?.authorization;
       if (!authHeader?.startsWith('Bearer ')) {
+        console.log('⚠️ [ExtractUser] No Bearer token found');
         return req.user?.user?.id;
       }
       const token = authHeader.substring(7);
-      // Decode JWT payload without verification (user validation happens in service)
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-      return payload.sub || payload.userId || payload.id;
-    } catch {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+         console.warn('⚠️ [ExtractUser] Invalid token format (not 3 parts)');
+         return req.user?.user?.id;
+      }
+      const base64Payload = parts[1].replace(/-/g, '+').replace(/_/g, '/'); // Convert URL-safe base64
+      const paddedPayload = base64Payload.padEnd(base64Payload.length + (4 - base64Payload.length % 4) % 4, '=');
+      
+      const payload = JSON.parse(Buffer.from(paddedPayload, 'base64').toString());
+      const userId = payload.sub || payload.userId || payload.id;
+      console.log('🔑 [ExtractUser] Extracted UserID:', userId);
+      return userId;
+    } catch (e) {
+      console.error('❌ [ExtractUser] Error extracting user:', e);
       return req.user?.user?.id;
     }
   }
@@ -128,5 +140,13 @@ export class QuizSessionController {
   @ApiOperation({ summary: 'Get session result' })
   async getResult(@Param('sessionId') sessionId: string) {
     return this.quizSessionService.getSessionResult(sessionId);
+  }
+
+  @Delete(':sessionId')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
+  @ApiOperation({ summary: 'Delete quiz session/attempt' })
+  async deleteSession(@Param('sessionId') sessionId: string, @Auth() auth: AuthDto) {
+    return this.quizSessionService.deleteAttempt(auth.user.id, sessionId);
   }
 }

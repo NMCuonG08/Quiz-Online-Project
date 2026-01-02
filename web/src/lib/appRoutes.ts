@@ -12,10 +12,11 @@ export const APP_ROUTES = {
     SETTINGS: "/settings",
   },
   QUIZ: {
-    LIST: "/quizzes",
-    DETAIL: (slug: string) => `/quizzes/${slug}`,
-    PLAY: (slug: string) => `/quizzes/${slug}/play`,
-    RESULT: (sessionId: string) => `/quizzes/result/${sessionId}`,
+    LIST: "/quiz",
+    DETAIL: (slug: string) => `/quiz/${slug}`,
+    PLAY: (slug: string) => `/quiz/${slug}/play`,
+    DO_QUIZ: (slug: string) => `/quiz/${slug}/do-quiz`,
+    RESULT: (sessionId: string) => `/quiz/result/${sessionId}`,
   },
   ADMIN: {
     DASHBOARD: "/admin",

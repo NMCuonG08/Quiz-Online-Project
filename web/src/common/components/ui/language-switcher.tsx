@@ -32,7 +32,7 @@ export function LanguageSwitcher() {
         />
       </div>
 
-      <SelectContent className="shadow-lg shadow-black/5 dark:shadow-black/20 border border-border">
+      <SelectContent className="shadow-lg shadow-black/5 dark:shadow-black/20 border-2 light:border-black dark:border-white">
         <SelectItem value="en">English</SelectItem>
         <SelectItem value="vi">Tiếng Việt</SelectItem>
       </SelectContent>
