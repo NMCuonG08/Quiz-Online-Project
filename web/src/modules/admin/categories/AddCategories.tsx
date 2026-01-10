@@ -13,7 +13,7 @@ import { ArrowLeftIcon } from "@/modules/admin/common/components/icons";
 import { Select } from "@/modules/admin/common/components/select";
 import { cn } from "@/lib/utils";
 import { useAdminCategory } from "./hooks/useAdminCategory";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { categorySchema, type CategoryFormData } from "./schema/category";
 import {
   showError,
@@ -28,7 +28,7 @@ import {
 } from "@/lib/apiError";
 
 const AddCategories = () => {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { categories, getCategories, createCategory } = useAdminCategory();
@@ -117,9 +117,9 @@ const AddCategories = () => {
       const payload = {
         name: data.name,
         slug: data.slug,
-        description: data.description,
+        description: data.description || "",
         isActive: data.isActive,
-        parentId: data.parentId ? Number(data.parentId) : null,
+        parentId: data.parentId && data.parentId.trim() !== "" ? data.parentId : null,
         iconFile: data.iconFile ?? null,
       };
       console.log("[AddCategory] payload:", payload);
@@ -214,15 +214,16 @@ const AddCategories = () => {
             placeholder="Select parent category"
             items={[
               { value: "", label: "No parent" },
-              ...categories
-                .filter((c) => String(c.id) !== watchedValues.parentId)
-                .map((c) => ({
-                  value: String(c.id),
-                  label: c.name,
-                })),
+              ...categories.map((c) => ({
+                value: String(c.id),
+                label: c.name,
+              })),
             ]}
             value={watchedValues.parentId}
-            onChange={(e) => setValue("parentId", e.target.value)}
+            onChange={(e) => setValue("parentId", e.target.value, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })}
             error={errors.parentId?.message}
           />
         </div>

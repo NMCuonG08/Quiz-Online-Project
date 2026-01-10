@@ -210,7 +210,7 @@ const EditQuestionModal: React.FC<Props> = ({
                 )}
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Points</label>
                 <Input
@@ -241,6 +241,9 @@ const EditQuestionModal: React.FC<Props> = ({
                   min="1"
                 />
               </div>
+            </div>
+
+            <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Type</label>
                 <Select

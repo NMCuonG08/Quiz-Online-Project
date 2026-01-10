@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import dayjs from "dayjs";
-import { useRouter } from "@/common/i18n/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import {
   Table,
   TableBody,
@@ -25,7 +25,7 @@ import { showDeleteConfirm, showError, showSuccess } from "@/lib/Notification";
 const ListQuizTable = () => {
   const { quizzes, pagination, loading, error, getQuizzes, deleteQuiz } =
     useAdminQuiz();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
 
@@ -135,10 +135,7 @@ const ListQuizTable = () => {
                     <TableCell className="min-w-[80px] xl:pl-7.5">
                       <div className="flex-shrink-0">
                         <Image
-                          src={
-                            item.thumbnail_url ||
-                            "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
-                          }
+                          src={item.thumbnail_url || "/logo.jpg"}
                           alt={item.title}
                           width={60}
                           height={60}

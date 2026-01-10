@@ -50,6 +50,7 @@ export function mapQuizToResponseDto(quiz: QuizWithRelations): QuizResponseDto {
     published_at: quiz.published_at || undefined,
     instructions: quiz.instructions || undefined,
     // Flattened fields
+    category_id: quiz.category_id || null,
     category_name: quiz.category?.name || null,
     creator_name: quiz.creator?.full_name || quiz.creator?.username || null,
     thumbnail_url: quiz.thumbnail?.url || null,

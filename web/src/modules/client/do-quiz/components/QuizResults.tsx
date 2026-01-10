@@ -7,7 +7,7 @@ import { Button } from "@/common/components/ui/button";
 import { Badge } from "@/common/components/ui/badge";
 import { CheckCircle2, XCircle, Trophy, Clock, RotateCcw, Home, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { APP_ROUTES } from "@/lib/appRoutes";
 
 interface QuizResultsProps {
@@ -24,8 +24,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   userAnswers = [],
   onRetakeQuiz,
 }) => {
-  const router = useRouter();
-  const [showDetails, setShowDetails] = React.useState(true);
+  const router = useLocalizedRouter();
 
   // Calculate stats locally
   const stats = React.useMemo(() => {
@@ -121,7 +120,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
       </div>
 
       {/* Score Card */}
-      <Card className="border shadow-lg bg-white dark:bg-gray-900">
+      <Card className="border shadow-lg bg-card text-card-foreground">
         <CardContent className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Grade */}
@@ -129,7 +128,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
               <div className={cn("text-4xl font-black mb-1", gradeInfo.color)}>
                 {gradeInfo.grade}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Grade</div>
+              <div className="text-xs text-muted-foreground font-semibold uppercase">Grade</div>
             </div>
 
             {/* Percentage */}
@@ -137,7 +136,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
               <div className="text-4xl font-black text-indigo-600 dark:text-indigo-400 mb-1">
                 {stats.percentage}%
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Score</div>
+              <div className="text-xs text-muted-foreground font-semibold uppercase">Score</div>
             </div>
 
             {/* Correct/Wrong */}
@@ -147,7 +146,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                 <span className="text-gray-400 mx-1">/</span>
                 <span className="text-rose-600 dark:text-rose-400">{stats.wrong}</span>
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Right / Wrong</div>
+              <div className="text-xs text-muted-foreground font-semibold uppercase">Right / Wrong</div>
             </div>
 
             {/* Time */}
@@ -155,7 +154,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
               <div className="text-3xl font-black text-cyan-600 dark:text-cyan-400 mb-1">
                 {formatTime(stats.time)}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400 font-semibold uppercase">Time</div>
+              <div className="text-xs text-muted-foreground font-semibold uppercase">Time</div>
             </div>
           </div>
 
@@ -191,88 +190,76 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
       {/* Answer Review */}
       {questions.length > 0 && (
-        <Card className="border shadow-lg bg-white dark:bg-gray-900">
+        <Card className="border shadow-lg bg-card text-card-foreground">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">📝 Answer Review</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDetails(!showDetails)}
-                className="h-8 px-3"
-              >
-                {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                <span className="ml-1 text-xs">{showDetails ? "Hide" : "Show"}</span>
-              </Button>
+              <CardTitle className="text-lg font-bold">📝 Answer Review</CardTitle>
             </div>
           </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            {questions.map((question, index) => {
+              const userAnswer = getUserAnswerForQuestion(question.id);
+              const correctOption = getCorrectOption(question);
+              const selectedOption = getSelectedOption(question, userAnswer);
+              const isCorrect = selectedOption?.is_correct || false;
+              const wasAnswered = !!selectedOption;
 
-          {showDetails && (
-            <CardContent className="pt-0 space-y-3">
-              {questions.map((question, index) => {
-                const userAnswer = getUserAnswerForQuestion(question.id);
-                const correctOption = getCorrectOption(question);
-                const selectedOption = getSelectedOption(question, userAnswer);
-                const isCorrect = selectedOption?.is_correct || false;
-                const wasAnswered = !!selectedOption;
-
-                return (
-                  <div
-                    key={question.id}
-                    className={cn(
-                      "p-4 rounded-xl border-2 transition-all",
-                      isCorrect
-                        ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/50"
-                        : wasAnswered
-                          ? "border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/50"
-                          : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50"
-                    )}
-                  >
-                    {/* Question Header */}
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold",
-                        isCorrect ? "bg-emerald-500" : wasAnswered ? "bg-rose-500" : "bg-amber-500"
-                      )}>
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-gray-900 dark:text-white">{question.content}</p>
-
-                        {/* Answers */}
-                        <div className="mt-2 space-y-1 text-xs">
-                          {wasAnswered && !isCorrect && selectedOption && (
-                            <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
-                              <XCircle className="w-3.5 h-3.5" />
-                              <span>Your answer: <strong>{selectedOption.content}</strong></span>
-                            </div>
-                          )}
-                          {correctOption && (
-                            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Correct: <strong>{correctOption.content}</strong></span>
-                            </div>
-                          )}
-                          {!wasAnswered && (
-                            <div className="text-amber-600 dark:text-amber-400 italic">
-                              ⚠️ Question was skipped
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Status Icon */}
-                      {isCorrect ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                      ) : wasAnswered ? (
-                        <XCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
-                      ) : null}
+              return (
+                <div
+                  key={question.id}
+                  className={cn(
+                    "p-4 rounded-xl border-2 transition-all",
+                    isCorrect
+                      ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/50"
+                      : wasAnswered
+                        ? "border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/50"
+                        : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50"
+                  )}
+                >
+                  {/* Question Header */}
+                  <div className="flex items-start gap-3">
+                    <div className={cn(
+                      "flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold",
+                      isCorrect ? "bg-emerald-500" : wasAnswered ? "bg-rose-500" : "bg-amber-500"
+                    )}>
+                      {index + 1}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{question.content}</p>
+
+                      {/* Answers */}
+                      <div className="mt-2 space-y-1 text-xs">
+                        {wasAnswered && !isCorrect && selectedOption && (
+                          <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Your answer: <strong>{selectedOption.content}</strong></span>
+                          </div>
+                        )}
+                        {correctOption && (
+                          <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Correct: <strong>{correctOption.content}</strong></span>
+                          </div>
+                        )}
+                        {!wasAnswered && (
+                          <div className="text-amber-600 dark:text-amber-400 italic">
+                            ⚠️ Question was skipped
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status Icon */}
+                    {isCorrect ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                    ) : wasAnswered ? (
+                      <XCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
+                    ) : null}
                   </div>
-                );
-              })}
-            </CardContent>
-          )}
+                </div>
+              );
+            })}
+          </CardContent>
         </Card>
       )}
     </div>

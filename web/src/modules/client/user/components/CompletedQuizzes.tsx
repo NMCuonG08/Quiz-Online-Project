@@ -10,7 +10,7 @@ import {
 import { Button } from "@/common/components/ui/button";
 import { Badge } from "@/common/components/ui/badge";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { APP_ROUTES } from "@/lib/appRoutes";
 import {
     QuizService,
@@ -28,7 +28,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 
 const CompletedQuizzes = () => {
-    const router = useRouter();
+    const router = useLocalizedRouter();
     const [quizHistory, setQuizHistory] = useState<QuizHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);

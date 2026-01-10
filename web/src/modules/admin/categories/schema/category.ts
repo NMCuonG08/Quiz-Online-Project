@@ -3,11 +3,11 @@ import { z } from "zod";
 export const categorySchema = z.object({
   name: z.string().min(1, "Category name is required").max(100, "Name must be less than 100 characters"),
   slug: z.string().min(1, "Slug is required").max(100, "Slug must be less than 100 characters"),
-  description: z.string().min(1, "Description is required").max(500, "Description must be less than 500 characters"),
+  description: z.string().max(500, "Description must be less than 500 characters").optional().default(""),
   isActive: z.boolean().default(true),
   iconFile: z.instanceof(File).optional().nullable(),
   iconPreview: z.string().optional().nullable(),
-  parentId: z.string().optional(),
+  parentId: z.string().optional().default(""),
 });
 
 export const createCategorySchema = categorySchema.omit({

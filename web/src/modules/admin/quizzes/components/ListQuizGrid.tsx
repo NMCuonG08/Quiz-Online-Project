@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useRouter } from "@/common/i18n/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { Button } from "@/common/components/ui/button";
 import { Plus } from "lucide-react";
 import { useAdminQuiz } from "../hooks/useAdminQuiz";
@@ -9,7 +9,7 @@ import QuizCard from "./QuizCard";
 
 const ListQuizGrid = () => {
     const { quizzes, pagination, loading, error, getQuizzes } = useAdminQuiz();
-    const router = useRouter();
+    const router = useLocalizedRouter();
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize] = useState(12);
 

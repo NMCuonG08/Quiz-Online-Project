@@ -59,6 +59,9 @@ export class QuizResponseDto {
   instructions?: string;
 
   // Flattened fields
+  @ApiProperty({ description: 'Category ID', required: false })
+  category_id?: string | null;
+
   @ApiProperty({ description: 'Category name' })
   category_name: string | null;
 

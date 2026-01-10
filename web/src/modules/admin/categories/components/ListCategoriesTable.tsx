@@ -19,13 +19,13 @@ import {
 } from "@/modules/admin/common/components/icons";
 import { useAdminCategory } from "../hooks/useAdminCategory";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { showDeleteConfirm, showError, showSuccess } from "@/lib/Notification";
 
 const ListCategoriesTable = () => {
   const { categories, loading, error, getCategories, deleteCategory } =
     useAdminCategory();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   useEffect(() => {
     getCategories();
   }, [getCategories]);
@@ -126,10 +126,7 @@ const ListCategoriesTable = () => {
 
                   <TableCell className="min-w-[155px]">
                     <Image
-                      src={
-                        item.icon_url ||
-                        "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
-                      }
+                      src={item.icon_url || "/logo.jpg"}
                       alt={item.name}
                       width={50}
                       height={50}

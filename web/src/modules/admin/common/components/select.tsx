@@ -2,7 +2,7 @@
 
 import { ChevronUpIcon } from "@/modules/admin/common/components/icons";
 import { cn } from "@/lib/utils";
-import { useId, useState } from "react";
+import { useId, useEffect, useState } from "react";
 
 type PropsType = {
   label: string;
@@ -13,9 +13,9 @@ type PropsType = {
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   error?: string;
 } & (
-  | { placeholder?: string; defaultValue: string }
-  | { placeholder: string; defaultValue?: string }
-);
+    | { placeholder?: string; defaultValue: string }
+    | { placeholder: string; defaultValue?: string }
+  );
 
 export function Select({
   items,
@@ -30,10 +30,17 @@ export function Select({
 }: PropsType) {
   const id = useId();
 
-  const [isOptionSelected, setIsOptionSelected] = useState(false);
+  const currentValue = value !== undefined ? value : defaultValue || "";
+  const [isOptionSelected, setIsOptionSelected] = useState(!!currentValue && currentValue !== "");
+
+  // Update isOptionSelected when value changes
+  useEffect(() => {
+    setIsOptionSelected(!!currentValue && currentValue !== "");
+  }, [currentValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setIsOptionSelected(true);
+    const newValue = e.target.value;
+    setIsOptionSelected(!!newValue && newValue !== "");
     onChange?.(e);
   };
 
@@ -55,26 +62,26 @@ export function Select({
 
         <select
           id={id}
-          value={value !== undefined ? value : defaultValue || ""}
+          value={currentValue}
           onChange={handleChange}
           className={cn(
             "w-full appearance-none rounded-lg border bg-transparent px-5.5 py-3 outline-none transition active:border-primary [&>option]:text-dark-5 dark:[&>option]:text-dark-6 dark:bg-[#122031]",
             error
               ? "border-destructive focus:border-destructive dark:border-destructive"
               : "border-stroke focus:border-primary dark:border-dark-3 dark:focus:border-primary",
-            isOptionSelected && "text-dark dark:text-white",
+            isOptionSelected ? "text-dark dark:text-white" : "text-gray-400 dark:text-gray-500",
             prefixIcon && "pl-11.5"
           )}
           aria-invalid={!!error}
         >
           {placeholder && (
-            <option value="" disabled hidden>
+            <option value="" className="text-gray-400 dark:text-gray-500">
               {placeholder}
             </option>
           )}
 
           {items.map((item) => (
-            <option key={item.value} value={item.value}>
+            <option key={item.value} value={item.value} className="text-dark dark:text-white">
               {item.label}
             </option>
           ))}

@@ -251,11 +251,10 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                                     Mã phòng: {r.room_code}
                                   </div>
                                   <span
-                                    className={`text-xs px-2 py-1 rounded ${
-                                      r.is_private
+                                    className={`text-xs px-2 py-1 rounded ${r.is_private
                                         ? "bg-yellow-100 text-yellow-800"
                                         : "bg-green-100 text-green-800"
-                                    }`}
+                                      }`}
                                   >
                                     {r.is_private ? "Private" : "Public"}
                                   </span>
@@ -322,7 +321,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                         Tạo phòng
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-violet-light dark:bg-gray-dark sm:max-w-lg">
+                    <DialogContent className="bg-white dark:bg-gray-dark sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                           <Users /> Tạo phòng với bạn bè

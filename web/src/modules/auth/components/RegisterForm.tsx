@@ -16,7 +16,6 @@ import {
   registerSchema,
   type RegisterFormData,
 } from "@/modules/auth/common/schema/auth";
-import { useRouter } from "next/navigation";
 import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { APP_ROUTES } from "@/lib/appRoutes";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";

@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/common/components/ui/button";
@@ -30,7 +31,7 @@ import {
 
 const EditCategory = () => {
   const params = useParams();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const slugParam = (params?.slug as string) || "";
   const {
     currentCategory,
@@ -160,9 +161,9 @@ const EditCategory = () => {
       const payload = {
         name: data.name,
         slug: data.slug,
-        description: data.description,
+        description: data.description || "",
         isActive: data.isActive,
-        parentId: data.parentId ? Number(data.parentId) : null,
+        parentId: data.parentId && data.parentId.trim() !== "" ? data.parentId : null,
         iconFile: data.iconFile ?? null,
       };
       console.log("[EditCategory] payload:", payload);
@@ -263,18 +264,17 @@ const EditCategory = () => {
             items={[
               { value: "", label: "No parent" },
               ...categories
-                .filter(
-                  (c) =>
-                    String(c.id) !== watchedValues.parentId &&
-                    c.slug !== watchedValues.slug
-                )
+                .filter((c) => c.slug !== watchedValues.slug) // Only exclude self
                 .map((c) => ({
                   value: String(c.id),
                   label: c.name,
                 })),
             ]}
             value={watchedValues.parentId}
-            onChange={(e) => setValue("parentId", e.target.value)}
+            onChange={(e) => setValue("parentId", e.target.value, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })}
             error={errors.parentId?.message}
           />
         </div>

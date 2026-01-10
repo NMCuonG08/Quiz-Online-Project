@@ -2,7 +2,7 @@
 import React from "react";
 import Image from "next/image";
 import dayjs from "dayjs";
-import { useRouter } from "@/common/i18n/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { Button } from "@/common/components/ui/button";
 import { Edit, Trash2, Eye, HelpCircle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ type Props = {
 };
 
 const QuizCard: React.FC<Props> = ({ quiz, onRefresh }) => {
-    const router = useRouter();
+    const router = useLocalizedRouter();
     const { deleteQuiz } = useAdminQuiz();
 
     const handleViewQuestions = (e: React.MouseEvent) => {
@@ -48,10 +48,7 @@ const QuizCard: React.FC<Props> = ({ quiz, onRefresh }) => {
             {/* Thumbnail */}
             <div className="relative h-40 w-full bg-gray-100 dark:bg-dark-2">
                 <Image
-                    src={
-                        quiz.thumbnail_url ||
-                        "https://res.cloudinary.com/dj9r2qksh/image/upload/v1746417078/newspaper_images/ffgcjz2kfajfc5huitka.jpg"
-                    }
+                    src={quiz.thumbnail_url || "/logo.jpg"}
                     alt={quiz.title}
                     fill
                     className="object-cover"

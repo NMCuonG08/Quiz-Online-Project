@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { useQuiz } from "../do-quiz/hooks/useQuiz";
 import {
   QuizHeader,
@@ -22,7 +22,7 @@ interface DoQuizPageProps {
 }
 
 const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
-  const router = useRouter();
+  const router = useLocalizedRouter();
 
   const {
     questions,
@@ -172,9 +172,11 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   };
 
   // Handle retake quiz
-  const handleRetakeQuiz = () => {
+  const handleRetakeQuiz = async () => {
     resetQuizState();
     setHasAnswered(false);
+    // Start a new quiz session
+    await startQuiz();
   };
 
   // Handle view answers

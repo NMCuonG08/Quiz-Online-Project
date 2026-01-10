@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/common/components/ui/button";
@@ -29,7 +30,7 @@ import {
 const EditQuiz = () => {
   const params = useParams();
   const slugParam = (params?.slug as string) || "";
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { currentQuiz, getQuizBySlug, loading, error, updateQuiz } =
     useAdminQuiz();
   const { categories, getCategories } = useAdminCategory();
@@ -322,10 +323,10 @@ const EditQuiz = () => {
               setValue(
                 "quiz_type",
                 e.target.value as
-                  | "MULTIPLE_CHOICE"
-                  | "TRUE_FALSE"
-                  | "FILL_IN_THE_BLANK"
-                  | "ESSAY",
+                | "MULTIPLE_CHOICE"
+                | "TRUE_FALSE"
+                | "FILL_IN_THE_BLANK"
+                | "ESSAY",
                 { shouldDirty: true, shouldValidate: true }
               )
             }

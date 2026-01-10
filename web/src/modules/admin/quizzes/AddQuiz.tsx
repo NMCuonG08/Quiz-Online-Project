@@ -15,7 +15,7 @@ import TagInput from "@/modules/admin/common/components/TagInput";
 import { cn } from "@/lib/utils";
 import { useAdminQuiz } from "./hooks/useAdminQuiz";
 import { useAdminCategory } from "@/modules/admin/categories/hooks/useAdminCategory";
-import { useRouter } from "@/common/i18n/navigation";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { quizSchema, type QuizFormData } from "./schema/quiz";
 import type { Category } from "@/modules/admin/categories/services/admin.category.service";
 import {
@@ -26,7 +26,7 @@ import {
 } from "@/lib/Notification";
 
 const AddQuiz = () => {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
