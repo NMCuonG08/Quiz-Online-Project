@@ -210,9 +210,7 @@ export class QuestionRepository extends BaseRepository<Question> {
             if (option.is_correct !== undefined) {
               cleanOption.is_correct = option.is_correct === true || option.is_correct === 'true';
             }
-            if (option.media_url) {
-              cleanOption.media_url = option.media_url;
-            }
+            cleanOption.media_url = option.media_url || null;
             
             return cleanOption;
           }),
@@ -315,9 +313,7 @@ export class QuestionRepository extends BaseRepository<Question> {
             }
             
             // Media URL field
-            if (option.media_url) {
-              cleanOption.media_url = option.media_url;
-            }
+            cleanOption.media_url = option.media_url || null;
             
             return cleanOption;
           }),

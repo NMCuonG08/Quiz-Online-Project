@@ -5,6 +5,7 @@ export enum DifficultyLevelEnum {
 }
 
 export enum QuizTypeEnumEnum {
+  SINGLE_CHOICE = 'SINGLE_CHOICE',
   MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
   TRUE_FALSE = 'TRUE_FALSE',
   FILL_IN_THE_BLANK = 'FILL_IN_THE_BLANK',
@@ -12,6 +13,7 @@ export enum QuizTypeEnumEnum {
 }
 
 export enum QuestionTypeEnum {
+  SINGLE_CHOICE = 'SINGLE_CHOICE',
   MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
   TRUE_FALSE = 'TRUE_FALSE',
   FILL_BLANK = 'FILL_BLANK',

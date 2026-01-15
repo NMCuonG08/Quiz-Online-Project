@@ -112,23 +112,29 @@ const ListQuestionsOfQuiz = () => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <Button variant="ghost" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Quay về
-        </Button>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-[#122031] p-4 rounded-xl border border-stroke dark:border-dark-3 shadow-sm min-h-[72px]">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            <span className="font-semibold">Quay về</span>
+          </Button>
+        </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
           {/* Filter by Question Type */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#020D1A] px-3 py-1.5 rounded-lg border border-stroke dark:border-dark-3">
+            <Filter className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             <Select value={filterType} onValueChange={handleFilterChange}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[150px] sm:w-[180px] border-none bg-transparent focus:ring-0 h-8 text-sm font-medium dark:text-white">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="dark:bg-[#122031] dark:border-dark-3">
                 {QUESTION_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
+                  <SelectItem key={type.value} value={type.value} className="dark:text-gray-300 dark:focus:bg-white/10 dark:focus:text-white">
                     {type.label}
                   </SelectItem>
                 ))}
@@ -136,7 +142,12 @@ const ListQuestionsOfQuiz = () => {
             </Select>
           </div>
 
-          <Button onClick={() => setIsAddModalOpen(true)}>Add Question</Button>
+          <Button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-primary hover:bg-primary/90 text-white px-6 font-semibold shadow-md active:scale-95 transition-transform"
+          >
+            Add Question
+          </Button>
         </div>
       </div>
 

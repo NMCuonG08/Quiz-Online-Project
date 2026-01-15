@@ -137,8 +137,12 @@ const AddQuestionModal: React.FC<Props> = ({
     patch: Partial<QuestionOption>
   ) => {
     setQuestionData((prev) => {
-      // For TRUE_FALSE, only one option can be correct
-      if (prev.question_type === "TRUE_FALSE" && patch.is_correct === true) {
+      // For SINGLE_CHOICE and TRUE_FALSE, only one option can be correct
+      if (
+        (prev.question_type === "SINGLE_CHOICE" ||
+          prev.question_type === "TRUE_FALSE") &&
+        patch.is_correct === true
+      ) {
         return {
           ...prev,
           options:
@@ -362,10 +366,10 @@ const AddQuestionModal: React.FC<Props> = ({
                     {/* Hide Remove button for TRUE_FALSE since options are fixed */}
                     {questionData.question_type !== "TRUE_FALSE" && (
                       <Button
-                        variant="destructive"
+                        variant="outline"
                         size="sm"
                         onClick={() => handleRemoveOption(index)}
-                        className="mt-2"
+                        className="mt-2 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
                       >
                         Remove Option
                       </Button>
@@ -373,8 +377,9 @@ const AddQuestionModal: React.FC<Props> = ({
                   </div>
                 ))}
 
-                {/* Add Option Card - Only show for MULTIPLE_CHOICE, FILL_BLANK, and MATCHING */}
-                {(questionData.question_type === "MULTIPLE_CHOICE" ||
+                {/* Add Option Card - Only show for CHOICE, FILL_BLANK, and MATCHING */}
+                {(questionData.question_type === "SINGLE_CHOICE" ||
+                  questionData.question_type === "MULTIPLE_CHOICE" ||
                   questionData.question_type === "FILL_BLANK" ||
                   questionData.question_type === "MATCHING") && (
                     <AddOptionCard onClick={handleAddOption} />

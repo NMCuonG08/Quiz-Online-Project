@@ -95,13 +95,32 @@ const EditQuestionModal: React.FC<Props> = ({
     index: number,
     patch: Partial<QuestionOption>
   ) => {
-    setQuestionData((prev) => ({
-      ...prev,
-      options:
-        prev.options?.map((opt, i) =>
-          i === index ? { ...opt, ...patch } : opt
-        ) || [],
-    }));
+    setQuestionData((prev) => {
+      // For SINGLE_CHOICE and TRUE_FALSE, only one option can be correct
+      if (
+        (prev.question_type === "SINGLE_CHOICE" ||
+          prev.question_type === "TRUE_FALSE") &&
+        patch.is_correct === true
+      ) {
+        return {
+          ...prev,
+          options:
+            prev.options?.map((opt, i) => ({
+              ...opt,
+              is_correct: i === index, // Only the clicked one is correct
+            })) || [],
+        };
+      }
+
+      // Default behavior for other question types
+      return {
+        ...prev,
+        options:
+          prev.options?.map((opt, i) =>
+            i === index ? { ...opt, ...patch } : opt
+          ) || [],
+      };
+    });
   };
 
   const handleRemoveOption = (index: number) => {
@@ -309,8 +328,13 @@ const EditQuestionModal: React.FC<Props> = ({
                 </div>
               ))}
 
-              {/* Add Option Card */}
-              <AddOptionCard onClick={handleAddOption} />
+              {/* Add Option Card - Only show for CHOICE, FILL_BLANK, and MATCHING */}
+              {(questionData.question_type === "SINGLE_CHOICE" ||
+                questionData.question_type === "MULTIPLE_CHOICE" ||
+                questionData.question_type === "FILL_BLANK" ||
+                questionData.question_type === "MATCHING") && (
+                  <AddOptionCard onClick={handleAddOption} />
+                )}
             </div>
           </div>
 

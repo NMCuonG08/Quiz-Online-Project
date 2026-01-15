@@ -50,10 +50,8 @@ export class UpdateQuestionDto {
   explanation?: string;
 
   @ApiPropertyOptional({ example: '2a639f98-cf28-4afb-8924-17d4a92c1517' })
-  @IsString()
   @IsOptional()
-  @IsUUID()
-  media_id?: string;
+  media_id?: string | null;
 
   @ApiPropertyOptional({
     example: MediaTypeEnum.VIDEO,

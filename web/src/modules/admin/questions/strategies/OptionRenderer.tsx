@@ -1,5 +1,5 @@
 import React from "react";
-import { X } from "lucide-react";
+import { X, Image as ImageIcon } from "lucide-react";
 import { Input } from "@/common/components/ui/input";
 import { Checkbox } from "@/common/components/ui/checkbox";
 import { Textarea } from "@/common/components/ui/textarea";
@@ -15,6 +15,65 @@ export interface OptionRenderer {
     onRemove?: () => void
   ): React.ReactNode;
 }
+
+// Compact Image Upload Component to save space
+const CompactImageUpload: React.FC<{
+  value: any;
+  onChange: (file: File | null) => void;
+}> = ({ value, onChange }) => {
+  const [showUpload, setShowUpload] = React.useState(!!value);
+
+  // Update showUpload if value changes externally (like when clearing)
+  React.useEffect(() => {
+    if (value) setShowUpload(true);
+  }, [value]);
+
+  if (!showUpload) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-8 text-xs gap-1.5 text-gray-500 hover:text-primary dark:text-gray-400"
+        onClick={() => setShowUpload(true)}
+      >
+        <ImageIcon className="w-3.5 h-3.5" />
+        Add Image (Optional)
+      </Button>
+    );
+  }
+
+  return (
+    <div className="space-y-1 mt-1 border rounded-md p-2 bg-gray-50/50 dark:bg-[#020D1A] border-dashed border-gray-200 dark:border-[#1e293b]">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+          <ImageIcon className="w-3 h-3" />
+          Option Image
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-5 w-5 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+          onClick={() => {
+            onChange(null);
+            setShowUpload(false);
+          }}
+          title="Remove property"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <UploadImage
+        value={value}
+        onChange={onChange}
+        placeholder="Drop or click to upload"
+        maxSize={2}
+        className="!h-24 dark:!bg-[#020D1A]" // Force background
+      />
+    </div>
+  );
+};
 
 // Multiple Choice Option Renderer
 export class MultipleChoiceOptionRenderer implements OptionRenderer {
@@ -55,19 +114,14 @@ export class MultipleChoiceOptionRenderer implements OptionRenderer {
               }
               placeholder="Option text"
             />
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Option Image (Optional)</label>
-              <UploadImage
-                value={option.media_url}
-                onChange={(file) =>
-                  onChange({
-                    media_url: file,
-                  })
-                }
-                placeholder="Upload option image"
-                maxSize={2}
-              />
-            </div>
+            <CompactImageUpload
+              value={option.media_url}
+              onChange={(file) =>
+                onChange({
+                  media_url: file,
+                })
+              }
+            />
             <Textarea
               value={option.explanation || ""}
               onChange={(e) =>
@@ -84,6 +138,73 @@ export class MultipleChoiceOptionRenderer implements OptionRenderer {
     );
   }
 }
+
+// Single Choice Option Renderer
+export class SingleChoiceOptionRenderer implements OptionRenderer {
+  render(
+    option: QuestionOption,
+    onChange: (patch: Partial<QuestionOption>) => void,
+    onRemove?: () => void
+  ): React.ReactNode {
+    return (
+      <div className="relative rounded-md border dark:border-dark-4 p-3">
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-1 right-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors z-10 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            title="Remove Option"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+        <div className="flex items-start gap-3">
+          <div
+            className={`mt-2 w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors ${option.is_correct
+              ? "border-primary bg-primary"
+              : "border-gray-300 dark:border-dark-5"
+              }`}
+            onClick={() => onChange({ is_correct: true })}
+          >
+            {option.is_correct && (
+              <div className="w-2 h-2 rounded-full bg-white" />
+            )}
+          </div>
+          <div className="flex-1 space-y-2">
+            <Input
+              value={option.option_text || ""}
+              onChange={(e) =>
+                onChange({
+                  option_text: e.target.value,
+                })
+              }
+              placeholder="Option text"
+            />
+            <CompactImageUpload
+              value={option.media_url}
+              onChange={(file) =>
+                onChange({
+                  media_url: file,
+                })
+              }
+            />
+            <Textarea
+              value={option.explanation || ""}
+              onChange={(e) =>
+                onChange({
+                  explanation: e.target.value,
+                })
+              }
+              placeholder="Explanation (optional)"
+              className="min-h-[56px]"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 
 // True/False Option Renderer
 export class TrueFalseOptionRenderer implements OptionRenderer {
@@ -402,6 +523,7 @@ export class MatchingOptionRenderer implements OptionRenderer {
 // Factory Pattern for creating Option Renderers
 export class OptionRendererFactory {
   private static renderers: Map<string, OptionRenderer> = new Map([
+    ["SINGLE_CHOICE", new SingleChoiceOptionRenderer()],
     ["MULTIPLE_CHOICE", new MultipleChoiceOptionRenderer()],
     ["TRUE_FALSE", new TrueFalseOptionRenderer()],
     ["FILL_BLANK", new FillInBlankOptionRenderer()],

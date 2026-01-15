@@ -657,6 +657,7 @@ enum QuizType {
   EXAM
   TIMED
   LIVE
+  SINGLE_CHOICE
   MULTIPLE_CHOICE
   TRUE_FALSE
   FILL_IN_THE_BLANK
@@ -664,6 +665,7 @@ enum QuizType {
 }
 
 enum QuestionType {
+  SINGLE_CHOICE
   MULTIPLE_CHOICE
   TRUE_FALSE
   FILL_BLANK
@@ -700,7 +702,7 @@ enum ParticipantStatus {
   JOINED
   ACTIVE
   DISCONNECTED
-	LEFT
+  LEFT
   FINISHED
 }
 

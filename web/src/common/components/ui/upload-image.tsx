@@ -134,7 +134,7 @@ export const UploadImage: React.FC<UploadImageProps> = ({
 
       {preview ? (
         <div className="relative">
-          <div className="relative w-full h-32 border-2 border-dashed border-gray-300 dark:border-dark-4 rounded-lg overflow-hidden bg-gray-50 dark:bg-dark-3/50">
+          <div className="relative w-full h-32 border-2 border-dashed border-gray-300 dark:border-[#1e293b] rounded-lg overflow-hidden bg-gray-50 dark:bg-[#020D1A]">
             <Image
               src={preview}
               alt="Preview"
@@ -150,8 +150,8 @@ export const UploadImage: React.FC<UploadImageProps> = ({
 
           {/* Show current image status */}
           {typeof value === 'string' && value && !selectedFile && (
-            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs px-2 py-1">
-              Current image
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-[10px] px-2 py-0.5 uppercase tracking-wider">
+              Existing Image
             </div>
           )}
 
@@ -162,7 +162,7 @@ export const UploadImage: React.FC<UploadImageProps> = ({
                 type="button"
                 variant="secondary"
                 size="sm"
-                className="w-6 h-6 p-0 rounded-full"
+                className="w-6 h-6 p-0 rounded-full dark:bg-[#122031] dark:text-white dark:border-dark-4"
                 onClick={handleClick}
                 disabled={uploading}
                 title="Change image"
@@ -189,12 +189,12 @@ export const UploadImage: React.FC<UploadImageProps> = ({
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
-          className={`w-full h-32 border-2 border-dashed border-gray-300 dark:border-dark-4 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 dark:hover:border-dark-5 transition-colors bg-gray-50 dark:bg-dark-3/50 ${isDragging ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''
+          className={`w-full h-32 border-2 border-dashed border-gray-300 dark:border-[#1e293b] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 dark:hover:border-blue-500 transition-colors bg-gray-50 dark:bg-[#020D1A] ${isDragging ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''
             }`}
         >
           <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500 mb-2" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">{placeholder}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Max {maxSize}MB</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{placeholder}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 uppercase tracking-tighter">Max {maxSize}MB</p>
         </div>
       )}
     </div>

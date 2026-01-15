@@ -156,6 +156,7 @@ export class QuestionService extends BaseService {
     media?: Express.Multer.File,
     optionMediaFiles?: Express.Multer.File[],
   ): Promise<QuestionResponseDto> {
+    console.log('Update Question Request:', { id, updateDataKeys: Object.keys(updateData), media: !!media });
     const existingQuestion = await this.questionRepository.findByIdRaw(id);
     if (!existingQuestion) {
       throw new NotFoundException('Question not found');
@@ -247,6 +248,18 @@ export class QuestionService extends BaseService {
     if (restOfUpdateData.settings !== undefined) {
       dataToUpdate.settings = restOfUpdateData.settings;
     }
+    
+    // Process media_id from body (e.g., if set to null to remove image)
+    if (restOfUpdateData.media_id !== undefined) {
+      // Handle 'null' string from FormData
+      if (restOfUpdateData.media_id === 'null' || restOfUpdateData.media_id === null) {
+        dataToUpdate.media_id = null;
+      } else {
+        dataToUpdate.media_id = String(restOfUpdateData.media_id);
+      }
+    }
+
+    // New media upload always takes precedence
     if (mediaId) {
       dataToUpdate.media_id = mediaId;
     }

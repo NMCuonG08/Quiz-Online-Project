@@ -209,8 +209,8 @@ export class AdminQuestionService {
         // Add question media file if present
         if (hasQuestionFile) {
           form.append('media', cleanPayload.media_url as File);
+          delete cleanPayload.media_url;
         }
-        delete cleanPayload.media_url;
         
         // Process options - extract files and clean data
         if (cleanPayload.options) {
@@ -221,12 +221,16 @@ export class AdminQuestionService {
             delete (cleanOption as Record<string, unknown>).created_at;
             delete (cleanOption as Record<string, unknown>).updated_at;
             
-            // If option has a file, add it to FormData
+            // Handle option media
             if (option.media_url instanceof File) {
               form.append(`option_${index}_media`, option.media_url);
               delete cleanOption.media_url;
+            } else if (typeof option.media_url === 'string') {
+              // Keep the existing media URL
+              cleanOption.media_url = option.media_url;
             } else {
-              delete cleanOption.media_url;
+              // Ensure it's null or undefined if not provided
+              cleanOption.media_url = null;
             }
             
             return cleanOption;
@@ -244,6 +248,9 @@ export class AdminQuestionService {
             } else {
               form.append(key, String(value));
             }
+          } else if (key === 'media_url' && value === null) {
+            // Signal to backend that media should be removed
+            form.append('media_id', 'null');
           }
         });
         
@@ -257,10 +264,21 @@ export class AdminQuestionService {
             delete (cleanOption as Record<string, unknown>).question_id;
             delete (cleanOption as Record<string, unknown>).created_at;
             delete (cleanOption as Record<string, unknown>).updated_at;
-            delete cleanOption.media_url;
+            
+            if (typeof option.media_url === 'string') {
+              cleanOption.media_url = option.media_url;
+            } else {
+              cleanOption.media_url = null;
+            }
             return cleanOption;
           });
         }
+
+        // If media_url is null, it means the user removed the image
+        if (cleanPayload.media_url === null) {
+          (cleanPayload as any).media_id = null;
+        }
+
         delete cleanPayload.media_url;
         body = cleanPayload;
       }

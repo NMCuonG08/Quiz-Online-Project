@@ -24,6 +24,7 @@ const baseQuestionObjectSchema = z.object({
     .min(1, "Question text is required")
     .max(2000, "Question text too long"),
   question_type: z.enum([
+    "SINGLE_CHOICE",
     "MULTIPLE_CHOICE",
     "TRUE_FALSE",
     "FILL_BLANK",
@@ -90,8 +91,13 @@ const questionOptionsRefinement = (data: z.infer<typeof baseQuestionObjectSchema
     return;
   }
   
-  // MULTIPLE_CHOICE, FILL_BLANK, and MATCHING need at least one option
-  if (question_type === "MULTIPLE_CHOICE" || question_type === "FILL_BLANK" || question_type === "MATCHING") {
+  // SINGLE_CHOICE, MULTIPLE_CHOICE, FILL_BLANK, and MATCHING need at least one option
+  if (
+    question_type === "SINGLE_CHOICE" ||
+    question_type === "MULTIPLE_CHOICE" ||
+    question_type === "FILL_BLANK" ||
+    question_type === "MATCHING"
+  ) {
     if (!options || options.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -100,10 +106,15 @@ const questionOptionsRefinement = (data: z.infer<typeof baseQuestionObjectSchema
       });
       return;
     }
-    
-    // For MULTIPLE_CHOICE, check that options have text
-    if (question_type === "MULTIPLE_CHOICE") {
-      const emptyOptions = options.filter(o => !o.option_text || o.option_text.trim() === "");
+
+    // For CHOICE questions, check that options have text
+    if (
+      question_type === "SINGLE_CHOICE" ||
+      question_type === "MULTIPLE_CHOICE"
+    ) {
+      const emptyOptions = options.filter(
+        (o) => !o.option_text || o.option_text.trim() === ""
+      );
       if (emptyOptions.length > 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -113,15 +124,31 @@ const questionOptionsRefinement = (data: z.infer<typeof baseQuestionObjectSchema
         return;
       }
     }
-    
-    // Check for at least one correct answer
-    const hasCorrect = options.some(o => o.is_correct);
-    if (!hasCorrect) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one option must be marked as correct",
-        path: ["options"],
-      });
+
+    // For SINGLE_CHOICE, check that exactly one is correct
+    if (question_type === "SINGLE_CHOICE") {
+      const correctOptions = options.filter((o) => o.is_correct);
+      if (correctOptions.length !== 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "SINGLE_CHOICE questions must have exactly one correct answer",
+          path: ["options"],
+        });
+        return;
+      }
+    }
+
+    // Check for at least one correct answer (except for SINGLE_CHOICE which we already checked)
+    if (question_type !== "SINGLE_CHOICE") {
+      const hasCorrect = options.some((o) => o.is_correct);
+      if (!hasCorrect) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "At least one option must be marked as correct",
+          path: ["options"],
+        });
+      }
     }
   }
 };

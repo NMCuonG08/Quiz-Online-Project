@@ -6,7 +6,7 @@ export interface Question {
   time_limit?: number;
   points: number;
   sort_order: number;
-  question_type: "multiple_choice" | "true_false" | "fill_blank" | "essay";
+  question_type: "single_choice" | "multiple_choice" | "true_false" | "fill_blank" | "essay" | "matching";
   options: QuestionOption[];
   correct_answer?: string;
   explanation?: string;
@@ -35,7 +35,8 @@ export interface QuizSession {
 
 export interface UserAnswer {
   question_id: string;
-  selected_option_id?: string;
+  selected_option_id?: string; // Keep for backward compatibility if needed, but we'll use ids
+  selected_option_ids?: string[]; 
   text_answer?: string;
   is_correct: boolean;
   points_earned: number;

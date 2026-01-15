@@ -16,6 +16,7 @@ import {
 import { User, LogOut, LayoutDashboard } from "lucide-react";
 import "@/styles/nav-link.css";
 import { useLocale, useTranslations } from "next-intl";
+import Image from "next/image";
 
 const NavBarLaptop = () => {
   const { isLoggedIn, logout } = useAuth();
@@ -46,7 +47,12 @@ const NavBarLaptop = () => {
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <LocalizedLink href="/" className="flex items-center gap-2">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-pink-300 via-purple-300 to-blue-300" />
+          <Image
+            src="/logo.png"
+            alt="Logo"
+            width={50}
+            height={50}
+          />
           <span className="text-lg font-semibold tracking-tight text-foreground">
             CourseCo
           </span>

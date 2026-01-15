@@ -25,26 +25,63 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
   const handleOptionSelect = (option: QuestionOption) => {
     if (isSubmitting) return;
 
-    const isAlreadySelected = userAnswer?.selected_option_id === option.id;
+    const questionType = question.question_type?.toLowerCase();
+    const isMultipleSelect = questionType === "multiple_choice";
 
-    if (isAlreadySelected) {
+    if (isMultipleSelect) {
+      const currentSelectedIds = userAnswer?.selected_option_ids || [];
+      const isAlreadySelected = currentSelectedIds.includes(option.id);
+
+      let newSelectedIds: string[];
+      if (isAlreadySelected) {
+        newSelectedIds = currentSelectedIds.filter(id => id !== option.id);
+      } else {
+        newSelectedIds = [...currentSelectedIds, option.id];
+      }
+
+      // Check if the set of selected options matches the set of correct options
+      const correctOptionIds = question.options
+        .filter(opt => opt.is_correct)
+        .map(opt => opt.id);
+
+      const isCorrect =
+        newSelectedIds.length === correctOptionIds.length &&
+        newSelectedIds.every(id => correctOptionIds.includes(id));
+
       const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
-        selected_option_id: undefined,
+        selected_option_ids: newSelectedIds,
+        selected_option_id: newSelectedIds.length === 1 ? newSelectedIds[0] : undefined,
         text_answer: undefined,
-        is_correct: false,
-        points_earned: 0,
+        is_correct: isCorrect,
+        points_earned: isCorrect ? question.points : 0,
         time_spent: 0,
       };
       onAnswerSelect(answer);
     } else {
-      const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
-        selected_option_id: option.id,
-        text_answer: undefined,
-        is_correct: option.is_correct,
-        points_earned: option.is_correct ? question.points : 0,
-        time_spent: 0,
-      };
-      onAnswerSelect(answer);
+      // Single selection logic (Standard for SINGLE_CHOICE and TRUE_FALSE)
+      const isAlreadySelected = userAnswer?.selected_option_id === option.id;
+
+      if (isAlreadySelected) {
+        const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
+          selected_option_ids: [],
+          selected_option_id: undefined,
+          text_answer: undefined,
+          is_correct: false,
+          points_earned: 0,
+          time_spent: 0,
+        };
+        onAnswerSelect(answer);
+      } else {
+        const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
+          selected_option_ids: [option.id],
+          selected_option_id: option.id,
+          text_answer: undefined,
+          is_correct: option.is_correct,
+          points_earned: option.is_correct ? question.points : 0,
+          time_spent: 0,
+        };
+        onAnswerSelect(answer);
+      }
     }
   };
 
@@ -53,6 +90,7 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
 
     const answer: Omit<UserAnswer, "question_id" | "answered_at"> = {
       selected_option_id: undefined,
+      selected_option_ids: [],
       text_answer: text,
       is_correct: false,
       points_earned: 0,
@@ -63,65 +101,86 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
   };
 
   const isOptionSelected = (optionId: string) => {
+    if (userAnswer?.selected_option_ids) {
+      return userAnswer.selected_option_ids.includes(optionId);
+    }
     return userAnswer?.selected_option_id === optionId;
   };
 
-  const renderMultipleChoice = () => (
-    <div className="space-y-4">
-      {[...question.options]
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((option, index) => {
-          const isSelected = isOptionSelected(option.id);
-          return (
-            <div
-              key={option.id}
-              onClick={() => handleOptionSelect(option)}
-              className={cn(
-                "group relative flex items-start gap-4 p-5 rounded-2xl border-2 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom duration-500",
-                isSelected
-                  ? "border-primary bg-primary/5 shadow-lg shadow-primary/5"
-                  : "border-border bg-card hover:border-primary/50 hover:bg-muted/50",
-                isSubmitting && "opacity-50 pointer-events-none"
-              )}
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-300 flex-shrink-0 mt-1",
-                isSelected ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"
-              )}>
-                {isSelected ? (
-                  <Check className="w-6 h-6 text-primary-foreground" />
-                ) : (
-                  <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
-                    {String.fromCharCode(65 + index)}
-                  </span>
+  const renderChoiceOptions = () => {
+    const isMultipleSelect = question.question_type?.toLowerCase() === "multiple_choice";
+
+    return (
+      <div className="space-y-4">
+        {[...question.options]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((option, index) => {
+            const isSelected = isOptionSelected(option.id);
+            return (
+              <div
+                key={option.id}
+                onClick={() => handleOptionSelect(option)}
+                className={cn(
+                  "group relative flex items-start gap-4 p-5 rounded-2xl border-2 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom duration-500",
+                  isSelected
+                    ? "border-primary bg-primary/5 shadow-lg shadow-primary/5"
+                    : "border-border bg-card hover:border-primary/50 hover:bg-muted/50",
+                  isSubmitting && "opacity-50 pointer-events-none"
                 )}
-              </div>
-              <div className="flex-1">
-                {option.media_url && (
-                  <div className="mb-3">
-                    <img
-                      src={option.media_url}
-                      alt={`Option ${String.fromCharCode(65 + index)}`}
-                      className="max-w-full max-h-40 rounded-lg object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className={cn(
+                  "flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-300 flex-shrink-0 mt-1",
+                  isSelected ? "bg-primary border-primary" : "border-border group-hover:border-primary/50",
+                  !isMultipleSelect && "rounded-full" // Round for single choice
+                )}>
+                  {isSelected ? (
+                    <Check className="w-6 h-6 text-primary-foreground" />
+                  ) : (
+                    <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  {option.media_url && (
+                    <div className="mb-3">
+                      <img
+                        src={option.media_url}
+                        alt={`Option ${String.fromCharCode(65 + index)}`}
+                        className="max-w-full max-h-40 rounded-lg object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                  <p className={cn(
+                    "text-lg font-medium transition-colors",
+                    isSelected ? "text-primary" : "text-foreground"
+                  )}>
+                    {option.content}
+                  </p>
+                </div>
+                {isMultipleSelect && (
+                  <div className={cn(
+                    "flex-shrink-0 w-6 h-6 border-2 rounded-md flex items-center justify-center transition-all mt-2",
+                    isSelected ? "bg-primary border-primary" : "border-muted-foreground/30"
+                  )}>
+                    {isSelected && <Check className="w-4 h-4 text-primary-foreground" />}
                   </div>
                 )}
-                <p className={cn(
-                  "text-lg font-medium transition-colors",
-                  isSelected ? "text-primary" : "text-foreground"
-                )}>
-                  {option.content}
-                </p>
               </div>
-            </div>
-          );
-        })}
-    </div>
-  );
+            );
+          })}
+        {isMultipleSelect && (
+          <p className="text-sm text-primary/70 font-medium italic mt-4 pl-2">
+            * Đây là câu hỏi có thể chọn nhiều đáp án
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const renderTrueFalse = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -281,8 +340,9 @@ const AnswerOptions: React.FC<AnswerOptionsProps> = ({
     const questionType = question.question_type?.toLowerCase();
 
     switch (questionType) {
+      case "single_choice":
       case "multiple_choice":
-        return renderMultipleChoice();
+        return renderChoiceOptions();
       case "true_false":
         return renderTrueFalse();
       case "fill_in_blank":
