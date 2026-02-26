@@ -19,9 +19,11 @@ done
 echo "Running Prisma migrate..."
 npx prisma migrate deploy
 
-# Chạy seed data
-echo "Running Prisma seed..."
-npm run prisma:seed
+# Seed data (chỉ chạy khi có biến SEED_DB=true)
+if [ "$SEED_DB" = "true" ]; then
+  echo "Running Prisma seed..."
+  node prisma/seed.js
+fi
 
 # Start app
 echo "Starting app..."
