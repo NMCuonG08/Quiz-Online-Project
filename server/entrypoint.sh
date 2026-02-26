@@ -22,7 +22,7 @@ npx prisma migrate deploy
 # Seed data (chỉ chạy khi có biến SEED_DB=true)
 if [ "$SEED_DB" = "true" ]; then
   echo "Running Prisma seed..."
-  node prisma/seed.js
+  node dist/prisma/seed.js
 fi
 
 # Start app
