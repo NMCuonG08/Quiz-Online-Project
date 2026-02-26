@@ -280,7 +280,7 @@ const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
                 <LoadingSkeleton />
               </SwiperSlide>
             ))
-            : quizzes.map((quiz) => (
+            : (Array.isArray(quizzes) ? quizzes : []).map((quiz) => (
               <SwiperSlide
                 key={quiz.id}
                 className="!w-48 sm:!w-56 md:!w-64 pb-8"

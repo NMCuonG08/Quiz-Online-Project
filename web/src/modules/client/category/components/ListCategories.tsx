@@ -82,7 +82,7 @@ const CategoryCarousel = () => {
 
   // Sử dụng dữ liệu từ Redux hoặc fallback data
   const displayCategories: Category[] =
-    categories.length > 0 ? (categories as Category[]) : fallbackCategories;
+    Array.isArray(categories) && categories.length > 0 ? (categories as Category[]) : fallbackCategories;
 
   // Xử lý lỗi ảnh - fallback về ảnh mặc định
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {

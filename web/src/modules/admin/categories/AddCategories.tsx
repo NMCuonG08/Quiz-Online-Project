@@ -179,7 +179,20 @@ const AddCategories = () => {
             type="text"
             name="name"
             required
-            handleChange={(e) => setValue("name", e.target.value)}
+            handleChange={(e) => {
+              const val = e.target.value;
+              setValue("name", val);
+              const generatedSlug = val
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d")
+                .replace(/[^a-z0-9 -]/g, "")
+                .replace(/\s+/g, "-")
+                .replace(/-+/g, "-")
+                .replace(/^-+|-+$/g, ""); // trim hyphens
+              setValue("slug", generatedSlug, { shouldValidate: true });
+            }}
             value={watchedValues.name}
             error={errors.name?.message}
           />

@@ -179,8 +179,8 @@ const clientQuizSlice = createSlice({
       })
       .addCase(fetchRecentlyPublishedQuizzes.fulfilled, (state, action) => {
         state.recentlyPublished.loading = false;
-        state.recentlyPublished.quizzes = action.payload.data.items;
-        state.recentlyPublished.pagination = action.payload.data.pagination;
+        state.recentlyPublished.quizzes = action.payload.data?.items || [];
+        state.recentlyPublished.pagination = action.payload.data?.pagination || null;
         state.recentlyPublished.error = null;
       })
       .addCase(fetchRecentlyPublishedQuizzes.rejected, (state, action) => {
@@ -196,8 +196,8 @@ const clientQuizSlice = createSlice({
       })
       .addCase(fetchBestRatedQuizzes.fulfilled, (state, action) => {
         state.bestRated.loading = false;
-        state.bestRated.quizzes = action.payload.data.items;
-        state.bestRated.pagination = action.payload.data.pagination;
+        state.bestRated.quizzes = action.payload.data?.items || [];
+        state.bestRated.pagination = action.payload.data?.pagination || null;
         state.bestRated.error = null;
       })
       .addCase(fetchBestRatedQuizzes.rejected, (state, action) => {
@@ -213,8 +213,8 @@ const clientQuizSlice = createSlice({
       })
       .addCase(fetchPopularQuizzes.fulfilled, (state, action) => {
         state.popular.loading = false;
-        state.popular.quizzes = action.payload.data.items;
-        state.popular.pagination = action.payload.data.pagination;
+        state.popular.quizzes = action.payload.data?.items || [];
+        state.popular.pagination = action.payload.data?.pagination || null;
         state.popular.error = null;
       })
       .addCase(fetchPopularQuizzes.rejected, (state, action) => {
@@ -230,8 +230,8 @@ const clientQuizSlice = createSlice({
       })
       .addCase(fetchEasyQuizzes.fulfilled, (state, action) => {
         state.easy.loading = false;
-        state.easy.quizzes = action.payload.data.items;
-        state.easy.pagination = action.payload.data.pagination;
+        state.easy.quizzes = action.payload.data?.items || [];
+        state.easy.pagination = action.payload.data?.pagination || null;
         state.easy.error = null;
       })
       .addCase(fetchEasyQuizzes.rejected, (state, action) => {
@@ -247,8 +247,8 @@ const clientQuizSlice = createSlice({
       })
       .addCase(fetchHardQuizzes.fulfilled, (state, action) => {
         state.hard.loading = false;
-        state.hard.quizzes = action.payload.data.items;
-        state.hard.pagination = action.payload.data.pagination;
+        state.hard.quizzes = action.payload.data?.items || [];
+        state.hard.pagination = action.payload.data?.pagination || null;
         state.hard.error = null;
       })
       .addCase(fetchHardQuizzes.rejected, (state, action) => {
@@ -264,8 +264,8 @@ const clientQuizSlice = createSlice({
       })
       .addCase(fetchQuizzesByDifficulty.fulfilled, (state, action) => {
         state.difficulty.loading = false;
-        state.difficulty.quizzes = action.payload.response.data.items;
-        state.difficulty.pagination = action.payload.response.data.pagination;
+        state.difficulty.quizzes = action.payload.response.data?.items || [];
+        state.difficulty.pagination = action.payload.response.data?.pagination || null;
         state.difficulty.currentDifficulty = action.payload.difficulty;
         state.difficulty.error = null;
       })
