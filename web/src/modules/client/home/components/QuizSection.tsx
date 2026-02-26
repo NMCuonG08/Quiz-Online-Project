@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { Button } from "@/common/components/ui/button";
-import Link from "next/link";
+import { LocalizedLink } from "@/common/components/ui";
 
 const QuizSection = () => {
   const quizCategories = [
@@ -28,17 +28,21 @@ const QuizSection = () => {
             </p>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex-1 min-w-0 sm:min-w-fit">
-                <Button className="w-full px-6 py-6 bg-yellow dark:bg-gray-dark text-base lg:text-lg text-black dark:text-white">
-                  Bắt đầu Quiz ngay
-                </Button>
+                <LocalizedLink href="/category">
+                  <Button className="w-full px-6 py-6 bg-yellow dark:bg-gray-dark text-base lg:text-lg text-black dark:text-white">
+                    Bắt đầu Quiz ngay
+                  </Button>
+                </LocalizedLink>
               </div>
               <div className="flex-1 min-w-0 sm:min-w-fit">
-                <Button
-                  variant="outline"
-                  className="w-full px-6 py-6 bg-gray dark:bg-gray-dark text-base lg:text-lg"
-                >
-                  <Link href="/category">Xem danh sách Quiz</Link>
-                </Button>
+                <LocalizedLink href="/category">
+                  <Button
+                    variant="outline"
+                    className="w-full px-6 py-6 bg-gray dark:bg-gray-dark text-base lg:text-lg"
+                  >
+                    Xem danh sách Quiz
+                  </Button>
+                </LocalizedLink>
               </div>
             </div>
 
