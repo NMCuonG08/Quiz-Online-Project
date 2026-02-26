@@ -44,6 +44,44 @@
     "createAccountButton": "Create account",
     "alreadyHaveAccount": "Already have an account?",
     "registrationFailed": "Registration failed"
+  },
+  "quizSection": {
+    "title": "Challenge your knowledge with Smart Quiz",
+    "description": "Diverse quiz system: vocabulary, grammar, reading comprehension and listening comprehension. Test your level and improve your English skills in a fun way.",
+    "startQuiz": "Start Quiz now",
+    "viewQuizList": "View Quiz list",
+    "imageAlt": "English learning Quiz",
+    "categoryAlt": "Quiz Category {index}"
+  },
+  "listCategories": {
+    "title": "Quiz Categories",
+    "subtitle": "Choose your favorite topic and start the challenge",
+    "loading": "Loading categories...",
+    "error": "Error: {message}"
+  },
+  "categoryDetail": {
+    "backToCategories": "Back to categories",
+    "quizzesInCategory": "Quizzes in {name}",
+    "totalQuizzes": "{count} quizzes found",
+    "noQuizzes": "No quizzes available in this category yet.",
+    "loading": "Loading quizzes...",
+    "loadingCategory": "Loading category...",
+    "error": "Error loading data",
+    "categoryNotFound": "Category not found",
+    "categoryNotFoundDesc": "The category you are looking for does not exist.",
+    "retry": "Retry",
+    "loadMore": "Load more",
+    "by": "By {name}",
+    "ratings": "{count} ratings"
+  },
+  "quizCarousel": {
+    "recentlyPublished": "Recently published »",
+    "bestRated": "Best rating right now »",
+    "popular": "Popular right now »",
+    "easyQuizzes": "Easy quizzes »",
+    "hardQuizzes": "Hard quizzes »",
+    "viewAll": "View all",
+    "failedToLoad": "Failed to load quizzes",
+    "by": "By {name}"
   }
 }
-

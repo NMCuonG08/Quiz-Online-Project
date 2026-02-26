@@ -1,13 +1,11 @@
 "use client";
 import React from "react";
-
-import ListQuizByCategory from "@/modules/client/category/ListQuizByCategory";
+import CategoryDetailPage from "@/modules/client/category/components/CategoryDetailPage";
 
 const Page = () => {
   return (
     <div className="min-h-screen bg-background">
-      {/* Nội dung chính */}
-      <ListQuizByCategory />
+      <CategoryDetailPage />
     </div>
   );
 };

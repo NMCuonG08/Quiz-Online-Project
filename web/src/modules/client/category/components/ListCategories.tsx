@@ -6,9 +6,10 @@ import {
   CarouselItem,
 } from "@/common/components/ui/carousel";
 import Image from "next/image";
-import Link from "next/link";
+import { LocalizedLink } from "@/common/components/ui";
 import type { Category } from "../services/category.service";
 import { useCategory } from "../hooks/useCategory";
+import { useTranslations } from "next-intl";
 
 // Fallback data nếu API chưa có dữ liệu
 const fallbackCategories: Category[] = [
@@ -72,6 +73,7 @@ const fallbackCategories: Category[] = [
 
 const CategoryCarousel = () => {
   const { categories, loading, error, getCategories } = useCategory();
+  const t = useTranslations("listCategories");
 
   // Fetch categories khi component mount
   useEffect(() => {
@@ -85,25 +87,24 @@ const CategoryCarousel = () => {
   // Xử lý lỗi ảnh - fallback về ảnh mặc định
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.target as HTMLImageElement;
-    // Nếu ảnh lỗi, thay thế bằng ảnh mặc định
-    target.src = "/categories/cate1.png"; // Ảnh mặc định
+    target.src = "/categories/cate1.png";
   };
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-6">
       <div className="mb-4">
-        <h2 className="text-2xl font-bold text-center mb-2">Danh mục Quiz</h2>
+        <h2 className="text-2xl font-bold text-center mb-2">{t("title")}</h2>
         <p className="text-gray-600 dark:text-gray-400 text-center text-sm">
-          Chọn chủ đề yêu thích và bắt đầu thử thách
+          {t("subtitle")}
         </p>
         {loading && (
           <p className="text-center text-sm text-blue-600 dark:text-blue-400">
-            Đang tải danh mục...
+            {t("loading")}
           </p>
         )}
         {error && (
           <p className="text-center text-sm text-red-600 dark:text-red-400">
-            Lỗi: {String(error)}
+            {t("error", { message: String(error) })}
           </p>
         )}
       </div>
@@ -121,7 +122,7 @@ const CategoryCarousel = () => {
               key={category.id}
               className="pl-2 md:pl-4 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6"
             >
-              <Link
+              <LocalizedLink
                 href={`/category/${category.slug}`}
                 className="block text-center"
               >
@@ -146,7 +147,7 @@ const CategoryCarousel = () => {
                 <h3 className="font-medium text-sm text-center">
                   {category.name}
                 </h3>
-              </Link>
+              </LocalizedLink>
             </CarouselItem>
           ))}
         </CarouselContent>

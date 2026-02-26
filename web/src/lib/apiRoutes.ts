@@ -34,6 +34,8 @@ export const apiRoutes = {
     HARD: "/api/quizzes/hard",
     BY_DIFFICULTY: (difficulty: string) =>
       `/api/quizzes/difficulty/${difficulty}`,
+    BY_CATEGORY: (categoryId: string) =>
+      `/api/quizzes/category/${categoryId}`,
   },
   QUESTIONS: {
     BASE: "/api/questions",

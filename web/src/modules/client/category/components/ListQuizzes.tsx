@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import CategoryCarousel from "./CategoryCarousel";
 import { useClientQuiz } from "../hooks/useClientQuiz";
+import { useTranslations } from "next-intl";
 
 const ListQuizzes: React.FC = () => {
   const {
@@ -17,6 +18,7 @@ const ListQuizzes: React.FC = () => {
     getEasyQuizzes,
     getHardQuizzes,
   } = useClientQuiz();
+  const t = useTranslations("quizCarousel");
 
   useEffect(() => {
     // Fetch all quiz categories on component mount
@@ -42,31 +44,31 @@ const ListQuizzes: React.FC = () => {
   return (
     <div className="space-y-8">
       <CategoryCarousel
-        title="Recently published »"
+        title={t("recentlyPublished")}
         quizzes={recentlyPublished.quizzes}
         loading={recentlyPublished.loading}
         error={recentlyPublished.error}
       />
       <CategoryCarousel
-        title="Best rating right now »"
+        title={t("bestRated")}
         quizzes={bestRated.quizzes}
         loading={bestRated.loading}
         error={bestRated.error}
       />
       <CategoryCarousel
-        title="Popular right now »"
+        title={t("popular")}
         quizzes={popular.quizzes}
         loading={popular.loading}
         error={popular.error}
       />
       <CategoryCarousel
-        title="Easy quizzes »"
+        title={t("easyQuizzes")}
         quizzes={easy.quizzes}
         loading={easy.loading}
         error={easy.error}
       />
       <CategoryCarousel
-        title="Hard quizzes »"
+        title={t("hardQuizzes")}
         quizzes={hard.quizzes}
         loading={hard.loading}
         error={hard.error}

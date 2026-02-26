@@ -119,6 +119,27 @@ export class ClientQuizService {
     }
   }
 
+  static async getQuizzesByCategory(
+    categoryId: string,
+    params?: QuizQueryParams
+  ): Promise<PaginatedQuizResponse> {
+    try {
+      const response = await apiClient.get(
+        apiRoutes.QUIZZES.BY_CATEGORY(categoryId),
+        {
+          params: {
+            page: params?.page || 1,
+            limit: params?.limit || 10,
+            ...params,
+          },
+        }
+      );
+      return response.data;
+    } catch (error: unknown) {
+      return this.handleError(error, "Failed to fetch quizzes by category");
+    }
+  }
+
   private static handleError(
     error: unknown,
     message: string

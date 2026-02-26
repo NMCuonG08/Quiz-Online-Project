@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper/modules";
@@ -6,6 +7,7 @@ import Image from "next/image";
 import { LocalizedLink } from "@/common/components/ui";
 import { formatTimeAgo } from "@/lib/time-utils";
 import { Card, CardContent, CardHeader } from "@/common/components/ui/card";
+import { useTranslations } from "next-intl";
 
 // Import Swiper styles
 import "swiper/css";
@@ -149,7 +151,7 @@ const QuizCard: React.FC<QuizCardProps> = ({
             </span>
           </div>
           <span className="flex-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 truncate text-right ml-2 min-w-0">
-            By {creator_name}
+            {creator_name}
           </span>
         </div>
       </CardContent>
@@ -169,6 +171,7 @@ const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
   loading = false,
   error = null,
 }) => {
+  const t = useTranslations("quizCarousel");
   // Loading skeleton component
   const LoadingSkeleton = () => (
     <Card className="overflow-hidden p-0 w-48 sm:w-56 md:w-64 h-80 sm:h-84 md:h-88 flex flex-col gap-0">
@@ -221,7 +224,7 @@ const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
     <div className="w-full h-48 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
       <div className="text-center">
         <p className="text-gray-500 dark:text-gray-400 mb-2">
-          Failed to load quizzes
+          {t("failedToLoad")}
         </p>
         <p className="text-sm text-gray-400 dark:text-gray-500">{error}</p>
       </div>
@@ -234,12 +237,11 @@ const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
           {title}
         </h2>
-        <a
-          href="#"
-          className="text-sm font-medium text-primary border-b-2 border-primary hover:text-primary-dark transition"
+        <span
+          className="text-sm font-medium text-primary border-b-2 border-primary hover:text-primary-dark transition cursor-pointer"
         >
-          View all
-        </a>
+          {t("viewAll")}
+        </span>
       </div>
 
       {error ? (
@@ -271,21 +273,21 @@ const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
         >
           {loading
             ? Array.from({ length: 5 }).map((_, index) => (
-                <SwiperSlide
-                  key={`skeleton-${index}`}
-                  className="!w-48 sm:!w-56 md:!w-64"
-                >
-                  <LoadingSkeleton />
-                </SwiperSlide>
-              ))
+              <SwiperSlide
+                key={`skeleton-${index}`}
+                className="!w-48 sm:!w-56 md:!w-64"
+              >
+                <LoadingSkeleton />
+              </SwiperSlide>
+            ))
             : quizzes.map((quiz) => (
-                <SwiperSlide
-                  key={quiz.id}
-                  className="!w-48 sm:!w-56 md:!w-64 pb-8"
-                >
-                  <QuizCard {...quiz} />
-                </SwiperSlide>
-              ))}
+              <SwiperSlide
+                key={quiz.id}
+                className="!w-48 sm:!w-56 md:!w-64 pb-8"
+              >
+                <QuizCard {...quiz} />
+              </SwiperSlide>
+            ))}
         </Swiper>
       )}
     </div>

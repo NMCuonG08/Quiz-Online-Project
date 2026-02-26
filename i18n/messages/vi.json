@@ -44,6 +44,44 @@
     "createAccountButton": "Tạo tài khoản",
     "alreadyHaveAccount": "Đã có tài khoản?",
     "registrationFailed": "Đăng ký thất bại"
+  },
+  "quizSection": {
+    "title": "Thử thách kiến thức với Quiz thông minh",
+    "description": "Hệ thống quiz đa dạng: từ vựng, ngữ pháp, đọc hiểu và nghe hiểu. Kiểm tra trình độ và nâng cao kỹ năng tiếng Anh một cách thú vị.",
+    "startQuiz": "Bắt đầu Quiz ngay",
+    "viewQuizList": "Xem danh sách Quiz",
+    "imageAlt": "Quiz học tiếng Anh",
+    "categoryAlt": "Quiz Category {index}"
+  },
+  "listCategories": {
+    "title": "Danh mục Quiz",
+    "subtitle": "Chọn chủ đề yêu thích và bắt đầu thử thách",
+    "loading": "Đang tải danh mục...",
+    "error": "Lỗi: {message}"
+  },
+  "categoryDetail": {
+    "backToCategories": "Quay lại danh mục",
+    "quizzesInCategory": "Quiz trong {name}",
+    "totalQuizzes": "Tìm thấy {count} quiz",
+    "noQuizzes": "Chưa có quiz nào trong danh mục này.",
+    "loading": "Đang tải quiz...",
+    "loadingCategory": "Đang tải danh mục...",
+    "error": "Lỗi khi tải dữ liệu",
+    "categoryNotFound": "Không tìm thấy danh mục",
+    "categoryNotFoundDesc": "Danh mục bạn đang tìm kiếm không tồn tại.",
+    "retry": "Thử lại",
+    "loadMore": "Tải thêm",
+    "by": "Bởi {name}",
+    "ratings": "{count} đánh giá"
+  },
+  "quizCarousel": {
+    "recentlyPublished": "Mới xuất bản »",
+    "bestRated": "Đánh giá cao nhất »",
+    "popular": "Phổ biến nhất »",
+    "easyQuizzes": "Quiz dễ »",
+    "hardQuizzes": "Quiz khó »",
+    "viewAll": "Xem tất cả",
+    "failedToLoad": "Không thể tải quiz",
+    "by": "Bởi {name}"
   }
 }
-
