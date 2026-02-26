@@ -28,7 +28,7 @@ RUN chmod +x /app/entrypoint.sh && \
 RUN pnpm run build
 
 # Prune dev dependencies to keep only production deps for final image
-RUN pnpm prune --prod
+RUN pnpm prune --prod --ignore-scripts
 
 # 2. Production stage  
 FROM node:22-alpine AS production

@@ -19,9 +19,9 @@ const QuizBadges: React.FC<QuizBadgesProps> = ({ items }) => {
       {items.map((it, idx) => (
         <Badge
           key={idx}
-          variant="outline"
+          variant="secondary"
           title={it.label}
-          className="px-2.5 py-1 text-xs hover:bg-accent/50 transition-colors bg-green-light dark:bg-gray-dark rounded-lg"
+          className="px-2.5 py-1 text-xs hover:bg-secondary/80 transition-colors rounded-lg"
         >
           {it.icon}
           <span className="truncate max-w-[12rem]">{it.label}</span>

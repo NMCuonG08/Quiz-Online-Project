@@ -17,7 +17,7 @@ const QuizInstructions: React.FC<QuizInstructionsProps> = ({
 }) => {
   if (!instructions) return null;
   return (
-    <Card className="bg-red-light dark:bg-gray-dark w-full">
+    <Card className="w-full bg-card">
       <CardHeader>
         <CardTitle>Hướng dẫn</CardTitle>
       </CardHeader>

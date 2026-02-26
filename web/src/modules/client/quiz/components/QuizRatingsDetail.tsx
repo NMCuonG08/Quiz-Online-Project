@@ -20,19 +20,19 @@ const QuizRatingsDetail: React.FC<QuizRatingsDetailProps> = ({
   breakdown = [],
 }) => {
   return (
-    <Card className="bg-red-light dark:bg-gray-dark w-full">
+    <Card className="w-full bg-card">
       <CardContent className="space-y-3">
         <CardHeader>
           <CardTitle className="flex items-end gap-4">
             <div className="text-3xl font-semibold">{average.toFixed(1)}</div>
-            <div className="text-sm text-gray-600">{total} lượt đánh giá</div>
+            <div className="text-sm text-muted-foreground">{total} lượt đánh giá</div>
           </CardTitle>
         </CardHeader>
         <div className="space-y-1">
           {breakdown.map((b) => (
             <div key={b.stars} className="flex items-center gap-2 text-xs">
               <span>{b.stars}★</span>
-              <div className="flex-1 h-2 bg-gray-100 rounded">
+              <div className="flex-1 h-2 bg-muted rounded">
                 <div
                   className="h-2 bg-yellow-400 rounded"
                   style={{

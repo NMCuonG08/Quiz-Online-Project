@@ -25,7 +25,7 @@ const QuizComments: React.FC<QuizCommentsProps> = ({ comments = [] }) => {
   const [value, setValue] = useState("");
 
   return (
-    <Card className="bg-red-light dark:bg-gray-dark w-full">
+    <Card className="w-full bg-card">
       <CardHeader>
         <CardTitle>Bình luận</CardTitle>
       </CardHeader>
@@ -37,20 +37,20 @@ const QuizComments: React.FC<QuizCommentsProps> = ({ comments = [] }) => {
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
-          <Button className="bg-black text-white">Gửi</Button>
+          <Button>Gửi</Button>
         </div>
         <div className="space-y-3">
           {comments.map((c) => (
             <div key={c.id} className="text-sm">
               <div className="font-medium">{c.user}</div>
-              <div className="text-gray-700">{c.content}</div>
-              <div className="text-xs text-gray-500">
+              <div className="text-foreground">{c.content}</div>
+              <div className="text-xs text-muted-foreground">
                 {new Date(c.createdAt).toLocaleString()}
               </div>
             </div>
           ))}
           {comments.length === 0 && (
-            <div className="text-sm text-gray-500">Chưa có bình luận</div>
+            <div className="text-sm text-muted-foreground">Chưa có bình luận</div>
           )}
         </div>
       </CardContent>

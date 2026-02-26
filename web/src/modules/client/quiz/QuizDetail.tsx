@@ -160,13 +160,13 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6 w-full">
             {/* CTA Section */}
-            <Card className="bg-red-light dark:bg-gray-dark">
+            <Card className="bg-card">
               <CardContent className="space-y-4">
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold">
                     Sẵn sàng thử thách?
                   </CardTitle>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {data.questions_count} câu hỏi •{" "}
                     {Math.floor(data.time_limit / 60)} phút •{" "}
                     {data.difficulty_level}
@@ -174,12 +174,13 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                 </CardHeader>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
-                    className="bg-blue-600 dark:bg-gray-dark text-white flex-1"
+                    className="flex-1"
+                    variant="default"
                     onClick={() =>
                       pushLocalized(prefixPath(`/quiz/${slug}/do-quiz`))
                     }
                   >
-                    <DoorOpen />
+                    <DoorOpen className="mr-2 h-4 w-4" />
                     Bắt đầu làm bài
                   </Button>
                   {/* Join Room Dialog */}
@@ -191,19 +192,19 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     }}
                   >
                     <DialogTrigger asChild>
-                      <Button className="bg-green-600 dark:bg-gray-dark text-white flex-1">
-                        <Users />
+                      <Button className="flex-1" variant="secondary">
+                        <Users className="mr-2 h-4 w-4" />
                         Tham gia phòng
                       </Button>
                     </DialogTrigger>
                     <DialogContent
                       showCloseButton={false}
-                      className="sm:max-w-[100vw] sm:w-[100vw] max-w-[100vw] w-[100vw] h-[100vh] overflow-auto p-6"
+                      className="sm:max-w-[100vw] sm:w-[100vw] max-w-[100vw] w-[100vw] h-[100vh] overflow-auto p-6 bg-background"
                     >
                       <button
                         type="button"
                         onClick={() => setOpenJoinRoom(false)}
-                        className="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100"
+                        className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
                         aria-label="Đóng danh sách phòng"
                       >
                         {/* Close icon */}
@@ -215,7 +216,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          className="size-10"
+                          className="size-6"
                         >
                           <path d="M18 6 6 18" />
                           <path d="m6 6 12 12" />
@@ -223,7 +224,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                       </button>
                       <DialogHeader className="text-left mb-2">
                         <DialogTitle className="flex items-center gap-2">
-                          <Users /> Danh sách phòng đang mở
+                          <Users className="h-5 w-5" /> Danh sách phòng đang mở
                         </DialogTitle>
                       </DialogHeader>
                       <div className="mt-0">
@@ -236,7 +237,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                         {loadingRooms ? (
                           <div>Đang tải...</div>
                         ) : rooms.length === 0 ? (
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-muted-foreground">
                             Chưa có phòng nào
                           </div>
                         ) : (
@@ -244,7 +245,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                             {rooms.map((r) => (
                               <div
                                 key={r.id}
-                                className="border rounded-lg p-4 bg-white dark:bg-gray-dark h-full flex flex-col"
+                                className="border rounded-lg p-4 bg-card h-full flex flex-col"
                               >
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="font-medium">
@@ -252,14 +253,14 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                                   </div>
                                   <span
                                     className={`text-xs px-2 py-1 rounded ${r.is_private
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : "bg-green-100 text-green-800"
+                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+                                      : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
                                       }`}
                                   >
                                     {r.is_private ? "Private" : "Public"}
                                   </span>
                                 </div>
-                                <div className="text-sm text-gray-600 mb-3">
+                                <div className="text-sm text-muted-foreground mb-3">
                                   {r.current_participants}/{r.max_participants}{" "}
                                   người
                                 </div>
@@ -316,15 +317,15 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     onOpenChange={setOpenCreateRoom}
                   >
                     <DialogTrigger asChild>
-                      <Button className="bg-red-600 dark:bg-gray-dark text-white flex-1">
-                        <Users />
+                      <Button className="flex-1" variant="destructive">
+                        <Users className="mr-2 h-4 w-4" />
                         Tạo phòng
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-white dark:bg-gray-dark sm:max-w-lg">
+                    <DialogContent className="sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                          <Users /> Tạo phòng với bạn bè
+                          <Users className="h-5 w-5" /> Tạo phòng với bạn bè
                         </DialogTitle>
                       </DialogHeader>
                       <form
@@ -339,13 +340,13 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                           value={String(quizId)}
                         />
                         <div className="grid gap-2">
-                          <Label htmlFor="quiz-name" className="gap-1">
+                          <Label htmlFor="quiz-name" className="flex items-center gap-1">
                             <Shield className="size-4" /> Tên quiz
                           </Label>
-                          <Input id="quiz-name" value={data.title} readOnly />
+                          <Input id="quiz-name" value={data.title} readOnly className="bg-muted" />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="room-code" className="gap-1">
+                          <Label htmlFor="room-code" className="flex items-center gap-1">
                             <Hash className="size-4" /> room_code (6 ký tự
                             chữ/số)
                           </Label>
@@ -362,7 +363,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                             aria-invalid={!!errors.roomCode}
                           />
                           {errors.roomCode && (
-                            <span className="text-xs text-red-500">
+                            <span className="text-xs text-destructive">
                               {errors.roomCode}
                             </span>
                           )}
@@ -370,7 +371,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                         <div className="grid gap-2">
                           <Label
                             htmlFor="is-private"
-                            className="justify-between"
+                            className="flex justify-between items-center"
                           >
                             <span className="inline-flex items-center gap-2">
                               <LockKeyhole className="size-4" /> Phòng riêng tư
@@ -395,7 +396,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                               aria-invalid={!!errors.password}
                             />
                             {errors.password && (
-                              <span className="text-xs text-red-500">
+                              <span className="text-xs text-destructive">
                                 {errors.password}
                               </span>
                             )}
@@ -417,23 +418,22 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                             aria-invalid={!!errors.maxParticipants}
                           />
                           {errors.maxParticipants && (
-                            <span className="text-xs text-red-500">
+                            <span className="text-xs text-destructive">
                               {errors.maxParticipants}
                             </span>
                           )}
                         </div>
                         <DialogFooter>
                           {createRoomError && (
-                            <div className="text-sm text-red-500 mr-auto">
+                            <div className="text-sm text-destructive mr-auto">
                               {createRoomError}
                             </div>
                           )}
                           <Button
                             type="submit"
                             disabled={creatingRoom}
-                            className="bg-blue dark:bg-gray-dark text-dark"
                           >
-                            <Users /> Tạo phòng
+                            <Users className="mr-2 h-4 w-4" /> Tạo phòng
                           </Button>
                         </DialogFooter>
                       </form>
@@ -459,7 +459,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Quiz Stats Card */}
-            <Card className="bg-violet dark:bg-gray-dark">
+            <Card className="bg-card">
               <CardHeader>
                 <CardTitle className="font-semibold">
                   Thông tin chi tiết
@@ -468,28 +468,28 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Độ khó</span>
+                    <span className="text-muted-foreground">Độ khó</span>
                     <span className="font-medium">{data.difficulty_level}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Thời gian</span>
+                    <span className="text-muted-foreground">Thời gian</span>
                     <span className="font-medium">{data.time_limit}s</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Lượt làm tối đa</span>
+                    <span className="text-muted-foreground">Lượt làm tối đa</span>
                     <span className="font-medium">{data.max_attempts}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Điểm qua môn</span>
+                    <span className="text-muted-foreground">Điểm qua môn</span>
                     <span className="font-medium">{data.passing_score}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Loại quiz</span>
+                    <span className="text-muted-foreground">Loại quiz</span>
                     <span className="font-medium">{data.quiz_type}</span>
                   </div>
                   {data.published_at && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Ngày tạo</span>
+                      <span className="text-muted-foreground">Ngày tạo</span>
                       <span className="font-medium">
                         {new Date(data.published_at).toLocaleDateString()}
                       </span>
@@ -507,21 +507,21 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
               variant="elevated"
               size="default"
               rounded="lg"
-              className="bg-gray-50 dark:bg-gray-dark"
+              className="bg-accent/50"
             >
               <h4 className="font-medium mb-3">Thống kê</h4>
               <div className="grid grid-cols-2 gap-4 text-center">
                 <div>
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-primary">
                     {data.questions_count}
                   </div>
-                  <div className="text-xs text-gray-600">Câu hỏi</div>
+                  <div className="text-xs text-muted-foreground">Câu hỏi</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                     {data.attempts_count}
                   </div>
-                  <div className="text-xs text-gray-600">Lượt làm</div>
+                  <div className="text-xs text-muted-foreground">Lượt làm</div>
                 </div>
               </div>
             </Div>

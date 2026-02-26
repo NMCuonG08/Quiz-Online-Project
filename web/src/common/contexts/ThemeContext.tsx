@@ -15,6 +15,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("system");
   const [actualTheme, setActualTheme] = useState<"light" | "dark">("light");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     // Get theme from localStorage or default to system
@@ -22,9 +23,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (savedTheme) {
       setTheme(savedTheme);
     }
+    setMounted(true);
   }, []);
 
   useEffect(() => {
+    // Only run this effect after we've mounted and restored preference
+    if (!mounted) return;
+
     const root = window.document.documentElement;
 
     // Remove previous theme classes
@@ -44,7 +49,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Save to localStorage
     localStorage.setItem("theme", theme);
-  }, [theme]);
+  }, [theme, mounted]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");

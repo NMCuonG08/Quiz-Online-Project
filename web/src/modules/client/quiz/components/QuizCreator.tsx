@@ -15,7 +15,7 @@ interface QuizCreatorProps {
 const QuizCreator: React.FC<QuizCreatorProps> = ({ creatorName }) => {
   if (!creatorName) return null;
   return (
-    <Card className="bg-violet dark:bg-gray-dark w-full">
+    <Card className="w-full bg-card">
       <CardHeader>
         <CardTitle>Người tạo</CardTitle>
       </CardHeader>
