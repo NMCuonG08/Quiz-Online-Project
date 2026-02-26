@@ -1,5 +1,5 @@
 "use client";
-import { Link, usePathname } from "@/common/i18n/navigation";
+import { usePathname } from "@/common/i18n/navigation";
 import { LocalizedLink } from "@/common/components/ui";
 import React from "react";
 import { ThemeToggle } from "@/common/components/ui/theme-toggle";
@@ -74,27 +74,27 @@ const NavBarLaptop = () => {
           >
             {tNav("quizzes")}
           </LocalizedLink>
-          <Link
-            href="#courses"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("#courses") ? "active" : "hover:text-[#FDD239]"
+          <LocalizedLink
+            href="/courses"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/courses") ? "active" : "hover:text-[#FDD239]"
               }`}
           >
             {tNav("courses")}
-          </Link>
-          <Link
-            href="#community"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("#community") ? "active" : "hover:text-[#FDD239]"
+          </LocalizedLink>
+          <LocalizedLink
+            href="/community"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/community") ? "active" : "hover:text-[#FDD239]"
               }`}
           >
             {tNav("community")}
-          </Link>
-          <Link
-            href="#about"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("#about") ? "active" : "hover:text-[#FDD239]"
+          </LocalizedLink>
+          <LocalizedLink
+            href="/about"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/about") ? "active" : "hover:text-[#FDD239]"
               }`}
           >
             {tNav("about")}
-          </Link>
+          </LocalizedLink>
         </nav>
 
         {/* Actions */}

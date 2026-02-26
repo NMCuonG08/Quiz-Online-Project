@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/common/components/ui/card";
+import { useTranslations } from "next-intl";
 
 interface QuizInstructionsProps {
   instructions?: string | null;
@@ -15,11 +16,12 @@ interface QuizInstructionsProps {
 const QuizInstructions: React.FC<QuizInstructionsProps> = ({
   instructions,
 }) => {
+  const t = useTranslations("quizDetail");
   if (!instructions) return null;
   return (
     <Card className="w-full bg-card">
       <CardHeader>
-        <CardTitle>Hướng dẫn</CardTitle>
+        <CardTitle>{t("instructions")}</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-sm whitespace-pre-line">{instructions}</p>

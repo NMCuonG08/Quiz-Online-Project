@@ -101,24 +101,24 @@ const NavBarMobile = () => {
               {tNav("quizzes")}
             </Link>
             <Link
-              href="#courses"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("#courses") ? "active" : "hover:text-yellow-500"
+              href="/courses"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/courses") ? "active" : "hover:text-yellow-500"
                 }`}
               onClick={() => setOpen(false)}
             >
               {tNav("courses")}
             </Link>
             <Link
-              href="#community"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("#community") ? "active" : "hover:text-yellow-500"
+              href="/community"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/community") ? "active" : "hover:text-yellow-500"
                 }`}
               onClick={() => setOpen(false)}
             >
               {tNav("community")}
             </Link>
             <Link
-              href="#about"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("#about") ? "active" : "hover:text-yellow-500"
+              href="/about"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/about") ? "active" : "hover:text-yellow-500"
                 }`}
               onClick={() => setOpen(false)}
             >

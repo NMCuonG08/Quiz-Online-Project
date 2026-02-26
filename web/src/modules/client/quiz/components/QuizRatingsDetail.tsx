@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/common/components/ui/card";
+import { useTranslations } from "next-intl";
 
 interface QuizRatingsDetailProps {
   average: number;
@@ -19,13 +20,14 @@ const QuizRatingsDetail: React.FC<QuizRatingsDetailProps> = ({
   total,
   breakdown = [],
 }) => {
+  const t = useTranslations("quizDetail");
   return (
     <Card className="w-full bg-card">
       <CardContent className="space-y-3">
         <CardHeader>
           <CardTitle className="flex items-end gap-4">
             <div className="text-3xl font-semibold">{average.toFixed(1)}</div>
-            <div className="text-sm text-muted-foreground">{total} lượt đánh giá</div>
+            <div className="text-sm text-muted-foreground">{t("ratingsCount", { count: total })}</div>
           </CardTitle>
         </CardHeader>
         <div className="space-y-1">

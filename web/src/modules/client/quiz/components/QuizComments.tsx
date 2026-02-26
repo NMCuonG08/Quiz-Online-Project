@@ -9,6 +9,7 @@ import {
 } from "@/common/components/ui/card";
 import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
+import { useTranslations } from "next-intl";
 
 interface CommentItem {
   id: string;
@@ -23,21 +24,22 @@ interface QuizCommentsProps {
 
 const QuizComments: React.FC<QuizCommentsProps> = ({ comments = [] }) => {
   const [value, setValue] = useState("");
+  const t = useTranslations("quizDetail");
 
   return (
     <Card className="w-full bg-card">
       <CardHeader>
-        <CardTitle>Bình luận</CardTitle>
+        <CardTitle>{t("comments")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Input
             className="flex-1"
-            placeholder="Viết bình luận..."
+            placeholder={t("commentPlaceholder")}
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
-          <Button>Gửi</Button>
+          <Button>{t("send")}</Button>
         </div>
         <div className="space-y-3">
           {comments.map((c) => (
@@ -50,7 +52,7 @@ const QuizComments: React.FC<QuizCommentsProps> = ({ comments = [] }) => {
             </div>
           ))}
           {comments.length === 0 && (
-            <div className="text-sm text-muted-foreground">Chưa có bình luận</div>
+            <div className="text-sm text-muted-foreground">{t("noComments")}</div>
           )}
         </div>
       </CardContent>

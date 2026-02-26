@@ -7,17 +7,17 @@ import { QuestionRendererProps } from "../types/game-quiz.types";
 import { Card } from "@/common/components/ui/card";
 import { Badge } from "@/common/components/ui/badge";
 import { Textarea } from "@/common/components/ui/textarea";
+import { useTranslations } from "next-intl";
 
 const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
   const {
     question,
-    questionNumber,
-    totalQuestions,
     selectedAnswer,
     onAnswerSelect,
     isAnswered,
     timeRemaining,
   } = props;
+  const t = useTranslations("gameQuiz");
   const [textValue, setTextValue] = useState(
     typeof selectedAnswer === "string" ? selectedAnswer : ""
   );
@@ -57,7 +57,7 @@ const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
             <Card className="p-2 overflow-hidden">
               <img
                 src={question.media_url}
-                alt="Question media"
+                alt={t("questionMedia")}
                 className="w-full h-auto max-h-96 object-contain rounded-lg"
               />
             </Card>
@@ -76,7 +76,7 @@ const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
               variant="secondary"
               className="text-lg sm:text-xl md:text-2xl px-4 py-2"
             >
-              {question.points} điểm
+              {t("points", { count: question.points })}
             </Badge>
           </div>
         </Card>
@@ -88,7 +88,7 @@ const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
           value={textValue}
           onChange={(e) => handleTextChange(e.target.value)}
           disabled={isAnswered}
-          placeholder="Nhập câu trả lời của bạn..."
+          placeholder={t("enterEssay")}
           rows={12}
           className="w-full p-6 sm:p-8 text-xl sm:text-2xl font-medium min-h-[300px] sm:min-h-[400px] resize-none"
         />
@@ -97,7 +97,7 @@ const EssayRenderer: React.FC<QuestionRendererProps> = (props) => {
             variant="outline"
             className="text-base sm:text-lg md:text-xl px-3 py-1"
           >
-            {textValue.length} ký tự
+            {t("characters", { count: textValue.length })}
           </Badge>
         </div>
       </div>

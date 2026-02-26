@@ -8,17 +8,17 @@ import { Card } from "@/common/components/ui/card";
 import { Badge } from "@/common/components/ui/badge";
 import { Input } from "@/common/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
   const {
     question,
-    questionNumber,
-    totalQuestions,
     selectedAnswer,
     onAnswerSelect,
     isAnswered,
     timeRemaining,
   } = props;
+  const t = useTranslations("gameQuiz");
   const [inputValue, setInputValue] = useState(
     typeof selectedAnswer === "string" ? selectedAnswer : ""
   );
@@ -38,7 +38,7 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
   const isCorrect =
     isAnswered && question.correct_answer
       ? inputValue.toLowerCase().trim() ===
-        question.correct_answer.toLowerCase().trim()
+      question.correct_answer.toLowerCase().trim()
       : false;
 
   return (
@@ -64,7 +64,7 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
             <Card className="p-2 overflow-hidden">
               <img
                 src={question.media_url}
-                alt="Question media"
+                alt={t("questionMedia")}
                 className="w-full h-auto max-h-96 object-contain rounded-lg"
               />
             </Card>
@@ -83,7 +83,7 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
               variant="secondary"
               className="text-lg sm:text-xl md:text-2xl px-4 py-2"
             >
-              {question.points} điểm
+              {t("points", { count: question.points })}
             </Badge>
           </div>
         </Card>
@@ -96,15 +96,15 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
           value={inputValue}
           onChange={(e) => handleInputChange(e.target.value)}
           disabled={isAnswered}
-          placeholder="Nhập câu trả lời của bạn..."
+          placeholder={t("enterAnswer")}
           className={cn(
             "w-full p-6 sm:p-8 text-2xl sm:text-3xl md:text-4xl font-semibold h-auto",
             isAnswered &&
-              isCorrect &&
-              "border-green-500 bg-green-50 dark:bg-green-950/50",
+            isCorrect &&
+            "border-green-500 bg-green-50 dark:bg-green-950/50",
             isAnswered &&
-              !isCorrect &&
-              "border-destructive bg-destructive/10 dark:bg-destructive/20"
+            !isCorrect &&
+            "border-destructive bg-destructive/10 dark:bg-destructive/20"
           )}
         />
         {isAnswered && question.correct_answer && (
@@ -114,10 +114,10 @@ const FillBlankRenderer: React.FC<QuestionRendererProps> = (props) => {
                 variant={isCorrect ? "default" : "destructive"}
                 className="text-xl sm:text-2xl md:text-3xl px-4 py-2 mb-4"
               >
-                {isCorrect ? "✓ Đúng!" : "✗ Sai"}
+                {isCorrect ? `✓ ${t("correct")}` : `✗ ${t("incorrect")}`}
               </Badge>
               <div className="text-lg sm:text-xl md:text-2xl text-muted-foreground mt-4">
-                Đáp án đúng:{" "}
+                {t("correctAnswer")}{" "}
                 <span className="font-bold text-foreground">
                   {question.correct_answer}
                 </span>
