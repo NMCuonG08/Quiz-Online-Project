@@ -27,6 +27,18 @@ import {
   showSuccess,
 } from "@/lib/Notification";
 
+const generateSlug = (str: string) => {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .replace(/([^0-9a-z-\s])/g, "")
+    .replace(/(\s+)/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
 const EditQuiz = () => {
   const params = useParams();
   const slugParam = (params?.slug as string) || "";
@@ -245,12 +257,17 @@ const EditQuiz = () => {
             type="text"
             name="title"
             required
-            handleChange={(e) =>
-              setValue("title", e.target.value, {
+            handleChange={(e) => {
+              const val = e.target.value;
+              setValue("title", val, {
                 shouldDirty: true,
                 shouldValidate: true,
-              })
-            }
+              });
+              setValue("slug", generateSlug(val), {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+            }}
             value={watchedValues.title}
             error={errors.title?.message}
           />
@@ -290,6 +307,34 @@ const EditQuiz = () => {
             error={errors.category_id?.message}
           />
 
+          <TextAreaGroup
+            label="Description"
+            placeholder="Short description about this quiz"
+            value={watchedValues.description}
+            onChange={(e) =>
+              setValue("description", e.target.value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+            error={errors.description?.message}
+          />
+
+          <TextAreaGroup
+            label="Instructions"
+            placeholder="Instructions for taking this quiz"
+            value={watchedValues.instructions}
+            onChange={(e) =>
+              setValue("instructions", e.target.value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+            error={errors.instructions?.message}
+          />
+        </div>
+
+        <div className="flex flex-col gap-5.5">
           <Select
             label="Difficulty Level"
             placeholder="Select difficulty"
@@ -342,39 +387,15 @@ const EditQuiz = () => {
                 checked={watchedValues.is_active}
                 onCheckedChange={handleToggleActive}
               />
-              <span className="text-body-sm text-dark-6 dark:text-white/70">
+              <span className={cn(
+                "text-body-sm font-bold",
+                watchedValues.is_active ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+              )}>
                 {watchedValues.is_active ? "Active" : "Inactive"}
               </span>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-col gap-5.5">
-          <TextAreaGroup
-            label="Description"
-            placeholder="Short description about this quiz"
-            value={watchedValues.description}
-            onChange={(e) =>
-              setValue("description", e.target.value, {
-                shouldDirty: true,
-                shouldValidate: true,
-              })
-            }
-            error={errors.description?.message}
-          />
-
-          <TextAreaGroup
-            label="Instructions"
-            placeholder="Instructions for taking this quiz"
-            value={watchedValues.instructions}
-            onChange={(e) =>
-              setValue("instructions", e.target.value, {
-                shouldDirty: true,
-                shouldValidate: true,
-              })
-            }
-            error={errors.instructions?.message}
-          />
 
           <InputGroup
             label="Time Limit (minutes)"
