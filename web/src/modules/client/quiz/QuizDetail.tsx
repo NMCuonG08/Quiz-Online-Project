@@ -453,7 +453,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
             />
 
             {/* Comments */}
-            <QuizComments />
+            <QuizComments quizId={data.id} />
           </div>
 
           {/* Right Column - Sidebar */}

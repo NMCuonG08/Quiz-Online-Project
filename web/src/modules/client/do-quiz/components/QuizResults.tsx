@@ -5,10 +5,12 @@ import { QuizResult, Question, UserAnswer } from "../types/quiz.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/common/components/ui/card";
 import { Button } from "@/common/components/ui/button";
 import { Badge } from "@/common/components/ui/badge";
-import { CheckCircle2, XCircle, Trophy, Clock, RotateCcw, Home, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, XCircle, Trophy, Home, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { APP_ROUTES } from "@/lib/appRoutes";
+import QuestionCard from "./QuestionCard";
+import AnswerOptions from "./AnswerOptions";
 
 interface QuizResultsProps {
   result: QuizResult;
@@ -25,6 +27,14 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   onRetakeQuiz,
 }) => {
   const router = useLocalizedRouter();
+  const [expandedQuestions, setExpandedQuestions] = React.useState<Record<string, boolean>>({});
+
+  const toggleExpand = (questionId: string) => {
+    setExpandedQuestions(prev => ({
+      ...prev,
+      [questionId]: !prev[questionId]
+    }));
+  };
 
   // Calculate stats locally
   const stats = React.useMemo(() => {
@@ -201,8 +211,9 @@ const QuizResults: React.FC<QuizResultsProps> = ({
               const userAnswer = getUserAnswerForQuestion(question.id);
               const correctOption = getCorrectOption(question);
               const selectedOption = getSelectedOption(question, userAnswer);
-              const isCorrect = selectedOption?.is_correct || false;
-              const wasAnswered = !!selectedOption;
+              const isCorrect = userAnswer?.is_correct || false;
+              const wasAnswered = userAnswer && (userAnswer.selected_option_id || userAnswer.selected_option_ids?.length || userAnswer.text_answer);
+              const isExpanded = expandedQuestions[question.id];
 
               return (
                 <div
@@ -249,13 +260,46 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                       </div>
                     </div>
 
-                    {/* Status Icon */}
-                    {isCorrect ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    ) : wasAnswered ? (
-                      <XCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
-                    ) : null}
+                    {/* Status Icon & Expand Button */}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      {isCorrect ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                      ) : wasAnswered ? (
+                        <XCircle className="w-5 h-5 text-rose-500" />
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => toggleExpand(question.id)}
+                      >
+                        {isExpanded ? (
+                          <>Close <ChevronUp className="w-3.5 h-3.5 ml-1" /></>
+                        ) : (
+                          <>Detail <ChevronDown className="w-3.5 h-3.5 ml-1" /></>
+                        )}
+                      </Button>
+                    </div>
                   </div>
+
+                  {/* Expanded View */}
+                  {isExpanded && (
+                    <div className="mt-4 pt-4 border-t-2 border-dashed border-border/50 animate-in fade-in slide-in-from-top-4 duration-500">
+                      <div className="mb-4">
+                        <QuestionCard
+                          question={question}
+                          questionNumber={index + 1}
+                          totalQuestions={questions.length}
+                        />
+                      </div>
+                      <AnswerOptions
+                        question={question}
+                        userAnswer={userAnswer}
+                        readOnly={true}
+                        showCorrectAnswers={true}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

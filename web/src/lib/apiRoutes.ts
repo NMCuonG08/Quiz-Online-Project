@@ -77,4 +77,9 @@ export const apiRoutes = {
     GOOGLE_URL: "/api/auth/google/url",
     GOOGLE_CALLBACK: "/api/auth/google/callback",
   },
+  FEEDBACK: {
+    GET_RATINGS: "/api/feedback/ratings",
+    POST_RATING: "/api/feedback/ratings",
+    DELETE_RATING: (quizId: string) => `/api/feedback/ratings/${quizId}`,
+  }
 };

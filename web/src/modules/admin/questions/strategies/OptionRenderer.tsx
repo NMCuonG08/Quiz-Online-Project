@@ -32,9 +32,9 @@ const CompactImageUpload: React.FC<{
     return (
       <Button
         type="button"
-        variant="ghost"
+        variant="outline"
         size="sm"
-        className="h-8 text-xs gap-1.5 text-gray-500 hover:text-primary dark:text-gray-400"
+        className="h-8 text-xs gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:border-blue-800/50"
         onClick={() => setShowUpload(true)}
       >
         <ImageIcon className="w-3.5 h-3.5" />

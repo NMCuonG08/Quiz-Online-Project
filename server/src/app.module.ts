@@ -19,6 +19,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { WebSocketModule } from './common/websocket/websocket.module';
 // import { NotificationService } from './modules/notification/services/notification.service';
 import { RoomPlayModule } from './modules/room-play/room-play.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -167,6 +168,7 @@ import { RoomPlayModule } from './modules/room-play/room-play.module';
     QuestionModule,
     RoomPlayModule,
     WebSocketModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService, JobRepository],
