@@ -1,35 +1,35 @@
 import React from "react";
 import Image from "next/image";
-
-const features = [
-  {
-    title: "Quiz Game",
-    subtitle:
-      "Chơi và kiểm tra kiến thức với các bộ câu hỏi đa dạng, chấm điểm tức thì.",
-    image: "/home/quiz.jpg",
-  },
-  {
-    title: "Fragments",
-    subtitle:
-      "Học theo từng mảnh kiến thức ngắn gọn, dễ nhớ, luyện tập theo lộ trình.",
-    image: "/home/quiz2.jpg",
-  },
-  {
-    title: "Sudoku",
-    subtitle: "Giải đố Sudoku từ dễ đến khó, rèn luyện tư duy logic mỗi ngày.",
-    image: "/home/quiz3.jpg",
-  },
-];
+import { useTranslations } from "next-intl";
 
 const FeatureSection = () => {
+  const t = useTranslations("featureSection");
+
+  const features = [
+    {
+      title: t("feature1Title"),
+      subtitle: t("feature1Subtitle"),
+      image: "/home/quiz.jpg",
+    },
+    {
+      title: t("feature2Title"),
+      subtitle: t("feature2Subtitle"),
+      image: "/home/quiz2.jpg",
+    },
+    {
+      title: t("feature3Title"),
+      subtitle: t("feature3Subtitle"),
+      image: "/home/quiz3.jpg",
+    },
+  ];
+
   return (
     <section className="max-w-6xl mx-auto px-4 mt-20 py-6">
       {features.slice(0, 3).map((feature, index) => (
         <div
           key={feature.title}
-          className={`flex items-start gap-8 py-6 ${
-            index % 2 === 0 ? "flex-row" : "flex-row-reverse"
-          }`}
+          className={`flex items-start gap-8 py-6 ${index % 2 === 0 ? "flex-row" : "flex-row-reverse"
+            }`}
         >
           <div className="flex-1 flex justify-start">
             <Image

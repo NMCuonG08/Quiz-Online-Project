@@ -237,5 +237,13 @@
     "contactDesc": "Có câu hỏi hoặc phản hồi? Chúng tôi rất muốn nghe từ bạn.",
     "contactEmail": "Gửi email",
     "contactGithub": "GitHub"
+  },
+  "featureSection": {
+    "feature1Title": "Quiz Game",
+    "feature1Subtitle": "Chơi và kiểm tra kiến thức với các bộ câu hỏi đa dạng, chấm điểm tức thì.",
+    "feature2Title": "Fragments",
+    "feature2Subtitle": "Học theo từng mảnh kiến thức ngắn gọn, dễ nhớ, luyện tập theo lộ trình.",
+    "feature3Title": "Sudoku",
+    "feature3Subtitle": "Giải đố Sudoku từ dễ đến khó, rèn luyện tư duy logic mỗi ngày."
   }
 }

@@ -237,5 +237,13 @@
     "contactDesc": "Have questions or feedback? We'd love to hear from you.",
     "contactEmail": "Email us",
     "contactGithub": "GitHub"
+  },
+  "featureSection": {
+    "feature1Title": "Quiz Game",
+    "feature1Subtitle": "Play and test your knowledge with diverse question banks, instant scoring.",
+    "feature2Title": "Fragments",
+    "feature2Subtitle": "Learn in bite-sized, easy-to-remember knowledge fragments, practice along a learning path.",
+    "feature3Title": "Sudoku",
+    "feature3Subtitle": "Solve Sudoku puzzles from easy to hard, train your logic thinking every day."
   }
 }
