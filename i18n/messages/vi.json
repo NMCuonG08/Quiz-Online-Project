@@ -143,7 +143,9 @@
     "mightBecause": "Điều này có thể do:",
     "backendStarting": "Server backend đang khởi động",
     "dbIssues": "Lỗi kết nối cơ sở dữ liệu",
-    "networkIssues": "Vấn đề kết nối mạng"
+    "networkIssues": "Vấn đề kết nối mạng",
+    "regenerateCode": "Tạo mã mới",
+    "loginToUseRooms": "Đăng nhập để tham gia hoặc tạo phòng"
   },
   "gameQuiz": {
     "points": "{count} điểm",

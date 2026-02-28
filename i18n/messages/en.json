@@ -143,7 +143,9 @@
     "mightBecause": "This might be because:",
     "backendStarting": "Backend server is starting up",
     "dbIssues": "Database connection issues",
-    "networkIssues": "Network connectivity problems"
+    "networkIssues": "Network connectivity problems",
+    "regenerateCode": "Generate new code",
+    "loginToUseRooms": "Login to join or create rooms"
   },
   "gameQuiz": {
     "points": "{count} points",

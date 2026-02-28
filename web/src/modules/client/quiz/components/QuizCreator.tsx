@@ -17,7 +17,7 @@ const QuizCreator: React.FC<QuizCreatorProps> = ({ creatorName }) => {
   const t = useTranslations("quizDetail");
   if (!creatorName) return null;
   return (
-    <Card className="w-full bg-card">
+    <Card className="w-full bg-[#FFF5F5]">
       <CardHeader>
         <CardTitle>{t("creator")}</CardTitle>
       </CardHeader>

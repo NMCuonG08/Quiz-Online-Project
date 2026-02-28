@@ -28,7 +28,8 @@ import {
   CardTitle,
 } from "@/common/components/ui/card";
 import { Div } from "@/common/components/ui/div";
-import { Users, DoorOpen, Shield, Hash, LockKeyhole } from "lucide-react";
+import { Users, DoorOpen, Shield, Hash, LockKeyhole, RefreshCw, LogIn } from "lucide-react";
+import { useAuth } from "@/modules/auth/common/hooks/useAuth";
 import type { QuizDetailData } from "./services/quiz.detail.service";
 import { useCreateRoom } from "./hooks/useCreateRoom";
 import { useListRooms } from "./hooks/useListRooms";
@@ -45,6 +46,7 @@ interface QuizDetailProps {
 const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
   const { data, loading, error } = useQuizDetail(slug);
   const t = useTranslations("quizDetail");
+  const { isLoggedIn } = useAuth();
   const {
     createRoom,
     loading: creatingRoom,
@@ -52,7 +54,18 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
   } = useCreateRoom();
   const [openJoinRoom, setOpenJoinRoom] = React.useState(false);
   const [openCreateRoom, setOpenCreateRoom] = React.useState(false);
-  const [roomCode, setRoomCode] = React.useState("");
+
+  // Auto-generate room code
+  function generateRoomCode(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  const [roomCode, setRoomCode] = React.useState(() => generateRoomCode());
   const [isPrivate, setIsPrivate] = React.useState(false);
   const [password, setPassword] = React.useState("");
   const [maxParticipants, setMaxParticipants] = React.useState<number>(50);
@@ -94,15 +107,12 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
     pushLocalized(prefixPath(`/quiz/${quizId}/room/${r.id}`));
   }
 
-  function handleRoomCodeChange(v: string) {
-    // Do not aggressively filter during typing; just cap length
-    setRoomCode(v.slice(0, 6));
+  function handleRegenerateRoomCode() {
+    setRoomCode(generateRoomCode());
   }
 
   function validateForm() {
     const nextErrors: typeof errors = {};
-    if (!/^[A-Za-z0-9]{6}$/.test(roomCode))
-      nextErrors.roomCode = t("roomCodeError");
     if (isPrivate && !password) nextErrors.password = t("enterPasswordRequired");
     const maxNum = Number(maxParticipants);
     if (!Number.isFinite(maxNum) || maxNum < 2)
@@ -186,259 +196,285 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     {t("startQuiz")}
                   </Button>
                   {/* Join Room Dialog */}
-                  <Dialog
-                    open={openJoinRoom}
-                    onOpenChange={(o) => {
-                      setOpenJoinRoom(o);
-                      if (o) void refetch();
-                    }}
-                  >
-                    <DialogTrigger asChild>
-                      <Button className="flex-1" variant="secondary">
-                        <Users className="mr-2 h-4 w-4" />
-                        {t("joinRoom")}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent
-                      showCloseButton={false}
-                      className="sm:max-w-[100vw] sm:w-[100vw] max-w-[100vw] w-[100vw] h-[100vh] overflow-auto p-6 bg-background"
+                  {isLoggedIn ? (
+                    <Dialog
+                      open={openJoinRoom}
+                      onOpenChange={(o) => {
+                        setOpenJoinRoom(o);
+                        if (o) void refetch();
+                      }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => setOpenJoinRoom(false)}
-                        className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-                        aria-label={t("closeRoomsList")}
+                      <DialogTrigger asChild>
+                        <Button className="flex-1" variant="secondary">
+                          <Users className="mr-2 h-4 w-4" />
+                          {t("joinRoom")}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent
+                        showCloseButton={false}
+                        className="sm:max-w-[100vw] sm:w-[100vw] max-w-[100vw] w-[100vw] h-[100vh] overflow-auto p-6 bg-background place-content-start"
                       >
-                        {/* Close icon */}
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="size-6"
+                        <button
+                          type="button"
+                          onClick={() => setOpenJoinRoom(false)}
+                          className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+                          aria-label={t("closeRoomsList")}
                         >
-                          <path d="M18 6 6 18" />
-                          <path d="m6 6 12 12" />
-                        </svg>
-                      </button>
-                      <DialogHeader className="text-left mb-2">
-                        <DialogTitle className="flex items-center gap-2">
-                          <Users className="h-5 w-5" /> {t("openRoomsList")}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="mt-0">
-                        {roomsError && (
-                          <BackendUnavailable
-                            message={roomsError}
-                            onRetry={refetch}
-                          />
-                        )}
-                        {loadingRooms ? (
-                          <div>{t("loadingRooms")}</div>
-                        ) : rooms.length === 0 ? (
-                          <div className="text-sm text-muted-foreground">
-                            {t("noRooms")}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 justify-start items-stretch">
-                            {rooms.map((r) => (
-                              <div
-                                key={r.id}
-                                className="border rounded-lg p-4 bg-card h-full flex flex-col"
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="font-medium">
-                                    {t("roomCode")}: {r.room_code}
+                          {/* Close icon */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="size-6"
+                          >
+                            <path d="M18 6 6 18" />
+                            <path d="m6 6 12 12" />
+                          </svg>
+                        </button>
+                        <DialogHeader className="text-left mb-2">
+                          <DialogTitle className="flex items-center gap-2">
+                            <Users className="h-5 w-5" /> {t("openRoomsList")}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="mt-0">
+                          {roomsError && (
+                            <BackendUnavailable
+                              message={roomsError}
+                              onRetry={refetch}
+                            />
+                          )}
+                          {loadingRooms ? (
+                            <div>{t("loadingRooms")}</div>
+                          ) : rooms.length === 0 ? (
+                            <div className="text-sm text-muted-foreground">
+                              {t("noRooms")}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 justify-start items-start">
+                              {rooms.map((r) => (
+                                <div
+                                  key={r.id}
+                                  className="border border-gray-900 rounded-lg p-4 bg-card h-full flex flex-col"
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="font-medium">
+                                      {t("roomCode")}: {r.room_code}
+                                    </div>
+                                    <span
+                                      className={`text-xs px-2 py-1 rounded ${r.is_private
+                                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+                                        : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                                        }`}
+                                    >
+                                      {r.is_private ? t("private") : t("public")}
+                                    </span>
                                   </div>
-                                  <span
-                                    className={`text-xs px-2 py-1 rounded ${r.is_private
-                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
-                                      : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                                      }`}
-                                  >
-                                    {r.is_private ? t("private") : t("public")}
-                                  </span>
-                                </div>
-                                <div className="text-sm text-muted-foreground mb-3">
-                                  {t("participants", { current: r.current_participants, max: r.max_participants })}
-                                </div>
-                                {r.is_private ? (
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`pwd-${r.id}`}>
-                                      {t("password")}
-                                    </Label>
-                                    <Input
-                                      id={`pwd-${r.id}`}
-                                      type="password"
-                                      value={
-                                        joiningRoomId === r.id
-                                          ? joinPassword
-                                          : ""
-                                      }
-                                      onChange={(e) => {
-                                        setJoiningRoomId(r.id);
-                                        setJoinPassword(e.target.value);
-                                      }}
-                                      placeholder={t("enterPassword")}
-                                    />
-                                    {/* lỗi sẽ hiện qua toast, không đẩy card xuống */}
+                                  <div className="text-sm text-muted-foreground mb-3">
+                                    {t("participants", { current: r.current_participants, max: r.max_participants })}
+                                  </div>
+                                  {r.is_private ? (
+                                    <div className="space-y-2">
+                                      <Label htmlFor={`pwd-${r.id}`}>
+                                        {t("password")}
+                                      </Label>
+                                      <Input
+                                        id={`pwd-${r.id}`}
+                                        type="password"
+                                        value={
+                                          joiningRoomId === r.id
+                                            ? joinPassword
+                                            : ""
+                                        }
+                                        onChange={(e) => {
+                                          setJoiningRoomId(r.id);
+                                          setJoinPassword(e.target.value);
+                                        }}
+                                        placeholder={t("enterPassword")}
+                                      />
+                                      {/* lỗi sẽ hiện qua toast, không đẩy card xuống */}
+                                      <Button
+                                        onClick={() => void handleJoin(r)}
+                                        disabled={
+                                          joining ||
+                                          !joinPassword ||
+                                          joiningRoomId !== r.id
+                                        }
+                                        className="w-full"
+                                      >
+                                        {t("join")}
+                                      </Button>
+                                    </div>
+                                  ) : (
                                     <Button
                                       onClick={() => void handleJoin(r)}
-                                      disabled={
-                                        joining ||
-                                        !joinPassword ||
-                                        joiningRoomId !== r.id
-                                      }
+                                      disabled={joining}
                                       className="w-full"
                                     >
                                       {t("join")}
                                     </Button>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    onClick={() => void handleJoin(r)}
-                                    disabled={joining}
-                                    className="w-full"
-                                  >
-                                    {t("join")}
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  <Dialog
-                    open={openCreateRoom}
-                    onOpenChange={setOpenCreateRoom}
-                  >
-                    <DialogTrigger asChild>
-                      <Button className="flex-1" variant="destructive">
-                        <Users className="mr-2 h-4 w-4" />
-                        {t("createRoom")}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <Users className="h-5 w-5" /> {t("createRoomWithFriends")}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <form
-                        className="grid gap-4"
-                        onSubmit={handleSubmit}
-                        noValidate
-                      >
-                        {/* Ẩn id, chỉ hiển thị tên quiz và không cho sửa */}
-                        <input
-                          type="hidden"
-                          name="quiz_id"
-                          value={String(quizId)}
-                        />
-                        <div className="grid gap-2">
-                          <Label htmlFor="quiz-name" className="flex items-center gap-1">
-                            <Shield className="size-4" /> {t("quizName")}
-                          </Label>
-                          <Input id="quiz-name" value={data.title} readOnly className="bg-muted" />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="room-code" className="flex items-center gap-1">
-                            <Hash className="size-4" /> {t("roomCodeLabel")}
-                          </Label>
-                          <Input
-                            id="room-code"
-                            type="text"
-                            inputMode="text"
-                            maxLength={6}
-                            placeholder={t("roomCodePlaceholder")}
-                            value={roomCode}
-                            onChange={(e) =>
-                              handleRoomCodeChange(e.target.value)
-                            }
-                            aria-invalid={!!errors.roomCode}
-                          />
-                          {errors.roomCode && (
-                            <span className="text-xs text-destructive">
-                              {errors.roomCode}
-                            </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
-                        <div className="grid gap-2">
-                          <Label
-                            htmlFor="is-private"
-                            className="flex justify-between items-center"
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <LockKeyhole className="size-4" /> {t("privateRoom")}
-                            </span>
-                            <Switch
-                              id="is-private"
-                              checked={isPrivate}
-                              onCheckedChange={(v) => setIsPrivate(Boolean(v))}
-                              aria-label={t("togglePrivate")}
-                            />
-                          </Label>
-                        </div>
-                        {isPrivate && (
+                      </DialogContent>
+                    </Dialog>
+                  ) : (
+                    <Button
+                      className="flex-1"
+                      variant="secondary"
+                      onClick={() => pushLocalized(prefixPath("/auth/login"))}
+                    >
+                      <LogIn className="mr-2 h-4 w-4" />
+                      {t("joinRoom")}
+                    </Button>
+                  )}
+                  {isLoggedIn ? (
+                    <Dialog
+                      open={openCreateRoom}
+                      onOpenChange={(o) => {
+                        setOpenCreateRoom(o);
+                        if (o) setRoomCode(generateRoomCode());
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button className="flex-1" variant="destructive">
+                          <Users className="mr-2 h-4 w-4" />
+                          {t("createRoom")}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Users className="h-5 w-5" /> {t("createRoomWithFriends")}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <form
+                          className="grid gap-4"
+                          onSubmit={handleSubmit}
+                          noValidate
+                        >
+                          {/* Ẩn id, chỉ hiển thị tên quiz và không cho sửa */}
+                          <input
+                            type="hidden"
+                            name="quiz_id"
+                            value={String(quizId)}
+                          />
                           <div className="grid gap-2">
-                            <Label htmlFor="password">{t("password")}</Label>
+                            <Label htmlFor="quiz-name" className="flex items-center gap-1">
+                              <Shield className="size-4" /> {t("quizName")}
+                            </Label>
+                            <Input id="quiz-name" value={data.title} readOnly className="bg-muted" />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="room-code" className="flex items-center gap-1">
+                              <Hash className="size-4" /> {t("roomCodeLabel")}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="room-code"
+                                type="text"
+                                value={roomCode}
+                                readOnly
+                                className="bg-muted font-mono tracking-widest text-center"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={handleRegenerateRoomCode}
+                                title={t("regenerateCode")}
+                              >
+                                <RefreshCw className="size-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label
+                              htmlFor="is-private"
+                              className="flex justify-between items-center"
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <LockKeyhole className="size-4" /> {t("privateRoom")}
+                              </span>
+                              <Switch
+                                id="is-private"
+                                checked={isPrivate}
+                                onCheckedChange={(v) => setIsPrivate(Boolean(v))}
+                                aria-label={t("togglePrivate")}
+                              />
+                            </Label>
+                          </div>
+                          {isPrivate && (
+                            <div className="grid gap-2">
+                              <Label htmlFor="password">{t("password")}</Label>
+                              <Input
+                                id="password"
+                                type="password"
+                                placeholder={t("enterPassword")}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                aria-invalid={!!errors.password}
+                              />
+                              {errors.password && (
+                                <span className="text-xs text-destructive">
+                                  {errors.password}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <div className="grid gap-2">
+                            <Label htmlFor="max-participants">
+                              {t("maxParticipants")}
+                            </Label>
                             <Input
-                              id="password"
-                              type="password"
-                              placeholder={t("enterPassword")}
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              aria-invalid={!!errors.password}
+                              id="max-participants"
+                              type="number"
+                              min={2}
+                              max={1000}
+                              value={maxParticipants}
+                              onChange={(e) =>
+                                setMaxParticipants(Number(e.target.value))
+                              }
+                              aria-invalid={!!errors.maxParticipants}
                             />
-                            {errors.password && (
+                            {errors.maxParticipants && (
                               <span className="text-xs text-destructive">
-                                {errors.password}
+                                {errors.maxParticipants}
                               </span>
                             )}
                           </div>
-                        )}
-                        <div className="grid gap-2">
-                          <Label htmlFor="max-participants">
-                            {t("maxParticipants")}
-                          </Label>
-                          <Input
-                            id="max-participants"
-                            type="number"
-                            min={2}
-                            max={1000}
-                            value={maxParticipants}
-                            onChange={(e) =>
-                              setMaxParticipants(Number(e.target.value))
-                            }
-                            aria-invalid={!!errors.maxParticipants}
-                          />
-                          {errors.maxParticipants && (
-                            <span className="text-xs text-destructive">
-                              {errors.maxParticipants}
-                            </span>
-                          )}
-                        </div>
-                        <DialogFooter>
-                          {createRoomError && (
-                            <div className="text-sm text-destructive mr-auto">
-                              {createRoomError}
-                            </div>
-                          )}
-                          <Button
-                            type="submit"
-                            disabled={creatingRoom}
-                          >
-                            <Users className="mr-2 h-4 w-4" /> {t("createRoom")}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                          <DialogFooter>
+                            {createRoomError && (
+                              <div className="text-sm text-destructive mr-auto">
+                                {createRoomError}
+                              </div>
+                            )}
+                            <Button
+                              type="submit"
+                              disabled={creatingRoom}
+                            >
+                              <Users className="mr-2 h-4 w-4" /> {t("createRoom")}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  ) : (
+                    <Button
+                      className="flex-1"
+                      variant="destructive"
+                      onClick={() => pushLocalized(prefixPath("/auth/login"))}
+                    >
+                      <LogIn className="mr-2 h-4 w-4" />
+                      {t("createRoom")}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -459,7 +495,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Quiz Stats Card */}
-            <Card className="bg-card">
+            <Card className="bg-[#FFF5F5]">
               <CardHeader>
                 <CardTitle className="font-semibold">
                   {t("detailInfo")}

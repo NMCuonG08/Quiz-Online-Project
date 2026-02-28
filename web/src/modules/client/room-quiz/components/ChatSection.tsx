@@ -71,7 +71,7 @@ export function ChatSection({
 
   return (
     <div
-      className={`bg-card border border-border rounded-lg h-full flex flex-col ${className}`}
+      className={`bg-card border border-gray-200 rounded-lg h-full flex flex-col ${className}`}
     >
       {/* Header */}
       <div className="p-4 border-b border-border">
@@ -106,13 +106,12 @@ export function ChatSection({
             return (
               <div
                 key={msg.id}
-                className={`flex ${
-                  isSystem
-                    ? "justify-center"
-                    : isMe
+                className={`flex ${isSystem
+                  ? "justify-center"
+                  : isMe
                     ? "justify-end"
                     : "justify-start"
-                }`}
+                  }`}
               >
                 {isSystem ? (
                   <div className="bg-muted/50 text-muted-foreground text-sm px-3 py-1 rounded-full">
@@ -120,9 +119,8 @@ export function ChatSection({
                   </div>
                 ) : (
                   <div
-                    className={`flex items-start gap-2 max-w-[80%] ${
-                      isMe ? "flex-row-reverse" : ""
-                    }`}
+                    className={`flex items-start gap-2 max-w-[80%] ${isMe ? "flex-row-reverse" : ""
+                      }`}
                   >
                     <Avatar className="w-8 h-8 mt-0.5">
                       <AvatarImage src={msg.avatar_url || undefined} />
@@ -134,9 +132,8 @@ export function ChatSection({
                       className={`flex-1 ${isMe ? "text-right" : "text-left"}`}
                     >
                       <div
-                        className={`flex items-center gap-2 mb-1 ${
-                          isMe ? "justify-end" : "justify-start"
-                        }`}
+                        className={`flex items-center gap-2 mb-1 ${isMe ? "justify-end" : "justify-start"
+                          }`}
                       >
                         <span className="text-sm font-medium text-foreground">
                           {displayName}
@@ -151,11 +148,10 @@ export function ChatSection({
                         </span>
                       </div>
                       <div
-                        className={`${
-                          isMe
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted/50 text-foreground"
-                        } p-2 rounded-lg text-sm inline-block`}
+                        className={`${isMe
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted/50 text-foreground"
+                          } p-2 rounded-lg text-sm inline-block`}
                       >
                         {msg.message}
                       </div>
