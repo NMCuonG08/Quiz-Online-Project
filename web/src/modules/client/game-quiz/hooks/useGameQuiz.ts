@@ -109,7 +109,10 @@ export const useGameQuiz = ({
       selectedOptionIds: Array.isArray(selectedAnswer) ? selectedAnswer : undefined,
       textAnswer: typeof selectedAnswer === "string" && 
         (currentQuestion.question_type === "fill_blank" || 
-         currentQuestion.question_type === "essay") 
+         currentQuestion.question_type === "fill_in_blank" ||
+         currentQuestion.question_type === "short_answer" ||
+         currentQuestion.question_type === "essay" ||
+         currentQuestion.question_type === "matching") 
         ? selectedAnswer : undefined,
       answeredAt: new Date(),
       timeSpent: (currentQuestion.time_limit || 0) - state.timeRemaining,
