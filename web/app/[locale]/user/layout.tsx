@@ -1,102 +1,201 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
+import { usePathname } from "@/common/i18n/navigation";
+import { LocalizedLink } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/common/components/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@/common/components/ui/avatar";
 import {
-  Bell,
-  Plus,
-  Home,
-  Folder,
-  Archive,
-  Star,
-  Settings,
+  LayoutDashboard,
+  User,
   LogOut,
-  Search,
+  BookOpen,
+  Trophy,
+  Users,
+  Menu,
+  ChevronRight,
+  Gamepad2,
+  Bell,
+  Sparkles,
 } from "lucide-react";
 import AuthGuard from "@/common/guards/AuthGuard";
+import { useAppSelector, useAppDispatch } from "@/hooks/useRedux";
+import { logout } from "@/modules/auth/common/slices/authSlice";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
+import { APP_ROUTES } from "@/lib/appRoutes";
+import { cn } from "@/lib/utils";
+
+interface NavItem {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  badge?: string;
+}
+
+const mainNavItems: NavItem[] = [
+  {
+    href: "/user",
+    icon: <LayoutDashboard size={18} />,
+    label: "Dashboard",
+  },
+  {
+    href: "/user/profile",
+    icon: <User size={18} />,
+    label: "Profile",
+  },
+];
+
+const quizNavItems: NavItem[] = [
+  {
+    href: "/quiz",
+    icon: <BookOpen size={18} />,
+    label: "Browse Quizzes",
+  },
+  {
+    href: "/category",
+    icon: <Sparkles size={18} />,
+    label: "Categories",
+  },
+  {
+    href: "/community",
+    icon: <Users size={18} />,
+    label: "Community",
+  },
+];
 
 export default function UserLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const pathname = usePathname();
+  const router = useLocalizedRouter();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+
+  const displayName = user?.username || "User";
+  const email = user?.email || "";
+  const avatarUrl = user?.avatarUrl;
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const handleLogout = async () => {
+    await dispatch(logout());
+    router.push(APP_ROUTES.AUTH.LOGIN);
+  };
+
+  const isActive = (href: string) => {
+    if (!pathname) return false;
+    // Exact match for /user, starts-with for sub-routes
+    if (href === "/user") {
+      return pathname.endsWith("/user") || pathname.endsWith("/user/");
+    }
+    return pathname.includes(href);
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo / Brand */}
+      <div className="flex items-center gap-3 px-3 mb-8">
+        <div className="size-9 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
+          <Gamepad2 size={18} className="text-primary-foreground" />
+        </div>
+        <div>
+          <span className="font-bold text-base tracking-tight">Quiz Online</span>
+          <p className="text-[10px] text-muted-foreground font-medium -mt-0.5">Dashboard</p>
+        </div>
+      </div>
+
+      {/* Main Navigation */}
+      <div className="space-y-1">
+        <p className="text-[11px] uppercase text-muted-foreground font-semibold tracking-wider px-3 mb-2">
+          Main
+        </p>
+        {mainNavItems.map((item) => (
+          <SidebarLink
+            key={item.href}
+            {...item}
+            active={isActive(item.href)}
+          />
+        ))}
+      </div>
+
+      {/* Quiz Section */}
+      <div className="mt-6 space-y-1">
+        <p className="text-[11px] uppercase text-muted-foreground font-semibold tracking-wider px-3 mb-2">
+          Quizzes
+        </p>
+        {quizNavItems.map((item) => (
+          <SidebarLink
+            key={item.href}
+            {...item}
+            active={isActive(item.href)}
+          />
+        ))}
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Premium CTA */}
+      {!user?.isPremium && (
+        <div className="mx-2 mb-4 rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Trophy size={16} className="text-primary" />
+            <p className="text-sm font-semibold">Go Premium</p>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+            Unlock all quizzes, analytics, and priority support.
+          </p>
+          <Button size="sm" className="w-full text-xs font-semibold h-8">
+            Upgrade Now
+          </Button>
+        </div>
+      )}
+
+      {/* User Profile Section */}
+      <div className="border-t border-border pt-3 mx-2">
+        <div className="flex items-center gap-3 px-1">
+          <Avatar className="size-9 ring-2 ring-border">
+            <AvatarImage src={avatarUrl} alt={displayName} />
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate">{displayName}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{email}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+            onClick={handleLogout}
+            title="Đăng xuất"
+          >
+            <LogOut size={16} />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <AuthGuard>
       <div className="min-h-screen w-full flex bg-background text-foreground">
-        {/* Sidebar */}
-        <aside className="w-64 shrink-0 border-r border-border p-4 hidden md:flex md:flex-col md:sticky md:top-0 md:h-screen md:overflow-y-auto">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="size-8 rounded-md bg-primary" />
-            <span className="font-semibold">Learning Content</span>
-          </div>
-
-          <nav className="space-y-1">
-            <SidebarItem href="#" icon={<Home size={18} />} label="Recents" />
-            <SidebarItem
-              href="#"
-              icon={<Folder size={18} />}
-              label="Shared Content"
-            />
-            <SidebarItem
-              href="#"
-              icon={<Archive size={18} />}
-              label="Archived"
-            />
-            <SidebarItem href="#" icon={<Star size={18} />} label="Templates" />
-          </nav>
-
-          <div className="mt-6">
-            <p className="text-xs uppercase text-muted-foreground mb-2">
-              Favorites
-            </p>
-            <div className="space-y-2">
-              <SidebarBadge label="Figma Basic" color="bg-sky-500" />
-              <SidebarBadge label="Folder NEW 2024" color="bg-emerald-500" />
-              <SidebarBadge label="Assignment 101" color="bg-indigo-500" />
-              <SidebarBadge label="Quiz Figma" color="bg-amber-500" />
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs uppercase text-muted-foreground">
-                Projects
-              </p>
-              <Button variant="outline" size="icon" className="h-6 w-6">
-                <Plus size={16} />
-              </Button>
-            </div>
-            <div className="space-y-1">
-              <SidebarDot label="Figma basic" color="bg-violet-600" />
-              <SidebarDot label="Fikri studio" color="bg-rose-500" />
-            </div>
-          </div>
-
-          <div className="mt-auto space-y-2">
-            <div className="rounded-lg border p-3">
-              <p className="text-sm font-medium mb-2">Get Trenning AI</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Use AI in every action on Trenning webapp
-              </p>
-              <Button size="sm" className="w-full">
-                Try it now
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <div className="size-8 rounded-full bg-muted" />
-              <span className="text-sm">RF</span>
-              <div className="ml-auto flex items-center gap-2">
-                <Settings size={16} />
-                <LogOut size={16} />
-              </div>
-            </div>
-          </div>
+        {/* Desktop Sidebar */}
+        <aside className="w-[260px] shrink-0 border-r border-border p-4 hidden md:flex md:flex-col md:sticky md:top-0 md:h-screen md:overflow-y-auto">
+          <SidebarContent />
         </aside>
 
         {/* Right area */}
-        <div className="flex-1 flex flex-col">
-          {/* Top Navbar */}
-          <header className="h-14 border-b border-border px-4 flex items-center gap-2 sticky top-0 z-20 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top Header */}
+          <header className="h-14 border-b border-border px-4 flex items-center gap-3 sticky top-0 z-20 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            {/* Mobile Menu */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button
@@ -105,165 +204,101 @@ export default function UserLayout({
                   className="md:hidden"
                   aria-label="Open menu"
                 >
-                  <Folder size={18} />
+                  <Menu size={20} />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0">
-                <div className="w-full h-full p-4 flex flex-col">
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="size-8 rounded-md bg-primary" />
-                    <span className="font-semibold">Learning Content</span>
-                  </div>
-
-                  <nav className="space-y-1">
-                    <SidebarItem
-                      href="#"
-                      icon={<Home size={18} />}
-                      label="Recents"
-                    />
-                    <SidebarItem
-                      href="#"
-                      icon={<Folder size={18} />}
-                      label="Shared Content"
-                    />
-                    <SidebarItem
-                      href="#"
-                      icon={<Archive size={18} />}
-                      label="Archived"
-                    />
-                    <SidebarItem
-                      href="#"
-                      icon={<Star size={18} />}
-                      label="Templates"
-                    />
-                  </nav>
-
-                  <div className="mt-6">
-                    <p className="text-xs uppercase text-muted-foreground mb-2">
-                      Favorites
-                    </p>
-                    <div className="space-y-2">
-                      <SidebarBadge label="Figma Basic" color="bg-sky-500" />
-                      <SidebarBadge
-                        label="Folder NEW 2024"
-                        color="bg-emerald-500"
-                      />
-                      <SidebarBadge
-                        label="Assignment 101"
-                        color="bg-indigo-500"
-                      />
-                      <SidebarBadge label="Quiz Figma" color="bg-amber-500" />
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs uppercase text-muted-foreground">
-                        Projects
-                      </p>
-                      <Button variant="outline" size="icon" className="h-6 w-6">
-                        <Plus size={16} />
-                      </Button>
-                    </div>
-                    <div className="space-y-1">
-                      <SidebarDot label="Figma basic" color="bg-violet-600" />
-                      <SidebarDot label="Fikri studio" color="bg-rose-500" />
-                    </div>
-                  </div>
-
-                  <div className="mt-auto space-y-2">
-                    <div className="rounded-lg border p-3">
-                      <p className="text-sm font-medium mb-2">
-                        Get Trenning AI
-                      </p>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        Use AI in every action on Trenning webapp
-                      </p>
-                      <Button size="sm" className="w-full">
-                        Try it now
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <div className="size-8 rounded-full bg-muted" />
-                      <span className="text-sm">RF</span>
-                      <div className="ml-auto flex items-center gap-2">
-                        <Settings size={16} />
-                        <LogOut size={16} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <SheetContent side="left" className="p-4 w-[280px]">
+                <SidebarContent />
               </SheetContent>
             </Sheet>
-            <h1 className="font-semibold">Fikri Studio</h1>
-            <span className="ml-2 text-xs bg-amber-200 text-amber-900 rounded px-2 py-0.5">
-              pro
-            </span>
+
+            {/* Page Title */}
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-semibold text-foreground">
+                {getPageTitle(pathname)}
+              </h1>
+            </div>
+
+            {/* Right Actions */}
             <div className="ml-auto flex items-center gap-2">
-              <div className="relative hidden sm:block">
-                <input
-                  className="h-9 w-48 md:w-72 rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none"
-                  placeholder="Search"
-                />
-                <Search
-                  size={16}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Thông báo"
+                  disableShadow
+                >
+                  <Bell size={18} />
+                </Button>
+                <span className="absolute top-1 right-1 size-2 rounded-full bg-primary animate-pulse pointer-events-none" />
               </div>
-              <Button variant="outline" className="gap-2 hidden sm:inline-flex">
-                Upload
-              </Button>
-              <Button className="gap-2 hidden md:inline-flex">
-                <Plus size={16} /> New Content
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Bell size={18} />
-              </Button>
+              <div className="hidden sm:block">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-1.5 font-semibold"
+                  onClick={() => router.push(APP_ROUTES.QUIZ.LIST)}
+                >
+                  <BookOpen size={14} />
+                  Explore Quizzes
+                </Button>
+              </div>
             </div>
           </header>
 
           {/* Main content */}
-          <main className="flex-1 p-4">{children}</main>
+          <main className="flex-1 p-4 md:p-6">{children}</main>
         </div>
       </div>
     </AuthGuard>
   );
 }
 
-function SidebarItem({
+/* ─────────── Sub-components ─────────── */
+
+function SidebarLink({
   href,
   icon,
   label,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-}) {
+  active,
+  badge,
+}: NavItem & { active: boolean }) {
   return (
-    <Link
+    <LocalizedLink
       href={href}
-      className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted text-sm"
+      className={cn(
+        "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+        active
+          ? "bg-primary/10 text-primary shadow-sm"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      )}
     >
-      <span className="text-muted-foreground">{icon}</span>
-      <span>{label}</span>
-    </Link>
+      <span
+        className={cn(
+          "transition-colors",
+          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+        )}
+      >
+        {icon}
+      </span>
+      <span className="flex-1">{label}</span>
+      {badge && (
+        <span className="text-[10px] font-bold bg-primary/15 text-primary px-1.5 py-0.5 rounded-md">
+          {badge}
+        </span>
+      )}
+      {active && (
+        <ChevronRight size={14} className="text-primary/60" />
+      )}
+    </LocalizedLink>
   );
 }
 
-function SidebarBadge({ label, color }: { label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted">
-      <span className={`size-5 rounded ${color}`} />
-      <span className="text-sm">{label}</span>
-    </div>
-  );
-}
+function getPageTitle(pathname: string | null): string {
+  if (!pathname) return "Dashboard";
 
-function SidebarDot({ label, color }: { label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted">
-      <span className={`size-2 rounded-full ${color}`} />
-      <span className="text-sm">{label}</span>
-    </div>
-  );
+  if (pathname.includes("/user/profile")) return "My Profile";
+  if (pathname.endsWith("/user") || pathname.endsWith("/user/"))
+    return "Dashboard";
+  return "Dashboard";
 }
