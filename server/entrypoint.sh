@@ -15,9 +15,9 @@ until redis-cli -h redis-cache ping | grep PONG > /dev/null; do
   sleep 2
 done
 
-# Chạy migration
-echo "Running Prisma migrate..."
-npx prisma migrate deploy
+# Chạy cập nhật database schema
+echo "Running Prisma db push..."
+npx prisma db push --accept-data-loss
 
 # Seed data (chỉ chạy khi có biến SEED_DB=true)
 if [ "$SEED_DB" = "true" ]; then

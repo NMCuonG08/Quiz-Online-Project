@@ -21,6 +21,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Courses",
+        url: "/admin/courses",
+        icon: Icons.Alphabet, // Placeholder icon
+        items: [],
+      },
+      {
         title: "Categories",
         icon: Icons.FourCircle,
         items: [

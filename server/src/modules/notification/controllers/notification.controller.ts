@@ -41,8 +41,18 @@ export class NotificationController {
   @Get('user/:userId')
   @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.ActivityRead })
-  findNotificationsByUserId(@Param('userId', UuidPipe) userId: string) {
-    return this.notificationService.findNotificationsByUserId(userId);
+  findNotificationsByUserId(
+    @Param('userId', UuidPipe) userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : undefined;
+    const limitNum = limit ? parseInt(limit, 10) : undefined;
+    return this.notificationService.findNotificationsByUserId(
+      userId,
+      pageNum,
+      limitNum,
+    );
   }
 
   @Get('status/:status')

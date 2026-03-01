@@ -58,8 +58,14 @@ export class NotificationService extends BaseService {
     return notification;
   }
 
-  async findNotificationsByUserId(userId: string) {
-    const cacheKey = `notifications:user:${userId}`;
+  async findNotificationsByUserId(
+    userId: string,
+    page?: number,
+    limit?: number,
+  ) {
+    const cacheKey = page
+      ? `notifications:user:${userId}:p${page}:l${limit}`
+      : `notifications:user:${userId}`;
 
     // Try to get from cache first
     const cachedNotifications = await this.redisService.get(cacheKey);
@@ -67,7 +73,32 @@ export class NotificationService extends BaseService {
       return cachedNotifications;
     }
 
-    // If not in cache, query from database
+    // If pagination params provided, return paginated response
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [notifications, total] = await Promise.all([
+        this.notificationRepository.findByUserIdPaginated(userId, skip, limit),
+        this.notificationRepository.countByUserId(userId),
+      ]);
+
+      const result = {
+        items: notifications,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1,
+        },
+      };
+
+      // Cache result with TTL 2 minutes (120 seconds)
+      await this.redisService.set(cacheKey, result, 120);
+      return result;
+    }
+
+    // If not paginated, return all (backward compatible)
     const notifications =
       await this.notificationRepository.findByUserId(userId);
 

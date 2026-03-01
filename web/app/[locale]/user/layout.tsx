@@ -6,6 +6,7 @@ import { LocalizedLink } from "@/common/components/ui";
 import { Button } from "@/common/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/common/components/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@/common/components/ui/avatar";
+import NotificationDropdown from "@/common/components/NotificationDropdown";
 import {
   LayoutDashboard,
   User,
@@ -16,7 +17,6 @@ import {
   Menu,
   ChevronRight,
   Gamepad2,
-  Bell,
   Sparkles,
 } from "lucide-react";
 import AuthGuard from "@/common/guards/AuthGuard";
@@ -221,17 +221,7 @@ export default function UserLayout({
 
             {/* Right Actions */}
             <div className="ml-auto flex items-center gap-2">
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  title="Thông báo"
-                  disableShadow
-                >
-                  <Bell size={18} />
-                </Button>
-                <span className="absolute top-1 right-1 size-2 rounded-full bg-primary animate-pulse pointer-events-none" />
-              </div>
+              <NotificationDropdown />
               <div className="hidden sm:block">
                 <Button
                   variant="default"

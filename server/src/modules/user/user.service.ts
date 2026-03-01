@@ -34,6 +34,26 @@ export class UserService {
     });
   }
 
+  async searchUsers(query: string, currentUserId: string) {
+    if (!query) return [];
+    return this.prismaService.user.findMany({
+      where: {
+        id: { not: currentUserId },
+        OR: [
+          { full_name: { contains: query, mode: 'insensitive' } },
+          { username: { contains: query, mode: 'insensitive' } },
+        ]
+      },
+      select: {
+        id: true,
+        username: true,
+        full_name: true,
+        avatar: true,
+      },
+      take: 20,
+    });
+  }
+
   async findOne(id: string): Promise<User> {
     const user = await this.prismaService.user.findUnique({
       where: { id },

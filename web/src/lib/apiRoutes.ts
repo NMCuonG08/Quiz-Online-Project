@@ -7,6 +7,9 @@ export const apiRoutes = {
     UPDATE_BY_ID: (id: string | number) => `/api/categories/${id}`,
     DELETE_BY_ID: (id: string | number) => `/api/categories/${id}`,
   },
+  USER: {
+    SEARCH: "/api/user/search",
+  },
   ROOMS: {
     BASE: "/api/rooms",
     CREATE: "/api/rooms",
@@ -81,5 +84,41 @@ export const apiRoutes = {
     GET_RATINGS: "/api/feedback/ratings",
     POST_RATING: "/api/feedback/ratings",
     DELETE_RATING: (quizId: string) => `/api/feedback/ratings/${quizId}`,
-  }
+  },
+  NOTIFICATIONS: {
+    BASE: "/api/notifications",
+    GET_ALL: "/api/notifications",
+    GET_BY_USER: (userId: string) => `/api/notifications/user/${userId}`,
+    GET_BY_ID: (id: string) => `/api/notifications/${id}`,
+    UNREAD_COUNT: (userId: string) => `/api/notifications/unread-count/${userId}`,
+    MARK_READ: (id: string) => `/api/notifications/${id}/mark-read`,
+    MARK_ALL_READ: (userId: string) => `/api/notifications/user/${userId}/mark-all-read`,
+    DELETE: (id: string) => `/api/notifications/${id}`,
+  },
+  USERS: {
+    UPDATE: (id: string) => `/api/user/${id}`,
+  },
+  COURSES: {
+    BASE: "/api/courses",
+    GET_ALL: "/api/courses",
+    GET_BY_ID: (id: string) => `/api/courses/${id}`,
+    CREATE: "/api/courses",
+    UPDATE_BY_ID: (id: string) => `/api/courses/${id}`,
+    DELETE_BY_ID: (id: string) => `/api/courses/${id}`,
+  },
+  COMMUNITY: {
+    POSTS: "/api/community/posts",
+    POST_BY_ID: (id: string) => `/api/community/posts/${id}`,
+    COMMENTS: "/api/community/comments",
+    POST_COMMENTS: (postId: string) => `/api/community/posts/${postId}/comments`,
+    TOGGLE_LIKE: "/api/community/likes/toggle",
+  },
+  FRIENDSHIPS: {
+    REQUEST: "/api/friendships/request",
+    ACCEPT: (id: string) => `/api/friendships/accept/${id}`,
+    DELETE: (id: string) => `/api/friendships/${id}`,
+    FRIENDS: "/api/friendships/friends",
+    PENDING: "/api/friendships/requests/pending",
+  },
 };
+

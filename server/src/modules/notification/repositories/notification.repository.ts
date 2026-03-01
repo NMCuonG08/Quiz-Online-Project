@@ -21,6 +21,21 @@ export class NotificationRepository extends BaseRepository<Notification> {
     });
   }
 
+  async findByUserIdPaginated(userId: string, skip: number, take: number) {
+    return this.model.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+      skip,
+      take,
+    });
+  }
+
+  async countByUserId(userId: string) {
+    return this.model.count({
+      where: { user_id: userId },
+    });
+  }
+
   async findByStatus(status: NotificationStatus) {
     const isRead =
       status === NotificationStatus.READ

@@ -35,6 +35,15 @@ model User {
   leaderboards        Leaderboard[]
   userStatistics      UserStatistics?
   quizRatings         QuizRating[]
+  createdCourses      Course[]
+  enrolledCourses     CourseEnrollment[]
+  
+  // Friendship and Community
+  friends             Friendship[]       @relation("UserFriends")
+  friendOf            Friendship[]       @relation("FriendUsers")
+  posts               Post[]             @relation("UserPosts")
+  comments            Comment[]
+  likes               Like[]
 
   // relations
   // consolidated user role relations handled by `userRoles`
@@ -130,6 +139,7 @@ model Category {
   children     Category[]    @relation("CategoryHierarchy")
   quizzes      Quiz[]
   leaderboards Leaderboard[]
+  courses      Course[]
 
   @@index([parent_id])
   @@index([is_active])
@@ -644,6 +654,151 @@ model QuizRating {
   @@map("quiz_ratings")
 }
 
+// Course System Models
+
+model Course {
+  id              String            @id @default(uuid()) @db.Uuid
+  title           String
+  slug            String            @unique
+  description     String?           @db.Text
+  category_id     String            @db.Uuid
+  creator_id      String            @db.Uuid
+  difficulty_level DifficultyLevel  @default(MEDIUM)
+  price           Float             @default(0.0) // 0 means free
+  thumbnail_url   String?
+  is_published    Boolean           @default(false)
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  category        Category          @relation(fields: [category_id], references: [id])
+  creator         User              @relation(fields: [creator_id], references: [id])
+  modules         CourseModule[]    
+  enrollments     CourseEnrollment[]
+  
+  @@index([category_id])
+  @@index([creator_id])
+  @@map("courses")
+}
+
+model CourseModule {
+  id          String         @id @default(uuid()) @db.Uuid
+  course_id   String         @db.Uuid
+  title       String
+  description String?        @db.Text
+  sort_order  Int            @default(0)
+  created_at  DateTime       @default(now())
+  updated_at  DateTime       @updatedAt
+
+  course      Course         @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  lessons     CourseLesson[]
+
+  @@index([course_id])
+  @@map("course_modules")
+}
+
+model CourseLesson {
+  id          String        @id @default(uuid()) @db.Uuid
+  module_id   String        @db.Uuid
+  title       String
+  content     String?       @db.Text
+  video_url   String?
+  sort_order  Int           @default(0)
+  is_free     Boolean       @default(false) // Preview lesson
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+
+  module      CourseModule  @relation(fields: [module_id], references: [id], onDelete: Cascade)
+
+  @@index([module_id])
+  @@map("course_lessons")
+}
+
+model CourseEnrollment {
+  id          String    @id @default(uuid()) @db.Uuid
+  course_id   String    @db.Uuid
+  user_id     String    @db.Uuid
+  progress    Float     @default(0.0) // Percentage
+  enrolled_at DateTime  @default(now())
+  last_accessed DateTime @default(now())
+
+  course      Course    @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([course_id, user_id])
+  @@index([user_id])
+  @@index([course_id])
+  @@map("course_enrollments")
+}
+
+// Friendship System Models
+
+model Friendship {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @db.Uuid
+  friendId   String           @db.Uuid
+  status     FriendshipStatus @default(PENDING)
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+
+  user       User             @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend     User             @relation("FriendUsers", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
+  @@map("friendships")
+}
+
+// Community System Models
+
+model Post {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  content     String   @db.Text
+  image_url   String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user        User     @relation("UserPosts", fields: [userId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  likes       Like[]
+
+  @@index([userId])
+  @@index([created_at])
+  @@map("posts")
+}
+
+model Comment {
+  id          String   @id @default(uuid()) @db.Uuid
+  postId      String   @db.Uuid
+  userId      String   @db.Uuid
+  content     String   @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@map("comments")
+}
+
+model Like {
+  id          String   @id @default(uuid()) @db.Uuid
+  postId      String   @db.Uuid
+  userId      String   @db.Uuid
+  created_at  DateTime @default(now())
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("likes")
+}
+
 // Enums
 
 enum DifficultyLevel {
@@ -776,4 +931,10 @@ enum FeedbackStatus {
   PENDING
   REVIEWED
   RESOLVED
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
 }

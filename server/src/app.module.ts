@@ -20,6 +20,10 @@ import { WebSocketModule } from './common/websocket/websocket.module';
 // import { NotificationService } from './modules/notification/services/notification.service';
 import { RoomPlayModule } from './modules/room-play/room-play.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { CourseModule } from './modules/courses/course.module';
+import { FriendshipModule } from './modules/friendships/friendships.module';
+import { CommunityModule } from './modules/community/community.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -169,6 +173,9 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
     RoomPlayModule,
     WebSocketModule,
     FeedbackModule,
+    CourseModule,
+    FriendshipModule,
+    CommunityModule,
   ],
   controllers: [AppController],
   providers: [AppService, JobRepository],

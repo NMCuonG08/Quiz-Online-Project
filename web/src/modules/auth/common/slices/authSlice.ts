@@ -121,6 +121,22 @@ export const registerUser = createAsyncThunk(
 //   }
 // );
 
+export const updateUserProfile = createAsyncThunk(
+  "auth/updateUserProfile",
+  async (
+    payload: { id: string; data: { username?: string; fullName?: string; avatar?: string; email?: string } },
+    { rejectWithValue }
+  ) => {
+    // If we had an AuthenticationService.updateProfile, we would use it.
+    // Instead relying on the external return of the UserService.
+    // This thunk just updates the state with the provided data payload.
+    // Wait, let's just make it a synchronous action or an async thunk that resolves immediately, 
+    // or properly we update state in the frontend when the API call succeeds.
+    // Let's just create an action to update user state locally.
+    return payload.data;
+  }
+);
+
 export const logout = createAsyncThunk(
   "auth/logout",
   async (_, { rejectWithValue }) => {
@@ -345,9 +361,13 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = null;
       })
-      .addCase(getUserProfile.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        if (state.user) {
+          state.user = {
+            ...state.user,
+            ...action.payload,
+          };
+        }
       });
   },
 });

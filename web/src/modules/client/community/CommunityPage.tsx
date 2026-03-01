@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/common/components/ui/card";
 import { Button } from "@/common/components/ui/button";
@@ -16,87 +16,75 @@ import {
     ThumbsUp,
     Clock,
     Send,
+    Heart,
 } from "lucide-react";
-
-interface Discussion {
-    id: number;
-    title: string;
-    author: string;
-    avatar: string;
-    replies: number;
-    views: number;
-    timeAgo: number;
-    timeUnit: "hours" | "days";
-    tags: string[];
-}
-
-interface Contributor {
-    id: number;
-    name: string;
-    avatar: string;
-    points: number;
-    quizzes: number;
-    rank: number;
-}
-
-interface Event {
-    id: number;
-    title: string;
-    date: string;
-    participants: number;
-    type: string;
-}
-
-const mockDiscussions: Discussion[] = [
-    {
-        id: 1, title: "Best resources for learning React Hooks?",
-        author: "Nguyen A", avatar: "🧑‍💻", replies: 24, views: 380,
-        timeAgo: 2, timeUnit: "hours", tags: ["React", "Hooks"],
-    },
-    {
-        id: 2, title: "How to prepare for the IELTS exam?",
-        author: "Tran B", avatar: "👩‍🎓", replies: 18, views: 520,
-        timeAgo: 5, timeUnit: "hours", tags: ["IELTS", "English"],
-    },
-    {
-        id: 3, title: "Tips for solving calculus problems faster",
-        author: "Le C", avatar: "📐", replies: 12, views: 290,
-        timeAgo: 1, timeUnit: "days", tags: ["Math", "Calculus"],
-    },
-    {
-        id: 4, title: "Share your favorite quiz strategies!",
-        author: "Pham D", avatar: "🎯", replies: 35, views: 780,
-        timeAgo: 2, timeUnit: "days", tags: ["Tips", "Strategy"],
-    },
-    {
-        id: 5, title: "How physics quizzes helped me understand concepts",
-        author: "Hoang E", avatar: "⚛️", replies: 9, views: 210,
-        timeAgo: 3, timeUnit: "days", tags: ["Physics", "Learning"],
-    },
-];
-
-const mockContributors: Contributor[] = [
-    { id: 1, name: "Nguyen Van A", avatar: "🏆", points: 12580, quizzes: 156, rank: 1 },
-    { id: 2, name: "Tran Thi B", avatar: "🥈", points: 10340, quizzes: 132, rank: 2 },
-    { id: 3, name: "Le Van C", avatar: "🥉", points: 8920, quizzes: 108, rank: 3 },
-    { id: 4, name: "Pham D", avatar: "⭐", points: 7650, quizzes: 94, rank: 4 },
-    { id: 5, name: "Hoang E", avatar: "⭐", points: 6100, quizzes: 78, rank: 5 },
-];
-
-const mockEvents: Event[] = [
-    { id: 1, title: "React Quiz Challenge 2026", date: "Mar 5, 2026", participants: 245, type: "online" },
-    { id: 2, title: "English Vocabulary Sprint", date: "Mar 10, 2026", participants: 180, type: "online" },
-    { id: 3, title: "Math Olympiad Practice", date: "Mar 15, 2026", participants: 92, type: "online" },
-];
+import { CommunityService, Post } from "./services/community.service";
+import { showSuccess, showError } from "@/lib/Notification";
+import { Avatar, AvatarFallback, AvatarImage } from "@/common/components/ui/avatar";
+import { formatDistanceToNow } from "date-fns";
 
 const CommunityPage = () => {
     const t = useTranslations("communityPage");
     const [postContent, setPostContent] = useState("");
+    const [posts, setPosts] = useState<Post[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchPosts = async () => {
+        setLoading(true);
+        try {
+            const { data } = await CommunityService.getPosts(1, 20);
+            setPosts(data || []);
+        } catch (e) {
+            console.error("Lỗi khi tải bài viết", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPosts();
+    }, []);
+
+    const handleCreatePost = async () => {
+        if (!postContent.trim()) return;
+        try {
+            const { data } = await CommunityService.createPost(postContent);
+            if (data) {
+                setPosts([data, ...posts]);
+                setPostContent("");
+                showSuccess("Đăng bài thành công!");
+            }
+        } catch (e) {
+            showError("Có lỗi khi đăng bài viết.");
+        }
+    };
+
+    const handleToggleLike = async (postId: string) => {
+        try {
+            const { data } = await CommunityService.toggleLike(postId);
+            setPosts((prev) =>
+                prev.map((p) => {
+                    if (p.id === postId) {
+                        return {
+                            ...p,
+                            _count: {
+                                ...p._count,
+                                likes: data.liked ? p._count.likes + 1 : Math.max(0, p._count.likes - 1)
+                            }
+                        };
+                    }
+                    return p;
+                })
+            );
+        } catch (e) {
+            console.log("Error toggling like", e);
+        }
+    };
 
     const stats = [
         { label: t("totalMembers"), value: "12,500+", icon: Users },
         { label: t("activeToday"), value: "1,240", icon: ThumbsUp },
-        { label: t("totalPosts"), value: "8,650", icon: MessageSquare },
+        { label: t("totalPosts"), value: (posts?.length || 0).toString(), icon: MessageSquare },
         { label: t("quizzesCompleted"), value: "45,000+", icon: Trophy },
     ];
 
@@ -136,53 +124,55 @@ const CommunityPage = () => {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Discussions Tab */}
                 <TabsContent value="discussions">
-                    {/* Post Input */}
                     <Card className="mb-6 p-4">
                         <div className="flex gap-3">
                             <Input
                                 className="flex-1"
-                                placeholder={t("writePost")}
+                                placeholder={"Bạn đang nghĩ gì?"}
                                 value={postContent}
                                 onChange={(e) => setPostContent(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleCreatePost()}
                             />
-                            <Button size="sm">
+                            <Button size="sm" onClick={handleCreatePost}>
                                 <Send className="w-4 h-4 mr-2" />
-                                {t("post")}
+                                Đăng bài
                             </Button>
                         </div>
                     </Card>
 
-                    <h2 className="text-xl font-semibold mb-4">{t("recentDiscussions")}</h2>
-                    <div className="space-y-3">
-                        {mockDiscussions.map((disc) => (
-                            <Card key={disc.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-                                <div className="flex items-start gap-3">
-                                    <div className="text-2xl flex-shrink-0">{disc.avatar}</div>
+                    <h2 className="text-xl font-semibold mb-4">Các bài đăng mới nhất</h2>
+                    <div className="space-y-4">
+                        {loading && <p className="text-center text-muted-foreground">Đang tải...</p>}
+                        {!loading && posts.length === 0 && <p className="text-center">Chưa có bài viết nào.</p>}
+                        {posts.map((post) => (
+                            <Card key={post.id} className="p-4 hover:shadow-md transition-shadow">
+                                <div className="flex items-start gap-4">
+                                    <Avatar className="size-10">
+                                        <AvatarImage src={post.user?.avatar || ""} />
+                                        <AvatarFallback>{post.user?.username?.charAt(0).toUpperCase()}</AvatarFallback>
+                                    </Avatar>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-medium text-sm mb-1">{disc.title}</h3>
-                                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                                            {disc.tags.map((tag) => (
-                                                <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-                                            ))}
+                                        <div className="flex items-center justify-between mb-1">
+                                            <h3 className="font-semibold text-sm">{post.user?.full_name || post.user?.username}</h3>
+                                            <span className="text-xs text-muted-foreground">
+                                                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                            <span>{disc.author}</span>
-                                            <span className="flex items-center gap-1">
-                                                <MessageSquare className="w-3 h-3" />
-                                                {t("replies", { count: disc.replies })}
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Eye className="w-3 h-3" />
-                                                {t("views", { count: disc.views })}
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="w-3 h-3" />
-                                                {disc.timeUnit === "hours"
-                                                    ? t("hoursAgo", { count: disc.timeAgo })
-                                                    : t("daysAgo", { count: disc.timeAgo })}
-                                            </span>
+                                        <p className="text-sm mt-3 mb-4 whitespace-pre-wrap">{post.content}</p>
+
+                                        <div className="flex items-center gap-4 text-xs text-muted-foreground pt-3 border-t">
+                                            <button
+                                                onClick={() => handleToggleLike(post.id)}
+                                                className="flex items-center gap-1.5 hover:text-primary transition-colors"
+                                            >
+                                                <Heart className="w-4 h-4" />
+                                                {post._count?.likes || 0} Thích
+                                            </button>
+                                            <button className="flex items-center gap-1.5 hover:text-primary transition-colors">
+                                                <MessageSquare className="w-4 h-4" />
+                                                {post._count?.comments || 0} Bình luận
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -193,54 +183,19 @@ const CommunityPage = () => {
 
                 {/* Leaderboard Tab */}
                 <TabsContent value="leaderboard">
-                    <h2 className="text-xl font-semibold mb-4">{t("topContributors")}</h2>
-                    <div className="space-y-3">
-                        {mockContributors.map((user) => (
-                            <Card key={user.id} className="p-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="text-3xl w-12 text-center">{user.avatar}</div>
-                                    <div className="flex-1">
-                                        <div className="font-medium">{user.name}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {t("points", { count: user.points.toLocaleString() })} · {t("quizzes", { count: user.quizzes })}
-                                        </div>
-                                    </div>
-                                    <Badge variant={user.rank <= 3 ? "default" : "outline"} className="text-sm">
-                                        #{user.rank}
-                                    </Badge>
-                                </div>
-                            </Card>
-                        ))}
+                    <div className="py-12 text-center text-muted-foreground border rounded-lg bg-muted/20">
+                        <Trophy className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                        <h2 className="text-xl font-semibold mb-2">Bảng xếp hạng</h2>
+                        <p>Tính năng đang trong quá trình phát triển.</p>
                     </div>
                 </TabsContent>
 
                 {/* Events Tab */}
                 <TabsContent value="events">
-                    <h2 className="text-xl font-semibold mb-4">{t("upcomingEvents")}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {mockEvents.map((event) => (
-                            <Card key={event.id} className="p-0 overflow-hidden">
-                                <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-6">
-                                    <CardHeader className="p-0 mb-3">
-                                        <CardTitle className="text-base">{event.title}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-0 space-y-2">
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Calendar className="w-4 h-4" />
-                                            {event.date}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Users className="w-4 h-4" />
-                                            {t("participants", { count: event.participants })}
-                                        </div>
-                                        <Badge variant="secondary" className="text-xs">{t("online")}</Badge>
-                                        <div className="pt-2">
-                                            <Button size="sm" className="w-full">{t("joinEvent")}</Button>
-                                        </div>
-                                    </CardContent>
-                                </div>
-                            </Card>
-                        ))}
+                    <div className="py-12 text-center text-muted-foreground border rounded-lg bg-muted/20">
+                        <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                        <h2 className="text-xl font-semibold mb-2">Sự kiện Sắp tới</h2>
+                        <p>Tính năng đang trong quá trình phát triển.</p>
                     </div>
                 </TabsContent>
             </Tabs>
