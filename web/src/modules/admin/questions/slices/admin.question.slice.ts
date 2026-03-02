@@ -23,7 +23,7 @@ const initialState: QuestionsState = {
 };
 
 export const fetchQuestionsById = createAsyncThunk(
-  "questions/fetchByQuizSlug",
+  "adminQuestion/fetchByQuizSlug",
   async (
     { id, params }: { id: string; params?: QuestionsQueryParams },
     { rejectWithValue }
@@ -37,7 +37,7 @@ export const fetchQuestionsById = createAsyncThunk(
 );
 
 export const createQuestion = createAsyncThunk(
-  "questions/create",
+  "adminQuestion/create",
   async (payload: unknown, { rejectWithValue }) => {
     const parsed = createQuestionSchema.safeParse(payload);
     if (!parsed.success) {
@@ -52,7 +52,7 @@ export const createQuestion = createAsyncThunk(
 );
 
 export const updateQuestion = createAsyncThunk(
-  "questions/update",
+  "adminQuestion/update",
   async ({ id, data }: { id: string; data: unknown }, { rejectWithValue }) => {
     const parsed = updateQuestionSchema.safeParse({ ...(data as object), id });
     if (!parsed.success) {
@@ -67,7 +67,7 @@ export const updateQuestion = createAsyncThunk(
 );
 
 export const deleteQuestion = createAsyncThunk(
-  "questions/delete",
+  "adminQuestion/delete",
   async (id: string, { rejectWithValue }) => {
     const response = await AdminQuestionService.deleteQuestion(id);
     if (!response?.success) {

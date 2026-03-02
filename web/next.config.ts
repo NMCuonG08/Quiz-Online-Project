@@ -12,13 +12,11 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // fix for Next.js 15+
-  serverExternalPackages: [],
   // Webpack alias to access i18n folder outside web directory
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      "@i18n": path.resolve(__dirname, "../i18n"),
+      "@i18n": path.resolve(process.cwd(), "../i18n"),
     };
     return config;
   },

@@ -26,7 +26,7 @@ const initialState: QuizState = {
 };
 
 export const fetchQuizzes = createAsyncThunk(
-  "quiz/fetchQuizzes",
+  "adminQuiz/fetchQuizzes",
   async (params?: QuizQueryParams, { rejectWithValue }) => {
     const response = await QuizService.getQuizzes(params);
     if (!response.success) {
@@ -37,7 +37,7 @@ export const fetchQuizzes = createAsyncThunk(
 );
 
 export const fetchQuizBySlug = createAsyncThunk(
-  "quiz/fetchQuizBySlug",
+  "adminQuiz/fetchQuizBySlug",
   async (slug: string, { rejectWithValue }) => {
     const response = await QuizService.getQuizBySlug(slug);
     if (response.error) {
@@ -48,7 +48,7 @@ export const fetchQuizBySlug = createAsyncThunk(
 );
 
 export const createQuiz = createAsyncThunk(
-  "quiz/createQuiz",
+  "adminQuiz/createQuiz",
   async (payload: CreateQuizPayload, { rejectWithValue }) => {
     const response = await QuizService.createQuiz(payload);
     if ("error" in (response as QuizResponse) && response.error) {
@@ -60,7 +60,7 @@ export const createQuiz = createAsyncThunk(
 );
 
 export const updateQuiz = createAsyncThunk(
-  "quiz/updateQuiz",
+  "adminQuiz/updateQuiz",
   async (
     { id, data }: { id: string; data: UpdateQuizPayload },
     { rejectWithValue }
@@ -74,7 +74,7 @@ export const updateQuiz = createAsyncThunk(
 );
 
 export const deleteQuiz = createAsyncThunk(
-  "quiz/deleteQuiz",
+  "adminQuiz/deleteQuiz",
   async (id: string, { rejectWithValue }) => {
     const response = await QuizService.deleteQuizById(id);
     if ((response as DeleteResponse).success === true) {
@@ -89,8 +89,8 @@ export const deleteQuiz = createAsyncThunk(
   }
 );
 
-const quizSlice = createSlice({
-  name: "quiz",
+const adminQuizSlice = createSlice({
+  name: "adminQuiz",
   initialState,
   reducers: {
     clearError: (state) => {
@@ -184,6 +184,6 @@ const quizSlice = createSlice({
   },
 });
 
-export const { clearError, clearCurrentQuiz, clearQuizzes } = quizSlice.actions;
+export const { clearError, clearCurrentQuiz, clearQuizzes } = adminQuizSlice.actions;
 
-export default quizSlice.reducer;
+export default adminQuizSlice.reducer;
