@@ -3,6 +3,7 @@ import createNextIntlPlugin from "next-intl/plugin";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   images: {
     domains: ["images.unsplash.com", "res.cloudinary.com", "example.com"],
   },
@@ -16,7 +17,7 @@ const nextConfig: NextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      "@i18n": path.resolve(process.cwd(), "../i18n"),
+      "@i18n": path.resolve(process.cwd(), "i18n"),
     };
     return config;
   },
