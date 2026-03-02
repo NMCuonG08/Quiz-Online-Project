@@ -44,6 +44,7 @@ export class QuizController {
 
   @Get('me')
   @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.QuizRead })
   @ApiOperation({ summary: 'Get quizzes created by the current user' })
   @ApiResponse({
     status: 200,
@@ -83,7 +84,7 @@ export class QuizController {
 
   @Patch(':id')
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizUpdate })
+  @Authenticated({ permission: Permission.QuizRead })
   @ApiOperation({ summary: 'Update a quiz by id' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('thumbnail'))
@@ -210,7 +211,7 @@ export class QuizController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('thumbnail'))
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizCreate })
+  @Authenticated({ permission: Permission.QuizRead })
   @ApiResponse({
     status: 201,
     description: 'Successfully created quiz',
@@ -232,7 +233,7 @@ export class QuizController {
 
   @Delete(':id')
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizDelete })
+  @Authenticated({ permission: Permission.QuizRead })
   @ApiResponse({
     status: 200,
     description: 'Successfully deleted quiz',

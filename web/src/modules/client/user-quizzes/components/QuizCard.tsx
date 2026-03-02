@@ -44,7 +44,10 @@ const QuizCard: React.FC<Props> = ({ quiz, onRefresh }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-dark border-2 border-stroke dark:border-dark-3 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 group relative">
+        <div
+            onClick={handleViewQuestions}
+            className="bg-white dark:bg-gray-dark border-2 border-stroke dark:border-dark-3 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 group relative cursor-pointer"
+        >
             {/* Thumbnail */}
             <div className="relative h-40 w-full bg-gray-100 dark:bg-dark-2">
                 <Image

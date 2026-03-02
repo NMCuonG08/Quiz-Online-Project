@@ -66,7 +66,10 @@ const QuestionCard: React.FC<Props> = ({ question, onRefresh }) => {
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-dark border-2 border-stroke dark:border-dark-3 rounded-xl h-[240px] w-full p-4 flex flex-col hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative group">
+      <div
+        onClick={() => setIsEditModalOpen(true)}
+        className="bg-white dark:bg-gray-dark border-2 border-stroke dark:border-dark-3 rounded-xl h-[240px] w-full p-4 flex flex-col hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative group cursor-pointer"
+      >
         {/* Action buttons */}
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button

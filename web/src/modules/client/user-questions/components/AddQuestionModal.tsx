@@ -399,10 +399,19 @@ const AddQuestionModal: React.FC<Props> = ({
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={onClose} disabled={loading}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+              className="text-white bg-red-500 hover:bg-red-600 border-none"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={loading}>
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+            >
               {loading ? "Creating..." : "Create Question"}
             </Button>
           </div>

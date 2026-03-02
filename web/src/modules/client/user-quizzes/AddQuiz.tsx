@@ -587,10 +587,20 @@ const AddQuiz = () => {
         </div>
 
         <div className="col-span-1 md:col-span-2 flex items-center justify-end gap-3">
-          <Button type="button" variant="outline" onClick={() => form.reset()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => form.reset()}
+            className="bg-red-500 hover:bg-red-600 text-white border-none"
+          >
             Reset
           </Button>
-          <Button type="submit">Create Quiz</Button>
+          <Button
+            type="submit"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+          >
+            Create Quiz
+          </Button>
         </div>
       </form>
     </div>

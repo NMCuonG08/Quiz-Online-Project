@@ -552,6 +552,7 @@ const EditQuiz = () => {
                 });
               }
             }}
+            className="bg-red-500 hover:bg-red-600 text-white border-none"
           >
             Reset
           </Button>
@@ -562,6 +563,7 @@ const EditQuiz = () => {
               e.preventDefault();
               handleSubmit(onSubmit)();
             }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
           >
             Save Changes
           </Button>

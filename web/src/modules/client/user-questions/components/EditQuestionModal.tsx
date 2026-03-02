@@ -341,14 +341,18 @@ const EditQuestionModal: React.FC<Props> = ({
           {/* Actions */}
           <div className="flex justify-end gap-3">
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={onClose}
               disabled={loading}
-              className="text-red-500 hover:text-white hover:bg-red-500 dark:text-red-400 dark:hover:bg-red-600 transition-colors"
+              className="text-white bg-red-500 hover:bg-red-600 border-none"
             >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={loading}>
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+            >
               {loading ? "Updating..." : "Update Question"}
             </Button>
           </div>
