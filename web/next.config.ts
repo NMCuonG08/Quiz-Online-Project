@@ -12,19 +12,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Fix for React Server Components chunk error
-  experimental: {
-    serverComponentsExternalPackages: [],
-  },
-  // Disable turbopack for development to avoid RSC issues
-  turbo: {
-    rules: {
-      "*.svg": {
-        loaders: ["@svgr/webpack"],
-        as: "*.js",
-      },
-    },
-  },
+  // fix for Next.js 15+
+  serverExternalPackages: [],
   // Webpack alias to access i18n folder outside web directory
   webpack: (config) => {
     config.resolve.alias = {

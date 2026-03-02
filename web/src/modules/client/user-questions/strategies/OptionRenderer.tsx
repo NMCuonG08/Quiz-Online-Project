@@ -5,7 +5,7 @@ import { Checkbox } from "@/common/components/ui/checkbox";
 import { Textarea } from "@/common/components/ui/textarea";
 import { Button } from "@/common/components/ui/button";
 import { UploadImage } from "@/common/components/ui/upload-image";
-import type { QuestionOption } from "../types/user.question";
+import type { QuestionOption } from "../types";
 
 // Strategy Pattern for Question Option UI Rendering
 export interface OptionRenderer {

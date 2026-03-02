@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { Button } from "@/common/components/ui/button";
 import { Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
-import type { QuestionItem } from "../types/user.question";
+import type { QuestionItem } from "../types";
 import EditQuestionModal from "./EditQuestionModal";
 import { showConfirm, showError, showSuccess } from "@/lib/Notification";
 import { useUserQuestions } from "../hooks/useUserQuestions";

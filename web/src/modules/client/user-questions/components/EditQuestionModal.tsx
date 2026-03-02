@@ -19,7 +19,7 @@ import {
 } from "@/common/components/ui/select";
 import { OptionRendererFactory } from "../strategies/OptionRenderer";
 import AddOptionCard from "./AddOptionCard";
-import type { QuestionItem, QuestionOption } from "../types/user.question";
+import type { QuestionItem, QuestionOption } from "../types";
 import {
   updateQuestionSchema,
   transformQuestionData,
