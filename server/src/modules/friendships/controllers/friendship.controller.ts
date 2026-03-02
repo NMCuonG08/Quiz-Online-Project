@@ -21,21 +21,30 @@ export class FriendshipController {
   @Authenticated()
   sendRequest(@Auth() auth: AuthDto, @Body() body: SendFriendRequestDto) {
     if (!auth.user) throw new Error('Unauthorized');
-    return this.friendshipService.sendFriendRequest(auth.user.id, body.friendId);
+    return this.friendshipService.sendFriendRequest(
+      auth.user.id,
+      body.friendId,
+    );
   }
 
   @Post('accept/:id')
   @Authenticated()
   acceptRequest(@Auth() auth: AuthDto, @Param('id') friendshipId: string) {
     if (!auth.user) throw new Error('Unauthorized');
-    return this.friendshipService.acceptFriendRequest(auth.user.id, friendshipId);
+    return this.friendshipService.acceptFriendRequest(
+      auth.user.id,
+      friendshipId,
+    );
   }
 
   @Delete(':id')
   @Authenticated()
   rejectOrRemove(@Auth() auth: AuthDto, @Param('id') friendshipId: string) {
     if (!auth.user) throw new Error('Unauthorized');
-    return this.friendshipService.rejectOrCancelRequest(auth.user.id, friendshipId);
+    return this.friendshipService.rejectOrCancelRequest(
+      auth.user.id,
+      friendshipId,
+    );
   }
 
   @Get('friends')

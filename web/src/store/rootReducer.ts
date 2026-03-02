@@ -2,8 +2,11 @@ import { combineReducers } from "@reduxjs/toolkit";
 import authReducer from "@/modules/auth/common/slices/authSlice";
 import categoryReducer from "@/modules/client/category/slices/category.slice";
 import adminCategoryReducer from "@/modules/admin/categories/slices/admin.category.slice";
+import adminCourseCategoryReducer from "@/modules/admin/course-categories/slices/admin.course.category.slice";
 import adminQuizReducer from "@/modules/admin/quizzes/slices/admin.quiz.slice";
 import adminQuestionReducer from "@/modules/admin/questions/slices/admin.question.slice";
+import userQuizReducer from "@/modules/client/user-quizzes/slices/user.quiz.slice";
+import userQuestionReducer from "@/modules/client/user-questions/slices/user.question.slice";
 import clientQuizReducer from "@/modules/client/category/slices/client.quiz.slice";
 import quizDetailReducer from "@/modules/client/quiz/slices/quiz.detail.slice";
 import roomQuizReducer from "@/modules/client/room-quiz/slices/room-quiz.slice";
@@ -25,8 +28,11 @@ const rootReducer = combineReducers({
   auth: authReducer, // Use non-persisted version for testing
   category: categoryReducer,
   adminCategory: adminCategoryReducer,
+  adminCourseCategory: adminCourseCategoryReducer,
   adminQuiz: adminQuizReducer,
   adminQuestion: adminQuestionReducer,
+  userQuiz: userQuizReducer,
+  userQuestion: userQuestionReducer,
   clientQuiz: clientQuizReducer,
   quizDetail: quizDetailReducer,
   roomQuiz: roomQuizReducer,

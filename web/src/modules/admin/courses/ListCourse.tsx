@@ -4,11 +4,17 @@ import { useAdminCourses } from "./hooks/useAdminCourses";
 import { Button } from "@/common/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/common/components/ui/table";
 import { Loader2, Plus, Edit2, Trash2, Eye, EyeOff } from "lucide-react";
-import Breadcrumb from "../common/components/Breadcrumbs/Breadcrumb";
+import Breadcrumb from "@/modules/admin/common/components/Breadcrumb";
 import { format } from "date-fns";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 
 export default function ListCourse() {
-    const { courses, loading, deleteCourse, updateCourse } = useAdminCourses();
+    const router = useLocalizedRouter();
+    const {
+        courses, loading,
+        page, totalPages, total, setPage,
+        deleteCourse, updateCourse
+    } = useAdminCourses();
 
     const handleTogglePublish = async (id: string, currentStatus: boolean) => {
         await updateCourse(id, { is_published: !currentStatus });
@@ -28,7 +34,10 @@ export default function ListCourse() {
                     <h4 className="text-xl font-semibold text-black dark:text-white">
                         Các khóa học của bạn
                     </h4>
-                    <Button className="flex items-center gap-2">
+                    <Button
+                        className="flex items-center gap-2"
+                        onClick={() => router.push("/admin/courses/add")}
+                    >
                         <Plus size={18} />
                         Thêm Khóa học
                     </Button>
@@ -68,8 +77,8 @@ export default function ListCourse() {
                                         </TableCell>
                                         <TableCell>
                                             <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${course.difficulty_level === 'HARD' ? 'bg-danger/10 text-danger' :
-                                                    course.difficulty_level === 'MEDIUM' ? 'bg-warning/10 text-warning' :
-                                                        'bg-success/10 text-success'
+                                                course.difficulty_level === 'MEDIUM' ? 'bg-warning/10 text-warning' :
+                                                    'bg-success/10 text-success'
                                                 }`}>
                                                 {course.difficulty_level}
                                             </span>
@@ -94,7 +103,11 @@ export default function ListCourse() {
                                                 >
                                                     {course.is_published ? <Eye size={18} /> : <EyeOff size={18} className="text-muted-foreground" />}
                                                 </button>
-                                                <button title="Edit" className="hover:text-primary transition-colors">
+                                                <button
+                                                    title="Edit"
+                                                    className="hover:text-primary transition-colors"
+                                                    onClick={() => router.push(`/admin/courses/edit/${course.id}`)}
+                                                >
                                                     <Edit2 size={18} />
                                                 </button>
                                                 <button
@@ -110,6 +123,36 @@ export default function ListCourse() {
                                 ))}
                             </TableBody>
                         </Table>
+
+                        {/* Pagination UI */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between py-4 border-t">
+                                <div className="text-sm text-muted-foreground">
+                                    Tổng cộng: <span className="font-medium text-black dark:text-white">{total}</span> khóa học
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={page <= 1}
+                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    >
+                                        Trang trước
+                                    </Button>
+                                    <span className="text-sm font-medium">
+                                        Trang {page} / {totalPages}
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={page >= totalPages}
+                                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    >
+                                        Trang sau
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

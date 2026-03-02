@@ -44,6 +44,11 @@ const mainNavItems: NavItem[] = [
     icon: <User size={18} />,
     label: "Profile",
   },
+  {
+    href: "/user/quizzes",
+    icon: <BookOpen size={18} />,
+    label: "My Quizzes",
+  },
 ];
 
 const quizNavItems: NavItem[] = [

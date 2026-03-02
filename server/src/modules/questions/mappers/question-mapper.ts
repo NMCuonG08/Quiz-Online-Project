@@ -1,7 +1,10 @@
 import { QuestionResponseDto } from '../dtos/question-response.dto';
 import { QuestionOptionResponseDto } from '../dtos/question-option-response.dto';
 import { JsonValue } from '@prisma/client/runtime/library';
-import { mapQuestionOptionToResponseDto, QuestionOptionWithRelations } from './question-option-mapper';
+import {
+  mapQuestionOptionToResponseDto,
+  QuestionOptionWithRelations,
+} from './question-option-mapper';
 
 interface QuestionWithRelations {
   id: string;

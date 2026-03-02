@@ -1,8 +1,9 @@
 import { IBaseMapper } from './base.mapper.interface';
 
-export abstract class BaseMapper<Entity, DTO>
-  implements IBaseMapper<Entity, DTO>
-{
+export abstract class BaseMapper<Entity, DTO> implements IBaseMapper<
+  Entity,
+  DTO
+> {
   abstract toDTO(entity: Entity): DTO;
   abstract toEntity(dto: DTO): Entity;
 

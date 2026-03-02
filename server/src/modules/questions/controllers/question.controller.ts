@@ -79,7 +79,8 @@ export class QuestionController {
   @ApiOperation({ summary: 'Get public questions by quiz slug' })
   @ApiResponse({
     status: 200,
-    description: 'Successfully retrieved questions by quiz slug for public view',
+    description:
+      'Successfully retrieved questions by quiz slug for public view',
     type: [QuestionResponseDto],
   })
   async getPublicQuestionsByQuizSlug(
@@ -182,10 +183,19 @@ export class QuestionController {
     @UploadedFiles() files?: Express.Multer.File[],
   ): Promise<QuestionResponseDto> {
     // Separate question media from option media files
-    const questionMedia = files?.find(f => f.fieldname === 'media');
-    const optionMediaFiles = files?.filter(f => f.fieldname.startsWith('option_') && f.fieldname.endsWith('_media')) || [];
-    
-    return this.questionService.updateQuestion(id, question, questionMedia, optionMediaFiles);
+    const questionMedia = files?.find((f) => f.fieldname === 'media');
+    const optionMediaFiles =
+      files?.filter(
+        (f) =>
+          f.fieldname.startsWith('option_') && f.fieldname.endsWith('_media'),
+      ) || [];
+
+    return this.questionService.updateQuestion(
+      id,
+      question,
+      questionMedia,
+      optionMediaFiles,
+    );
   }
 
   @Delete(':id')

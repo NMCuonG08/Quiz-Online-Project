@@ -29,6 +29,24 @@ export class QuizService extends BaseService {
     );
   }
 
+  async getQuizzesByCreator(
+    creatorId: string,
+    paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const result = await this.quizRepository.paginateWithRelations(
+      paginationQuery,
+      {
+        creator_id: creatorId,
+      },
+    );
+    return new PaginatedResponseDto(
+      result.data,
+      result.meta.page,
+      result.meta.limit,
+      result.meta.total,
+    );
+  }
+
   async getQuizzesByCategory(
     categoryId: string,
     paginationQuery: QuizPaginationQueryDto,

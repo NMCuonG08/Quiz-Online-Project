@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DifficultyLevel } from '@prisma/client';
-import { IsEnum, IsNumber, IsOptional, IsString, IsBoolean, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsBoolean,
+  Min,
+} from 'class-validator';
 
 export class CreateCourseDto {
   @ApiProperty()
@@ -31,7 +38,7 @@ export class CreateCourseDto {
   @IsOptional()
   @IsString()
   thumbnail_url?: string;
-  
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

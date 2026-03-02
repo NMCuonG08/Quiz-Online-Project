@@ -68,15 +68,20 @@ export class QuizSessionService extends BaseService {
   async startSession(userId: string | undefined, dto: CreateQuizSessionDto) {
     let targetUserId = userId;
     console.log('🚀 startSession called with:', { userId, dto });
-    
+
     // Fallback: If no userId (public session), use the first user in the DB
     if (!targetUserId) {
       const user = await this.prisma.user.findFirst({ select: { id: true } });
       if (!user) {
-        throw new NotFoundException('No users found in system to assign session');
+        throw new NotFoundException(
+          'No users found in system to assign session',
+        );
       }
       targetUserId = user.id;
-      console.log('⚠️ No userId provided, falling back to system user:', targetUserId);
+      console.log(
+        '⚠️ No userId provided, falling back to system user:',
+        targetUserId,
+      );
     }
 
     let quizId = dto.quiz_id;
@@ -92,7 +97,7 @@ export class QuizSessionService extends BaseService {
     if (!quizId) {
       throw new NotFoundException('Quiz identifier missing');
     }
-    
+
     console.log('🔍 Checking for existing attempt:', { quizId, targetUserId });
 
     // Check for existing IN_PROGRESS attempt
@@ -126,15 +131,15 @@ export class QuizSessionService extends BaseService {
         total_questions: existingAttempt.quiz?._count?.questions || 0,
         score: existingAttempt.score,
         time_spent: existingAttempt.time_taken || 0,
-        answers: existingAttempt.responses.map(r => ({
+        answers: existingAttempt.responses.map((r) => ({
           question_id: r.question_id,
           selected_option_id: r.selected_options[0] || undefined,
-          text_answer: r.text_answer
+          text_answer: r.text_answer,
         })),
-        is_resume: true
+        is_resume: true,
       };
     }
-    
+
     console.log('⚠️ No existing attempt found, creating new one.');
 
     // Determine next attempt number
@@ -175,7 +180,7 @@ export class QuizSessionService extends BaseService {
       score: 0,
       time_spent: 0,
       answers: [],
-      is_resume: false
+      is_resume: false,
     };
   }
 
@@ -265,14 +270,17 @@ export class QuizSessionService extends BaseService {
       },
     });
 
-    const maxScore = attempt?.quiz?.questions.reduce((sum, q) => sum + q.points, 0) || 0;
+    const maxScore =
+      attempt?.quiz?.questions.reduce((sum, q) => sum + q.points, 0) || 0;
     const passingScore = attempt?.quiz?.passing_score || 70;
     const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
     const passed = percentage >= passingScore;
 
     // Calculate time taken
     const startedAt = attempt?.started_at || new Date();
-    const timeTaken = Math.floor((new Date().getTime() - startedAt.getTime()) / 1000);
+    const timeTaken = Math.floor(
+      (new Date().getTime() - startedAt.getTime()) / 1000,
+    );
 
     return await this.prisma.quizAttempt.update({
       where: { id: sessionId },

@@ -42,6 +42,21 @@ export class QuizController {
     return this.quizService.getQuizzes(paginationQuery);
   }
 
+  @Get('me')
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Get quizzes created by the current user' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved my quizzes',
+  })
+  async getMyQuizzes(
+    @Auth() auth: AuthDto,
+    @Query() paginationQuery: QuizPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<QuizResponseDto>> {
+    const creatorId = auth.user.id;
+    return this.quizService.getQuizzesByCreator(creatorId, paginationQuery);
+  }
+
   @Get('slug/:slug')
   @ApiOperation({ summary: 'Get a quiz by slug' })
   @ApiResponse({

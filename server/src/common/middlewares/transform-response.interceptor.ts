@@ -8,9 +8,10 @@ import { map, Observable } from 'rxjs';
 import { ResponseDto } from '@/common/dtos/responses/base.response';
 
 @Injectable()
-export class TransformResponseInterceptor<T>
-  implements NestInterceptor<T, ResponseDto<T>>
-{
+export class TransformResponseInterceptor<T> implements NestInterceptor<
+  T,
+  ResponseDto<T>
+> {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     // Check Graphql
     if (context.getType<'graphql'>() === 'graphql') {

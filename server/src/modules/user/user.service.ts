@@ -42,7 +42,7 @@ export class UserService {
         OR: [
           { full_name: { contains: query, mode: 'insensitive' } },
           { username: { contains: query, mode: 'insensitive' } },
-        ]
+        ],
       },
       select: {
         id: true,

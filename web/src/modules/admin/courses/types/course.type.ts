@@ -30,6 +30,7 @@ export interface CourseCreateData {
   difficulty_level?: "EASY" | "MEDIUM" | "HARD";
   price?: number;
   thumbnail_url?: string;
+  thumbnailFile?: File | null;
   is_published?: boolean;
 }
 

@@ -198,20 +198,27 @@ export class QuestionRepository extends BaseRepository<Question> {
           data: optionsData.map((option, index) => {
             const cleanOption: any = {
               question_id: question.id,
-              sort_order: typeof option.sort_order === 'number' ? option.sort_order : index + 1,
+              sort_order:
+                typeof option.sort_order === 'number'
+                  ? option.sort_order
+                  : index + 1,
             };
-            
+
             if (option.option_text !== undefined) {
               cleanOption.option_text = String(option.option_text || '');
             }
-            if (option.explanation !== undefined && option.explanation !== null) {
+            if (
+              option.explanation !== undefined &&
+              option.explanation !== null
+            ) {
               cleanOption.explanation = String(option.explanation);
             }
             if (option.is_correct !== undefined) {
-              cleanOption.is_correct = option.is_correct === true || option.is_correct === 'true';
+              cleanOption.is_correct =
+                option.is_correct === true || option.is_correct === 'true';
             }
             cleanOption.media_url = option.media_url || null;
-            
+
             return cleanOption;
           }),
         });
@@ -296,25 +303,32 @@ export class QuestionRepository extends BaseRepository<Question> {
             // Clean and convert option data to correct types
             const cleanOption: any = {
               question_id: id,
-              sort_order: typeof option.sort_order === 'number' ? option.sort_order : index + 1,
+              sort_order:
+                typeof option.sort_order === 'number'
+                  ? option.sort_order
+                  : index + 1,
             };
-            
+
             // String fields
             if (option.option_text !== undefined) {
               cleanOption.option_text = String(option.option_text || '');
             }
-            if (option.explanation !== undefined && option.explanation !== null) {
+            if (
+              option.explanation !== undefined &&
+              option.explanation !== null
+            ) {
               cleanOption.explanation = String(option.explanation);
             }
-            
+
             // Boolean field
             if (option.is_correct !== undefined) {
-              cleanOption.is_correct = option.is_correct === true || option.is_correct === 'true';
+              cleanOption.is_correct =
+                option.is_correct === true || option.is_correct === 'true';
             }
-            
+
             // Media URL field
             cleanOption.media_url = option.media_url || null;
-            
+
             return cleanOption;
           }),
         });

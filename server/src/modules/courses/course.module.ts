@@ -4,9 +4,10 @@ import { CourseService } from './services/course.service';
 import { CourseRepository } from './repositories/course.repository';
 
 import { GuardsModule } from '@/common/guards/guards.module';
+import { CloudinaryModule } from '@/infrastructure/storage/cloudinary/cloudinary.module';
 
 @Module({
-  imports: [GuardsModule],
+  imports: [GuardsModule, CloudinaryModule],
   controllers: [CourseController],
   providers: [CourseService, CourseRepository],
   exports: [CourseService, CourseRepository],

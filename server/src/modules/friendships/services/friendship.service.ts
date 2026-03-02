@@ -11,7 +11,9 @@ export class FriendshipService {
 
   async sendFriendRequest(userId: string, friendId: string) {
     if (userId === friendId) {
-      throw new BadRequestException('You cannot send a friend request to yourself');
+      throw new BadRequestException(
+        'You cannot send a friend request to yourself',
+      );
     }
 
     const existingFriendship = await this.prisma.friendship.findFirst({
@@ -82,8 +84,12 @@ export class FriendshipService {
         OR: [{ userId }, { friendId: userId }],
       },
       include: {
-        user: { select: { id: true, username: true, full_name: true, avatar: true } },
-        friend: { select: { id: true, username: true, full_name: true, avatar: true } },
+        user: {
+          select: { id: true, username: true, full_name: true, avatar: true },
+        },
+        friend: {
+          select: { id: true, username: true, full_name: true, avatar: true },
+        },
       },
     });
 
@@ -103,7 +109,9 @@ export class FriendshipService {
         status: 'PENDING',
       },
       include: {
-        user: { select: { id: true, username: true, full_name: true, avatar: true } },
+        user: {
+          select: { id: true, username: true, full_name: true, avatar: true },
+        },
       },
     });
   }

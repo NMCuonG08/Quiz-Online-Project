@@ -13,7 +13,11 @@ export class QuizAttemptRepository extends BaseRepository<QuizAttempt> {
     return this.prisma.quizAttempt;
   }
 
-  async findByQuizAndUser(quizId: string, userId: string, attemptNumber: number) {
+  async findByQuizAndUser(
+    quizId: string,
+    userId: string,
+    attemptNumber: number,
+  ) {
     return await this.prisma.quizAttempt.findUnique({
       where: {
         quiz_id_user_id_attempt_number: {

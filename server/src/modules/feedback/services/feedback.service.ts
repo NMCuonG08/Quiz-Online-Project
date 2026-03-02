@@ -14,7 +14,10 @@ export class FeedbackService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async createOrUpdateRating(userId: string, createDto: CreateRatingDto): Promise<RatingResponseDto> {
+  async createOrUpdateRating(
+    userId: string,
+    createDto: CreateRatingDto,
+  ): Promise<RatingResponseDto> {
     const existing = await this.ratingRepository.findFirst({
       quiz_id: createDto.quiz_id,
       user_id: userId,
@@ -24,7 +27,7 @@ export class FeedbackService {
     if (existing) {
       ratingTemp = await this.ratingRepository.update(
         { id: existing.id },
-        { rating: createDto.rating, comment: createDto.comment }
+        { rating: createDto.rating, comment: createDto.comment },
       );
     } else {
       ratingTemp = await this.ratingRepository.create({
@@ -47,19 +50,25 @@ export class FeedbackService {
       data: {
         average_rating: stats._avg.rating || 0,
         total_ratings: stats._count.rating || 0,
-      }
+      },
     });
 
     // fetch the resulting rating with user
     const fullRating = await this.prisma.quizRating.findUnique({
       where: { id: ratingTemp.id },
-      include: { user: { select: { id: true, username: true, full_name: true, avatar: true } } }
+      include: {
+        user: {
+          select: { id: true, username: true, full_name: true, avatar: true },
+        },
+      },
     });
 
     return RatingMapper.toResponseDto(fullRating);
   }
 
-  async getRatings(query: RatingPaginationQueryDto): Promise<PaginatedResponseDto<RatingResponseDto>> {
+  async getRatings(
+    query: RatingPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<RatingResponseDto>> {
     const where: any = {};
     if (query.quiz_id) {
       where.quiz_id = query.quiz_id;
@@ -81,18 +90,18 @@ export class FeedbackService {
               username: true,
               full_name: true,
               avatar: true,
-            }
-          }
-        }
+            },
+          },
+        },
       }),
-      this.prisma.quizRating.count({ where })
+      this.prisma.quizRating.count({ where }),
     ]);
 
     return new PaginatedResponseDto(
       data.map(RatingMapper.toResponseDto),
       Number(page),
       Number(limit),
-      total
+      total,
     );
   }
 
@@ -101,7 +110,7 @@ export class FeedbackService {
       quiz_id: quizId,
       user_id: userId,
     });
-    
+
     if (!existing) throw new NotFoundException('Rating not found');
 
     await this.ratingRepository.delete({ id: existing.id });
@@ -118,7 +127,7 @@ export class FeedbackService {
       data: {
         average_rating: stats._avg.rating || 0,
         total_ratings: stats._count.rating || 0,
-      }
+      },
     });
 
     return { success: true };

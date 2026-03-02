@@ -25,7 +25,7 @@ export class QuizRepository extends BaseRepository<Quiz> {
     const skip = (page - 1) * limit;
     const take = limit;
 
-    const orderBy = this.buildOrderBy(sortBy, sortOrder) as any;
+    const orderBy = this.buildOrderBy(sortBy, sortOrder);
     const whereClause = this.buildWhereClause(where, paginationDto);
 
     const dataPromise = this.prisma.quiz.findMany({

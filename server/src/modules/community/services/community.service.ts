@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
-import { CreatePostDto, CreateCommentDto, ToggleLikeDto } from '../dtos/community.dto';
+import {
+  CreatePostDto,
+  CreateCommentDto,
+  ToggleLikeDto,
+} from '../dtos/community.dto';
 
 @Injectable()
 export class CommunityService {
@@ -18,23 +22,26 @@ export class CommunityService {
 
   async getPosts(page = 1, limit = 10) {
     const skip = (page - 1) * limit;
-    
+
     return this.prisma.post.findMany({
       skip,
       take: limit,
       orderBy: { created_at: 'desc' },
       include: {
-        user: { select: { id: true, username: true, full_name: true, avatar: true } },
+        user: {
+          select: { id: true, username: true, full_name: true, avatar: true },
+        },
         _count: {
-          select: { comments: true, likes: true }
-        }
+          select: { comments: true, likes: true },
+        },
       },
     });
   }
 
   async deletePost(userId: string, postId: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
-    if (!post || post.userId !== userId) { // Simple auth check for now
+    if (!post || post.userId !== userId) {
+      // Simple auth check for now
       throw new NotFoundException('Post not found or unauthorized');
     }
 
@@ -50,8 +57,10 @@ export class CommunityService {
         content: data.content,
       },
       include: {
-        user: { select: { id: true, username: true, full_name: true, avatar: true } }
-      }
+        user: {
+          select: { id: true, username: true, full_name: true, avatar: true },
+        },
+      },
     });
   }
 
@@ -60,7 +69,9 @@ export class CommunityService {
       where: { postId },
       orderBy: { created_at: 'asc' },
       include: {
-        user: { select: { id: true, username: true, full_name: true, avatar: true } },
+        user: {
+          select: { id: true, username: true, full_name: true, avatar: true },
+        },
       },
     });
   }

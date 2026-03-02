@@ -6,17 +6,27 @@ import { showSuccess, showError } from "@/lib/Notification";
 export const useAdminCourses = () => {
   const [courses, setCourses] = useState<AdminCourse[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const fetchCourses = useCallback(async () => {
+  const fetchCourses = useCallback(async (currentPage = page, currentLimit = limit) => {
     setLoading(true);
-    const { success, data, error } = await AdminCourseService.getAllCourses();
+    const { success, data, error } = await AdminCourseService.getAllCourses(currentPage, currentLimit);
     if (success && data) {
-      setCourses(data);
+      const coursesData = (data as any).data?.data || (data as any).data || data || [];
+      const extractedCourses = Array.isArray(coursesData) ? coursesData : [];
+      setCourses(extractedCourses);
+      setTotal((data as any).data?.meta?.total || (data as any).meta?.total || 0);
+      setTotalPages((data as any).data?.meta?.totalPages || (data as any).meta?.totalPages || 1);
     } else {
       showError(error || "Không thể lấy danh sách khóa học");
     }
     setLoading(false);
-  }, []);
+  }, [page, limit]);
 
   const createCourse = async (courseData: CourseCreateData) => {
     const { success, data, error } = await AdminCourseService.createCourse(courseData);
@@ -61,6 +71,12 @@ export const useAdminCourses = () => {
   return {
     courses,
     loading,
+    page,
+    limit,
+    total,
+    totalPages,
+    setPage,
+    setLimit,
     refresh: fetchCourses,
     createCourse,
     updateCourse,

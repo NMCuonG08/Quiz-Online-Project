@@ -52,12 +52,13 @@ export class CategoryService extends BaseService {
     } as unknown as Category;
   }
 
-  async findAllCategories(): Promise<(Category & { parent_name: string | null })[]> {
+  async findAllCategories(): Promise<
+    (Category & { parent_name: string | null })[]
+  > {
     const cacheKey = 'categories:all';
     console.log('Fetching categories...');
     const message = 'Lấy toàn bộ categories thành công';
 
-    
     // Thử lấy từ cache trước
     const cachedCategories = await this.redisService.get(cacheKey);
     if (cachedCategories) {

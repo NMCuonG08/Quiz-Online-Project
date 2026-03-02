@@ -9,7 +9,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CommunityService } from '../services/community.service';
-import { CreatePostDto, CreateCommentDto, ToggleLikeDto } from '../dtos/community.dto';
+import {
+  CreatePostDto,
+  CreateCommentDto,
+  ToggleLikeDto,
+} from '../dtos/community.dto';
 import { AuthGuard, Authenticated, Auth } from '@/common/guards/auth.guard';
 import { AuthDto } from '@/modules/auth/dto';
 
@@ -18,7 +22,10 @@ export class CommunityController {
   constructor(private readonly communityService: CommunityService) {}
 
   @Get('posts')
-  getPosts(@Query('page') page: string = '1', @Query('limit') limit: string = '10') {
+  getPosts(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
     return this.communityService.getPosts(Number(page), Number(limit));
   }
 

@@ -313,7 +313,9 @@ export class QuestionOptionService extends BaseService {
     );
 
     // Map to DTOs
-    return createdOptions.map((option) => mapQuestionOptionToResponseDto(option));
+    return createdOptions.map((option) =>
+      mapQuestionOptionToResponseDto(option),
+    );
   }
 
   async bulkUpdateQuestionOptions(
@@ -358,6 +360,8 @@ export class QuestionOptionService extends BaseService {
     );
 
     // Map to DTOs
-    return updatedOptions.map((option) => mapQuestionOptionToResponseDto(option));
+    return updatedOptions.map((option) =>
+      mapQuestionOptionToResponseDto(option),
+    );
   }
 }

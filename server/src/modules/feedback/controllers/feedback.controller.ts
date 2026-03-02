@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, UseGuards, Query, Delete, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Query,
+  Delete,
+  Param,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FeedbackService } from '../services/feedback.service';
 import { CreateRatingDto } from '../dtos/create-rating.dto';
@@ -28,7 +37,7 @@ export class FeedbackController {
 
   @Post('ratings')
   @UseGuards(AuthGuard)
-  @Authenticated({permission: Permission.ActivityRead})
+  @Authenticated({ permission: Permission.ActivityRead })
   @ApiOperation({ summary: 'Create or update a quiz rating' })
   @ApiResponse({
     status: 201,
@@ -44,16 +53,13 @@ export class FeedbackController {
 
   @Delete('ratings/:quizId')
   @UseGuards(AuthGuard)
-  @Authenticated({permission: Permission.ActivityRead})
+  @Authenticated({ permission: Permission.ActivityRead })
   @ApiOperation({ summary: 'Delete a quiz rating by current user' })
   @ApiResponse({
     status: 200,
     description: 'Successfully deleted rating',
   })
-  async deleteRating(
-    @Param('quizId') quizId: string,
-    @Auth() auth: AuthDto,
-  ) {
+  async deleteRating(@Param('quizId') quizId: string, @Auth() auth: AuthDto) {
     const userId = auth.user.id;
     return this.feedbackService.deleteRating(userId, quizId);
   }
