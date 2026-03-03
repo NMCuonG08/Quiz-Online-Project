@@ -12,7 +12,7 @@ export const APP_ROUTES = {
     SETTINGS: "/settings",
   },
   QUIZ: {
-    LIST: "/quiz",
+    LIST: "/category",
     DETAIL: (slug: string) => `/quiz/${slug}`,
     PLAY: (slug: string) => `/quiz/${slug}/play`,
     DO_QUIZ: (slug: string) => `/quiz/${slug}/do-quiz`,
