@@ -38,6 +38,15 @@ import { useJoinRoom } from "./hooks/useJoinRoom";
 import { showError } from "@/lib/Notification";
 import { BackendUnavailable } from "./components/BackendUnavailable";
 import { useTranslations } from "next-intl";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/common/components/ui/breadcrumb";
+import { Link } from "@/common/i18n/navigation";
 
 interface QuizDetailProps {
   slug: string;
@@ -46,6 +55,7 @@ interface QuizDetailProps {
 const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
   const { data, loading, error } = useQuizDetail(slug);
   const t = useTranslations("quizDetail");
+  const tNav = useTranslations("nav");
   const { isLoggedIn } = useAuth();
   const {
     createRoom,
@@ -147,6 +157,29 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
     <div>
       <QuizBanner src={data.thumbnail_url} title={data.title} />
       <div className="w-full px-4 py-6">
+        {/* Breadcrumb Section */}
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/">{tNav("home")}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/category">{tNav("quizzes")}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="underline text-primary font-bold">
+                {data.title}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         {/* Hero Section */}
         <div className="mb-8">
           <QuizHeader
