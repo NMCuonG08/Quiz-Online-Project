@@ -96,7 +96,10 @@ export const apiRoutes = {
     DELETE: (id: string) => `/api/notifications/${id}`,
   },
   USERS: {
+    GET_ALL: "/api/user",
     UPDATE: (id: string) => `/api/user/${id}`,
+    ROLES: "/api/user/roles",
+    UPDATE_ROLES: (id: string) => `/api/user/${id}/roles`,
   },
   COURSES: {
     BASE: "/api/courses",

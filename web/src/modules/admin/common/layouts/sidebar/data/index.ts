@@ -27,6 +27,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Users",
+        url: "/admin/users",
+        icon: Icons.User,
+        items: [],
+      },
+      {
         title: "Categories",
         icon: Icons.FourCircle,
         items: [

@@ -13,6 +13,7 @@ import roomQuizReducer from "@/modules/client/room-quiz/slices/room-quiz.slice";
 import quizReducer from "@/modules/client/do-quiz/slices/quiz.slice";
 import websocketReducer from "@/common/slices/websocket.slice";
 import notificationReducer from "@/common/slices/notification.slice";
+import adminUserReducer from "@/modules/admin/users/slices/admin.user.slice";
 // Temporarily disable persistence for auth slice to test logout
 // const authPersistConfig = {
 //   key: 'auth',
@@ -31,6 +32,7 @@ const rootReducer = combineReducers({
   adminCourseCategory: adminCourseCategoryReducer,
   adminQuiz: adminQuizReducer,
   adminQuestion: adminQuestionReducer,
+  adminUser: adminUserReducer,
   userQuiz: userQuizReducer,
   userQuestion: userQuestionReducer,
   clientQuiz: clientQuizReducer,

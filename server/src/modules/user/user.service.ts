@@ -30,7 +30,20 @@ export class UserService {
 
   async findAll() {
     return this.prismaService.user.findMany({
+      include: {
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
       orderBy: { created_at: 'desc' },
+    });
+  }
+
+  async findAllRoles() {
+    return this.prismaService.role.findMany({
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -76,6 +89,47 @@ export class UserService {
     });
     await this.eventRepository.emit('UserUpdated', { id });
     return updated;
+  }
+
+  async updateUserRoles(id: string, roleIds: string[]) {
+    // Check if user exists
+    await this.findOne(id);
+
+    // Update user roles
+    await this.prismaService.$transaction(async (tx) => {
+      // Delete existing roles
+      await tx.userRole.deleteMany({
+        where: { userId: id },
+      });
+
+      // Create new roles
+      if (roleIds.length > 0) {
+        await tx.userRole.createMany({
+          data: roleIds.map((roleId) => ({
+            userId: id,
+            roleId,
+          })),
+        });
+      }
+    });
+
+    await this.eventRepository.emit('UserRolesUpdated', { id, roleIds });
+    return this.findOneWithRoles(id);
+  }
+
+  async findOneWithRoles(id: string) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id },
+      include: {
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+    if (!user) throw new ResourceNotFoundException('User', id);
+    return user;
   }
 
   async remove(id: string) {

@@ -81,6 +81,7 @@ type EventMap = {
   UserCreated: [{ id: string }];
   UserUpdated: [{ id: string }];
   UserDeleted: [{ id: string }];
+  UserRolesUpdated: [{ id: string; roleIds: string[] }];
 };
 
 export type EventItem<T extends EmitEvent> = {

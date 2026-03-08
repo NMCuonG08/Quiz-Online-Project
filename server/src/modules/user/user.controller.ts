@@ -37,9 +37,16 @@ export class UserController {
 
   @Get()
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.ActivityRead })
+  @Authenticated({ permission: Permission.AdminUserRead })
   findAll() {
     return this.userService.findAll();
+  }
+
+  @Get('roles')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.AdminUserRead })
+  findAllRoles() {
+    return this.userService.findAllRoles();
   }
 
   @Get('profile')
@@ -65,6 +72,16 @@ export class UserController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(id, updateUserDto);
+  }
+
+  @Patch(':id/roles')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.AdminUserUpdate })
+  updateRoles(
+    @Param('id') id: string,
+    @Body('roleIds') roleIds: string[],
+  ) {
+    return this.userService.updateUserRoles(id, roleIds);
   }
 
   @Delete(':id')
