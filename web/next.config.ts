@@ -5,7 +5,7 @@ import path from "path";
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
-    domains: ["images.unsplash.com", "res.cloudinary.com", "example.com"],
+    domains: ["images.unsplash.com", "res.cloudinary.com", "example.com", "lh3.googleusercontent.com"],
   },
   typescript: {
     ignoreBuildErrors: true,

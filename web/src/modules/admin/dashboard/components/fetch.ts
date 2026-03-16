@@ -1,25 +1,34 @@
-export async function getOverviewData() {
-  // Fake delay
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
-  return {
-    views: {
-      value: 3456,
-      growthRate: 0.43,
-    },
-    profit: {
-      value: 4220,
-      growthRate: 4.35,
-    },
-    products: {
-      value: 3456,
-      growthRate: 2.59,
-    },
-    users: {
-      value: 3456,
-      growthRate: -0.95,
-    },
-  };
+export async function getOverviewData() {
+  const url = `${API_BASE}/api/admin/dashboard/stats`;
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const result = await response.json();
+    const data = result.data; // Backend wraps response in { data: ... }
+    
+    if (!data || !data.overview) {
+       throw new Error('Data format incorrect or missing overview');
+    }
+
+    // Map backend keys to what the UI expects
+    return {
+      views: data.overview.attempts || { value: 0, growthRate: 0 },
+      profit: data.overview.questions || { value: 0, growthRate: 0 },
+      products: data.overview.quizzes || { value: 0, growthRate: 0 },
+      users: data.overview.users || { value: 0, growthRate: 0 },
+    };
+  } catch (error) {
+    console.error(`Error fetching from ${url}:`, error);
+    // Fallback to mock data if API fails
+    return {
+      views: { value: 0, growthRate: 0 },
+      profit: { value: 0, growthRate: 0 },
+      products: { value: 0, growthRate: 0 },
+      users: { value: 0, growthRate: 0 },
+    };
+  }
 }
 
 export async function getChatsData() {
@@ -39,6 +48,7 @@ export async function getChatsData() {
       },
       unreadCount: 3,
     },
+    // ... remaining data omitted for brevity but should be kept in real file
     {
       name: "Wilium Smith",
       profile: "/images/user/user-03.png",
@@ -88,4 +98,25 @@ export async function getChatsData() {
       unreadCount: 0,
     },
   ];
+}
+
+export async function getDashboardDetailedData() {
+  const url = `${API_BASE}/api/admin/dashboard/stats`;
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const result = await response.json();
+    return result.data || {
+      overview: { attempts: { value: 0 }, questions: { value: 0 }, quizzes: { value: 0 }, users: { value: 0 } },
+      recentQuizzes: [],
+      recentUsers: [],
+    };
+  } catch (error) {
+    console.error(`Error fetching detailed from ${url}:`, error);
+    return {
+      overview: { attempts: { value: 0 }, questions: { value: 0 }, quizzes: { value: 0 }, users: { value: 0 } },
+      recentQuizzes: [],
+      recentUsers: [],
+    };
+  }
 }

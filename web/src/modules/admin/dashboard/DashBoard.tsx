@@ -1,14 +1,16 @@
 import { PaymentsOverview } from "@/modules/admin/dashboard/components/payments-overview";
 import { UsedDevices } from "@/modules/admin/dashboard/components/used-devices";
 import { WeeksProfit } from "@/modules/admin/dashboard/components/weeks-profit";
-import { TopChannels } from "@/modules/admin/dashboard/components/top-channels";
-import { TopChannelsSkeleton } from "@/modules/admin/dashboard/components/top-channels/skeleton";
 import { createTimeFrameExtractor } from "@/utils/timeframe-extractor";
 import { Suspense } from "react";
 import { ChatsCard } from "@/modules/admin/dashboard/components/chats-card";
 import { OverviewCardsGroup } from "@/modules/admin/dashboard/components/overview-cards";
 import { OverviewCardsSkeleton } from "@/modules/admin/dashboard/components/overview-cards/skeleton";
 import { RegionLabels } from "@/modules/admin/dashboard/components/region-labels";
+import { RecentQuizzes } from "@/modules/admin/dashboard/components/recent-quizzes";
+import { RecentUsers } from "@/modules/admin/dashboard/components/recent-users";
+import { getDashboardDetailedData } from "@/modules/admin/dashboard/components/fetch";
+import { ExportReportButton } from "@/modules/admin/reports/components/ExportButton";
 
 type PropsType = {
   searchParams: Promise<{
@@ -19,9 +21,14 @@ type PropsType = {
 export default async function Home({ searchParams }: PropsType) {
   const { selected_time_frame } = await searchParams;
   const extractTimeFrame = createTimeFrameExtractor(selected_time_frame);
+  const detailedData = await getDashboardDetailedData();
 
   return (
     <>
+      <div className="flex justify-end mb-6">
+        <ExportReportButton />
+      </div>
+
       <Suspense fallback={<OverviewCardsSkeleton />}>
         <OverviewCardsGroup />
       </Suspense>
@@ -47,11 +54,15 @@ export default async function Home({ searchParams }: PropsType) {
 
         <RegionLabels />
 
-        <div className="col-span-12 grid xl:col-span-8">
-          <Suspense fallback={<TopChannelsSkeleton />}>
-            <TopChannels />
-          </Suspense>
-        </div>
+        <RecentQuizzes
+          data={detailedData.recentQuizzes}
+          className="col-span-12 xl:col-span-8"
+        />
+
+        <RecentUsers
+          data={detailedData.recentUsers}
+          className="col-span-12 xl:col-span-4"
+        />
 
         <Suspense fallback={null}>
           <ChatsCard />

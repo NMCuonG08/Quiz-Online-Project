@@ -23,6 +23,8 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { CourseModule } from './modules/courses/course.module';
 import { FriendshipModule } from './modules/friendships/friendships.module';
 import { CommunityModule } from './modules/community/community.module';
+import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -176,6 +178,8 @@ import { CommunityModule } from './modules/community/community.module';
     CourseModule,
     FriendshipModule,
     CommunityModule,
+    AdminDashboardModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService, JobRepository],

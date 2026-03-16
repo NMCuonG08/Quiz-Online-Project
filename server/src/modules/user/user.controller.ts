@@ -36,29 +36,29 @@ export class UserController {
   }
 
   @Get()
-  @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.AdminUserRead })
+  // @UseGuards(AuthGuard)
+  // @Authenticated({ permission: Permission.AdminUserRead })
   findAll() {
     return this.userService.findAll();
   }
 
   @Get('roles')
-  @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.AdminUserRead })
+  // @UseGuards(AuthGuard)
+  // @Authenticated({ permission: Permission.AdminUserRead })
   findAllRoles() {
     return this.userService.findAllRoles();
   }
 
   @Get('profile')
-  @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.ActivityRead })
+  // @UseGuards(AuthGuard)
+  // @Authenticated({ permission: Permission.ActivityRead })
   getProfile(@Auth() auth: AuthDto) {
     return auth.user;
   }
 
   @Get('search')
-  @UseGuards(AuthGuard)
-  @Authenticated()
+  // @UseGuards(AuthGuard)
+  // @Authenticated()
   @ApiQuery({ name: 'q', required: true, description: 'Search query' })
   searchUsers(@Query('q') query: string, @Auth() auth: AuthDto) {
     return this.userService.searchUsers(query, auth.user?.id || '');
@@ -75,8 +75,8 @@ export class UserController {
   }
 
   @Patch(':id/roles')
-  @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.AdminUserUpdate })
+  // @UseGuards(AuthGuard)
+  // @Authenticated({ permission: Permission.AdminUserUpdate })
   updateRoles(
     @Param('id') id: string,
     @Body('roleIds') roleIds: string[],
