@@ -183,7 +183,13 @@ const setAccessToken = (token: string | null): void => {
 const performLogout = async (): Promise<void> => {
   try {
     // Clear all auth-related storage
-    const authKeys = ["auth_token", "persist:auth", "token", "refresh_token"];
+    const authKeys = [
+      "auth_token",
+      "persist:root",
+      "persist:auth",
+      "token",
+      "refresh_token",
+    ];
     authKeys.forEach((key) => {
       try {
         localStorage.removeItem(key);
@@ -192,10 +198,24 @@ const performLogout = async (): Promise<void> => {
       }
     });
 
+    // Clear session storage just in case
+    try {
+      sessionStorage.clear();
+    } catch (e) {}
+
+    // Dispatch clearAuth to Redux store if accessible
+    try {
+      const store = (window as any).__STORE__;
+      if (store) {
+        // Import might be tricky, use string type or check if we can import it
+        store.dispatch({ type: "auth/clearAuth" });
+      }
+    } catch (e) {
+      console.warn("Could not dispatch clearAuth:", e);
+    }
+
     // Clear axios defaults
     delete apiClient.defaults.headers.common["Authorization"];
-
-    // No dispatch to avoid infinite loop - just clear local data
 
     // Only redirect to login if not already on auth pages
     const currentPath = window.location.pathname;
@@ -296,19 +316,8 @@ apiClient.interceptors.response.use(
 
     // Handle 500 Internal Server Error - return fallback response
     if (error.response?.status === 500) {
-      console.warn("🔄 API returned 500 error, returning fallback response");
-      return Promise.resolve({
-        data: {
-          success: false,
-          statusCode: 500,
-          message: "Internal server error - backend may be down",
-          data: null,
-        },
-        status: 500,
-        statusText: "Internal Server Error",
-        headers: error.response?.headers || {},
-        config: error.config,
-      });
+      console.warn("🔄 API returned 500 error");
+      return Promise.reject(error);
     }
 
     // Handle 401 Unauthorized - try refresh once, then logout if refresh fails
@@ -329,18 +338,7 @@ apiClient.interceptors.response.use(
             isLoggingOut = false;
           }, 1000);
         }
-        return Promise.resolve({
-          data: error.response?.data || {
-            error: {
-              message: "Unauthorized - Refresh token invalid",
-              code: "REFRESH_FAILED",
-            },
-          },
-          status: 401,
-          statusText: "Unauthorized",
-          headers: error.response?.headers || {},
-          config: error.config,
-        });
+        return Promise.reject(error);
       }
 
       if (originalConfig && originalConfig._retry) {
@@ -353,15 +351,7 @@ apiClient.interceptors.response.use(
             isLoggingOut = false;
           }, 1000);
         }
-        return Promise.resolve({
-          data: error.response?.data || {
-            error: { message: "Unauthorized", code: "UNAUTHORIZED" },
-          },
-          status: 401,
-          statusText: "Unauthorized",
-          headers: error.response?.headers || {},
-          config: error.config,
-        });
+        return Promise.reject(error);
       }
 
       // Try to refresh token - only retry if refresh succeeds
@@ -379,13 +369,7 @@ apiClient.interceptors.response.use(
               isLoggingOut = false;
             }, 1000);
           }
-          return Promise.resolve({
-            data: { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
-            status: 401,
-            statusText: "Unauthorized",
-            headers: error.response?.headers || {},
-            config: error.config,
-          });
+          return Promise.reject(error);
         }
 
         // Retry once with new token
@@ -406,13 +390,7 @@ apiClient.interceptors.response.use(
             isLoggingOut = false;
           }, 1000);
         }
-        return Promise.resolve({
-          data: { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
-          status: 401,
-          statusText: "Unauthorized",
-          headers: error.response?.headers || {},
-          config: error.config,
-        });
+        return Promise.reject(refreshError);
       }
     }
 
@@ -428,30 +406,11 @@ apiClient.interceptors.response.use(
           isLoggingOut = false;
         }, 1000);
       }
-      return Promise.resolve({
-        data: error.response?.data || {
-          error: { message: "Forbidden - Access denied", code: "FORBIDDEN" },
-        },
-        status: 403,
-        statusText: "Forbidden",
-        headers: error.response?.headers || {},
-        config: error.config,
-      });
+      return Promise.reject(error);
     }
 
-    // For all other errors, return the response instead of rejecting
-    return Promise.resolve({
-      data: error.response?.data || {
-        error: {
-          message: error.message || "An unexpected error occurred",
-          code: error.code || "UNKNOWN_ERROR",
-        },
-      },
-      status: error.response?.status || 500,
-      statusText: error.response?.statusText || "Internal Server Error",
-      headers: error.response?.headers || {},
-      config: error.config,
-    });
+    // For all other errors, reject with the error
+    return Promise.reject(error);
   }
 );
 

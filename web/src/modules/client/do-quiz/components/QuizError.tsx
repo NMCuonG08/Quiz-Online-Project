@@ -13,7 +13,7 @@ interface QuizErrorProps {
 
 const QuizError: React.FC<QuizErrorProps> = ({ error, onRetry, onGoBack }) => {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="fixed inset-0 bg-background flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
       {/* Aesthetic Background Pattern */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{ backgroundImage: `radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)`, backgroundSize: '40px 40px' }}

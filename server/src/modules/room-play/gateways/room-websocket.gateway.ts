@@ -45,6 +45,20 @@ export class RoomWebSocketGateway
       created_at: string;
     }>
   > = new Map();
+  // In-memory score storage per room (ephemeral)
+  private roomScores: Map<
+    string,
+    Map<
+      string,
+      {
+        userId: string;
+        username: string;
+        score: number;
+        correctAnswers: number;
+        timestamp: string;
+      }
+    >
+  > = new Map();
 
   constructor(
     private readonly roomService: RoomService,
@@ -625,6 +639,76 @@ export class RoomWebSocketGateway
     } catch (error) {
       this.logger.error(
         `❌ Failed to get room status for client ${client.id}:`,
+        error,
+      );
+    }
+  @SubscribeMessage('update_score')
+  async handleUpdateScore(
+    @MessageBody() data: { roomId: string; score: number; correctAnswers: number },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    this.logger.log(`📈 Update score request from ${client.id}:`, data);
+
+    try {
+      if (!data.roomId) {
+        this.logger.warn(`❌ No roomId provided by client ${client.id}`);
+        return;
+      }
+
+      const userId = this.extractUserIdFromToken(client);
+      const username = this.extractUsernameFromToken(client) || 'Unknown';
+
+      const updateData = {
+        userId,
+        username,
+        score: data.score,
+        correctAnswers: data.correctAnswers,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Save in memory
+      if (!this.roomScores.has(data.roomId)) {
+        this.roomScores.set(data.roomId, new Map());
+      }
+      this.roomScores.get(data.roomId)!.set(userId, updateData);
+
+      const socketRoom = `room:${data.roomId}`;
+      // Broadcast single score update
+      this.server.to(socketRoom).emit('score_updated', updateData);
+
+      // Also broadcast full leaderboard update
+      const fullLeaderboard = Array.from(
+        this.roomScores.get(data.roomId)!.values(),
+      );
+      this.server.to(socketRoom).emit('leaderboard_update', fullLeaderboard);
+
+      this.logger.log(`✅ Score and Leaderboard broadcasted to room ${socketRoom}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to update score for client ${client.id}:`,
+        error,
+      );
+    }
+  }
+
+  @SubscribeMessage('get_leaderboard')
+  async handleGetLeaderboard(
+    @MessageBody() data: { roomId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    this.logger.log(`🏆 Get leaderboard request from ${client.id}:`, data);
+
+    try {
+      if (!data.roomId) return;
+      
+      const leaderboard = this.roomScores.has(data.roomId)
+        ? Array.from(this.roomScores.get(data.roomId)!.values())
+        : [];
+        
+      client.emit('leaderboard_update', leaderboard);
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to get leaderboard for client ${client.id}:`,
         error,
       );
     }

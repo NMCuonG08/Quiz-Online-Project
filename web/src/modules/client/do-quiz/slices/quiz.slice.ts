@@ -205,6 +205,18 @@ const quizSlice = createSlice({
       return { ...initialState };
     },
 
+    resetSession: (state) => {
+      state.session = null;
+      state.result = null;
+      state.isQuizStarted = false;
+      state.isQuizCompleted = false;
+      state.userAnswers = [];
+      state.currentQuestionIndex = 0;
+      state.progress = { ...initialState.progress };
+      state.timeRemaining = 0;
+      state.timerActive = false;
+    },
+
     clearError: (state) => {
       state.error = null;
     },
@@ -345,6 +357,7 @@ export const {
   nextQuestion,
   previousQuestion,
   resetQuiz,
+  resetSession,
   clearError,
 } = quizSlice.actions;
 

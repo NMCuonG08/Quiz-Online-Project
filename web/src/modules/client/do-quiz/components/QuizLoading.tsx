@@ -12,7 +12,7 @@ const QuizLoading: React.FC<QuizLoadingProps> = ({
   message = "Initializing knowledge engine...",
 }) => {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="fixed inset-0 bg-background flex flex-col items-center justify-center p-4 z-50">
       {/* Dynamic Background Elements */}
       <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl animate-pulse duration-1000" />

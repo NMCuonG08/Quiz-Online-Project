@@ -76,6 +76,8 @@ export interface ClientEventMap {
   participant_left: [string];
   participants_list: [{ roomId: string; participants: Participant[] }];
   room_updated: [RoomData];
+  score_updated: [{ userId: string; username: string; score: number; correctAnswers: number; timestamp: string }];
+  leaderboard_update: [Array<{ userId: string; username: string; score: number; correctAnswers: number; timestamp: string }>];
 }
 
 export interface ServerEventMap {
@@ -86,6 +88,8 @@ export interface ServerEventMap {
   send_message: [{ roomId: string; message: string }];
   get_participants: [{ roomId: string }];
   invite_friends: [{ roomId: string; friendIds: string[] }];
+  update_score: [{ roomId: string; score: number; correctAnswers: number }];
+  get_leaderboard: [{ roomId: string }];
 }
 
 // Notification types

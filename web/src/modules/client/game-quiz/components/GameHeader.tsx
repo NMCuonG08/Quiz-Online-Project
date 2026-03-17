@@ -106,12 +106,15 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
                 </Button>
               )}
               {isLastQuestion && (
-                <Badge
-                  variant="secondary"
-                  className="text-base sm:text-lg px-4 sm:px-6 py-2"
+                <Button
+                  size="lg"
+                  variant="default"
+                  onClick={onNextQuestion}
+                  disabled={isLoading}
+                  className="text-base sm:text-lg px-6 sm:px-8 py-2 sm:py-3 bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse"
                 >
-                  Hoàn thành! 🎉
-                </Badge>
+                  {isLoading ? "Đang xử lý..." : "Hoàn thành & Xem kết quả! 🎉"}
+                </Button>
               )}
             </>
           )}

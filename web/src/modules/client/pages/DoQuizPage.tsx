@@ -47,6 +47,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
     getUserAnswer,
     clearQuizError,
     resetQuizState,
+    restartQuiz,
   } = useQuiz(slug);
 
   // Track answered question indices - only count if actually answered
@@ -101,8 +102,8 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
   // Validate slug
   if (!slug || slug.trim() === '') {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
+      <div className="fixed inset-0 bg-background flex flex-col items-center justify-center p-6 z-50">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
         <Card className="w-full max-w-md border-none shadow-2xl bg-card/60 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
           <CardHeader className="text-center pt-10">
             <div className="w-20 h-20 mx-auto mb-6 bg-destructive/10 rounded-3xl flex items-center justify-center animate-pulse">
@@ -173,7 +174,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
 
   // Handle retake quiz
   const handleRetakeQuiz = async () => {
-    resetQuizState();
+    restartQuiz();
     setHasAnswered(false);
     // Start a new quiz session
     await startQuiz();
@@ -214,11 +215,10 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
     return <QuizLoading message="Fetching questions..." />;
   }
 
-  // No questions found
   if (!loading && questions.length === 0 && !error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
+      <div className="fixed inset-0 bg-background flex flex-col items-center justify-center p-6 z-50">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
         <Card className="w-full max-w-md border-none shadow-2xl bg-card/60 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
           <CardHeader className="text-center pt-10">
             <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-3xl flex items-center justify-center opacity-50">

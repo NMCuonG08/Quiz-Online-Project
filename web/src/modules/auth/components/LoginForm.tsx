@@ -71,13 +71,13 @@ const LoginForm = () => {
     }
   };
 
+  // Re-enable this only for logged-in users who shouldn't see the login page, 
+  // but WITHOUT the success notification specifically for manual logins.
   useEffect(() => {
     if (isAuthenticated) {
-      showSuccess(tAuth("loginSuccess"));
-      // Add delay để user thấy success message
-      setTimeout(() => {
-        router.push(APP_ROUTES.HOME);
-      }, 1000);
+      // If already authenticated and visiting login page, just go home quietly
+      // unless we just submitted the form (which is handled in onSubmit)
+      router.push(APP_ROUTES.HOME);
     }
   }, [isAuthenticated, router]);
 

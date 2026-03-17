@@ -11,6 +11,7 @@ export interface GameQuizState {
   isGameStarted: boolean;
   isGameEnded: boolean;
   score: number;
+  correctAnswersCount: number;
   totalScore: number;
 }
 

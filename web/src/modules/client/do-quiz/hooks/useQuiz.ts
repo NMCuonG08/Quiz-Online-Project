@@ -12,6 +12,7 @@ import {
   nextQuestion,
   previousQuestion,
   resetQuiz,
+  resetSession,
   clearError,
   setCurrentQuestion,
   setUserAnswer,
@@ -345,6 +346,16 @@ export const useQuiz = (slug: string) => {
     dispatch(resetQuiz());
   }, [dispatch, slug]);
 
+  const restartQuiz = useCallback(() => {
+    // Clear localStorage when restarting
+    if (slug) {
+      safeLocalStorage.removeItem(getStorageKey(slug));
+      safeLocalStorage.removeItem(getProgressKey(slug));
+    }
+    hasLoadedFromStorage.current = false;
+    dispatch(resetSession());
+  }, [dispatch, slug]);
+
   return {
     // State
     questions,
@@ -374,5 +385,9 @@ export const useQuiz = (slug: string) => {
     getUserAnswer,
     clearQuizError,
     resetQuizState,
+    restartQuiz,
   };
 };
+
+export default useQuiz;
+

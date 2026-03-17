@@ -31,6 +31,7 @@ export const useGameQuiz = ({
     isGameStarted: false,
     isGameEnded: false,
     score: 0,
+    correctAnswersCount: 0,
     totalScore: questions.reduce((sum, q) => sum + q.points, 0),
   });
 
@@ -83,7 +84,25 @@ export const useGameQuiz = ({
 
     setState((prev) => {
       const newSelectedAnswers = new Map(prev.selectedAnswers);
-      newSelectedAnswers.set(currentQuestion.id, answer);
+      const questionType = currentQuestion.question_type?.toLowerCase();
+      const isMultipleChoice = questionType === "multiple_choice";
+
+      if (isMultipleChoice && typeof answer === "string") {
+        // Toggle logic for multiple choice
+        const currentAnswers = Array.isArray(prev.selectedAnswers.get(currentQuestion.id))
+          ? (prev.selectedAnswers.get(currentQuestion.id) as string[])
+          : [];
+        
+        const newAnswers = currentAnswers.includes(answer)
+          ? currentAnswers.filter(id => id !== answer)
+          : [...currentAnswers, answer];
+        
+        newSelectedAnswers.set(currentQuestion.id, newAnswers);
+      } else {
+        // Normal replacement logic
+        newSelectedAnswers.set(currentQuestion.id, answer);
+      }
+
       return {
         ...prev,
         selectedAnswers: newSelectedAnswers,
@@ -124,6 +143,7 @@ export const useGameQuiz = ({
       ...prev,
       isAnswered: true,
       score: prev.score + pointsEarned,
+      correctAnswersCount: prev.correctAnswersCount + (isCorrect ? 1 : 0),
     }));
 
     // Stop timer
@@ -209,10 +229,12 @@ export const useGameQuiz = ({
     isGameStarted: state.isGameStarted,
     isGameEnded: state.isGameEnded,
     score: state.score,
+    correctAnswersCount: state.correctAnswersCount,
     totalScore: state.totalScore,
     timeRemaining: state.timeRemaining,
-    hasSelectedAnswer: !!selectedAnswer,
+    hasSelectedAnswer: !!selectedAnswer && (!Array.isArray(selectedAnswer) || selectedAnswer.length > 0),
     isLastQuestion: state.currentQuestionIndex >= questions.length - 1,
+    selectedAnswers: state.selectedAnswers,
     // Actions
     startGame,
     selectAnswer,

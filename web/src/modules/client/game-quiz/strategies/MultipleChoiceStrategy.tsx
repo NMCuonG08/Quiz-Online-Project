@@ -146,12 +146,19 @@ export class MultipleChoiceStrategy implements IQuestionRendererStrategy {
   }
 
   validateAnswer(question: Question, answer: string | string[]): boolean {
-    if (typeof answer !== "string") return false;
-    const selectedOption = question.options.find((opt) => opt.id === answer);
-    return selectedOption?.is_correct ?? false;
+    const correctOptionIds = question.options
+      .filter((opt) => opt.is_correct)
+      .map((opt) => opt.id);
+
+    if (Array.isArray(answer)) {
+      if (answer.length !== correctOptionIds.length) return false;
+      return answer.every((id) => correctOptionIds.includes(id));
+    }
+    
+    return correctOptionIds.length === 1 && correctOptionIds[0] === answer;
   }
 
-  getDefaultAnswer(): string {
-    return "";
+  getDefaultAnswer(): string[] {
+    return [];
   }
 }

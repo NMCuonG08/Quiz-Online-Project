@@ -225,18 +225,21 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         const response = action.payload;
         const data = response.data || response;
-
         const token = data?.token || data?.accessToken || null;
 
-        state.isAuthenticated = true;
-        state.token = token;
-        state.user = data?.user || null;
-        state.loading = false;
-        state.error = null;
-
-        // Store token in localStorage
         if (token) {
+          state.isAuthenticated = true;
+          state.token = token;
+          state.user = data?.user || null;
+          state.loading = false;
+          state.error = null;
           TokenStorage.set(token);
+        } else {
+          state.isAuthenticated = false;
+          state.token = null;
+          state.user = null;
+          state.loading = false;
+          state.error = "Invalid session data received";
         }
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -252,15 +255,17 @@ const authSlice = createSlice({
         const data = response.data || response;
         const token = data?.token || data?.accessToken || null;
 
-        state.isAuthenticated = true;
-        state.token = token;
-        state.user = data?.user || null;
-        state.loading = false;
-        state.error = null;
-
         if (token) {
-          // Persist token similar to email/password flow
-          localStorage.setItem("auth_token", token);
+          state.isAuthenticated = true;
+          state.token = token;
+          state.user = data?.user || null;
+          state.loading = false;
+          state.error = null;
+          TokenStorage.set(token);
+        } else {
+          state.isAuthenticated = false;
+          state.token = null;
+          state.loading = false;
         }
       })
       .addCase(loginWithGoogleCode.rejected, (state, action) => {
@@ -276,15 +281,16 @@ const authSlice = createSlice({
         const data = response.data || response;
         const token = data?.token || data?.accessToken || null;
 
-        state.isAuthenticated = true;
-        state.token = token;
-        state.user = data?.user || null;
-        state.loading = false;
-        state.error = null;
-
-        // Store token in localStorage
         if (token) {
+          state.isAuthenticated = true;
+          state.token = token;
+          state.user = data?.user || null;
+          state.loading = false;
+          state.error = null;
           TokenStorage.set(token);
+        } else {
+          state.isAuthenticated = false;
+          state.loading = false;
         }
       })
       .addCase(registerUser.rejected, (state, action) => {
