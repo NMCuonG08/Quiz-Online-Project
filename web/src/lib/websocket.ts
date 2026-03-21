@@ -1,18 +1,21 @@
 import { io, Socket } from "socket.io-client";
-import type { ServerEventMap } from "@/common/types/websocket-event.type";
+import { BehaviorSubject, Subject, Observable, of, timer, fromEvent, merge } from "rxjs";
+import { switchMap, retry, tap, map, distinctUntilChanged, catchError, takeUntil, filter, share } from "rxjs/operators";
+import type { ServerEventMap, ClientEventMap } from "@/common/types/websocket-event.type";
 
 class WebSocketManager {
   private socket: Socket | null = null;
   private eventCallbacks = new Map<string, ((...args: unknown[]) => void)[]>();
-  private isConnecting = false;
-  private currentToken: string | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  private connectionAttempts = 0;
-  private maxConnectionAttempts = 3;
-  private lastConnectionAttempt = 0;
-  private connectionDebounceMs = 3000; // 3 seconds debounce
-  private connectionTimeout: NodeJS.Timeout | null = null;
+  
+  // RxJS State
+  private tokenSubject$ = new BehaviorSubject<string | null>(null);
+  private statusSubject$ = new BehaviorSubject<'connected' | 'disconnected' | 'connecting' | 'error'>('disconnected');
+  private socketSubject$ = new BehaviorSubject<Socket | null>(null);
+  private destroy$ = new Subject<void>();
+
+  public status$ = this.statusSubject$.asObservable().pipe(distinctUntilChanged());
+  public socket$ = this.socketSubject$.asObservable();
+
   private joinedRooms = new Set<string>();
   private participantsRoomHandlers = new Map<
     string,
@@ -20,285 +23,173 @@ class WebSocketManager {
   >();
   private pendingEmits: Array<{ event: string; args: unknown[] }> = [];
 
-  async connect(token: string): Promise<void> {
-    // Clear any pending connection timeout
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
+  constructor() {
+    this.setupAutoConnection();
+  }
 
-    // Check debounce - prevent too frequent connection attempts
-    const now = Date.now();
-    if (now - this.lastConnectionAttempt < this.connectionDebounceMs) {
-      // Debouncing connection attempt
-      // Schedule connection for later
-      this.connectionTimeout = setTimeout(() => {
-        this.connect(token);
-      }, this.connectionDebounceMs - (now - this.lastConnectionAttempt));
-      return;
-    }
-    this.lastConnectionAttempt = now;
+  private setupAutoConnection() {
+    this.tokenSubject$.pipe(
+      distinctUntilChanged(),
+      switchMap(token => {
+        if (!token) {
+          this.cleanupSocket();
+          return of(null);
+        }
 
-    // Check if we've exceeded max connection attempts
-    if (this.connectionAttempts >= this.maxConnectionAttempts) {
-      // Max connection attempts reached
-      return;
-    }
+        return new Observable<Socket>(observer => {
+          console.log("🔌 Attempting WebSocket connection with RxJS...");
+          this.statusSubject$.next('connecting');
 
-    // Nếu đã connected với cùng token, không cần connect lại
-    if (this.socket?.connected && this.currentToken === token) {
-      // Already connected with same token
-      return;
-    }
+          const socket = io(
+            process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3333",
+            {
+              auth: { token },
+              transports: ["websocket"],
+              path: "/api/socket.io",
+              reconnection: false, // Let RxJS handle reconnection logic
+            }
+          );
 
-    // Luôn disconnect trước khi connect mới
+          socket.on("connect", () => {
+            console.log("✅ WebSocket connected via RxJS");
+            this.socket = socket;
+            this.socketSubject$.next(socket);
+            this.statusSubject$.next('connected');
+            
+            // Handle post-connection logic
+            this.handlePostConnect();
+            
+            observer.next(socket);
+          });
+
+          socket.on("disconnect", (reason) => {
+            console.log("🔌 WebSocket disconnected:", reason);
+            this.statusSubject$.next('disconnected');
+            this.socket = null;
+            this.socketSubject$.next(null);
+
+            if (reason === "io client disconnect" || reason === "transport close") {
+              // Intentional or normal close
+              if (this.tokenSubject$.value) {
+                observer.error(new Error(reason)); // Trigger retry if we still have a token
+              } else {
+                observer.complete();
+              }
+            } else {
+              observer.error(new Error(reason));
+            }
+          });
+
+          socket.on("connect_error", (error) => {
+            console.error("🚨 WebSocket connection error:", error.message);
+            this.statusSubject$.next('error');
+            observer.error(error);
+          });
+
+          // Register all listeners from eventCallbacks
+          this.registerEventListeners(socket);
+
+          return () => {
+            console.log("🧹 Cleaning up WebSocket connection");
+            socket.disconnect();
+            this.socket = null;
+            this.socketSubject$.next(null);
+          };
+        }).pipe(
+          retry({
+            delay: (error, retryCount) => {
+              const delayTime = Math.min(Math.pow(2, retryCount - 1) * 1000, 30000);
+              console.log(`⏳ Reconnecting in ${delayTime}ms (attempt ${retryCount})...`);
+              return timer(delayTime);
+            }
+          }),
+          catchError(err => {
+            console.error("❌ Max retries reached or fatal error:", err);
+            return of(null);
+          })
+        );
+      }),
+      takeUntil(this.destroy$)
+    ).subscribe();
+  }
+
+  private cleanupSocket() {
     if (this.socket) {
-      // Disconnecting previous WebSocket before connecting
       this.socket.disconnect();
       this.socket = null;
     }
+    this.socketSubject$.next(null);
+    this.statusSubject$.next('disconnected');
+  }
 
-    this.connectionAttempts++;
+  private handlePostConnect() {
+    if (!this.socket) return;
 
-    // Nếu đang connecting, đợi hoặc cancel connection cũ
-    if (this.isConnecting) {
-      // WebSocket connection in progress
-      return new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 30; // 3 seconds max wait
-
-        const checkConnection = () => {
-          attempts++;
-          if (!this.isConnecting) {
-            this.connect(token).then(resolve).catch(reject);
-          } else if (attempts >= maxAttempts) {
-            // Connection timeout, forcing new connection
-            this.isConnecting = false;
-            // Disconnect existing socket before new connection
-            if (this.socket) {
-              this.socket.disconnect();
-              this.socket = null;
-            }
-            this.connect(token).then(resolve).catch(reject);
-          } else {
-            setTimeout(checkConnection, 100);
-          }
-        };
-        checkConnection();
+    // Flush pending emits
+    if (this.pendingEmits.length) {
+      console.log(`🚀 Flushing ${this.pendingEmits.length} pending emits`);
+      const toSend = [...this.pendingEmits];
+      this.pendingEmits = [];
+      toSend.forEach(({ event, args }) => {
+        this.socket!.emit(event, ...args);
       });
     }
 
-    this.isConnecting = true;
-    this.currentToken = token;
-
-    return new Promise((resolve, reject) => {
-      this.socket = io(
-        process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3333",
-        {
-          auth: { token },
-          transports: ["websocket"],
-          path: "/api/socket.io",
-        }
-      );
-
-      this.socket.on("connect", () => {
-        // WebSocket connected
-        this.isConnecting = false;
-        this.connectionAttempts = 0; // Reset on successful connection
-        this.startHeartbeat();
-        this.emit("connected");
-        // Flush any pending emits queued while offline
-        try {
-          if (this.pendingEmits.length) {
-            const toSend = [...this.pendingEmits];
-            this.pendingEmits = [];
-            toSend.forEach(({ event, args }) => {
-              try {
-                this.socket!.emit(event, ...args);
-              } catch {
-                // swallow
-              }
-            });
-          }
-        } catch {
-          // swallow
-        }
-        // Rejoin previously joined rooms and refresh state
-        try {
-          if (this.joinedRooms.size > 0) {
-            this.joinedRooms.forEach((roomId) => {
-              this.send("join_room", { roomId });
-              // Refresh participants and messages for this room
-              this.send("get_participants", { roomId });
-              this.send("get_messages", { roomId });
-            });
-          }
-        } catch (e) {
-          console.warn("⚠️ Failed to auto rejoin rooms after connect:", e);
-        }
-        resolve();
+    // Rejoin rooms
+    if (this.joinedRooms.size > 0) {
+      console.log(`🏠 Rejoining ${this.joinedRooms.size} rooms`);
+      this.joinedRooms.forEach((roomId) => {
+        this.socket!.emit("join_room", { roomId });
+        this.socket!.emit("get_participants", { roomId });
+        this.socket!.emit("get_messages", { roomId });
       });
+    }
+  }
 
-      this.socket.on("disconnect", (reason) => {
-        // WebSocket disconnected
-        this.isConnecting = false; // Đảm bảo luôn reset trạng thái
-        this.stopHeartbeat();
-        this.emit("disconnected", reason);
-      });
-
-      this.socket.on("connect_error", (error) => {
-        // WebSocket connection error (silent)
-        this.isConnecting = false;
-
-        // Handle specific error types
-        if (error.message?.includes("Connection too frequent")) {
-          console.warn(
-            "🔌 Connection rejected: too frequent, will retry later"
-          );
-          // Don't reject immediately, let the retry logic handle it
-          setTimeout(() => {
-            if (!this.socket?.connected) {
-              reject(error);
-            }
-          }, 2000);
-        } else {
-          this.emit("error", error);
-          reject(error);
+  private registerEventListeners(socket: Socket) {
+    // Forward all events from socket.io to our eventCallbacks
+    // This maintains backward compatibility with .on() and .off()
+    
+    // Internal helper to setup common listeners
+    const setupCommonListeners = (s: Socket) => {
+      s.on("notification", (data) => this.emit("notification", data));
+      s.on("room_message", (msg) => this.emit("room_message", msg));
+      s.on("messages_list", (list) => this.emit("messages_list", list));
+      s.on("room_joined", (p) => this.emit("room_joined", p));
+      s.on("room_left", (p) => this.emit("room_left", p));
+      s.on("room_join_error", (p) => this.emit("room_join_error", p));
+      s.on("room_leave_error", (p) => this.emit("room_leave_error", p));
+      s.on("user_joined", (p) => this.emit("user_joined", p));
+      s.on("user_left", (p) => this.emit("user_left", p));
+      s.on("on_user_delete", (id) => this.emit("user_deleted", id));
+      s.on("on_asset_delete", (id) => this.emit("asset_deleted", id));
+      s.on("participants_list", (payload) => {
+        this.emit("participants_list", payload);
+        const roomId = payload?.roomId;
+        if (roomId && this.participantsRoomHandlers.has(roomId)) {
+          this.participantsRoomHandlers.get(roomId)!.forEach(cb => cb(payload));
         }
       });
+    };
 
-      // Listen for backend events
-      this.socket.on("notification", (data) => {
-        console.log("📢 Notification received:", data);
+    setupCommonListeners(socket);
+  }
 
-        // If data is string, convert to object. If already object, just add missing fields
-        const notificationData =
-          typeof data === "string"
-            ? {
-                type: "info" as const,
-                title: "Thông báo",
-                message: data,
-                userId: "system",
-                timestamp: new Date().toISOString(),
-                read: false,
-              }
-            : {
-                ...data,
-                timestamp: data.timestamp || new Date().toISOString(),
-                read: data.read || false,
-              };
-
-        this.emit("notification", notificationData);
-      });
-
-      // ============== CHAT EVENTS ==============
-      this.socket.on("room_message", (message) => {
-        try {
-          this.emit("room_message", message);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch room_message:", e);
-        }
-      });
-
-      this.socket.on("messages_list", (messages) => {
-        try {
-          this.emit("messages_list", messages);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch messages_list:", e);
-        }
-      });
-
-      // ============== ROOM LIFECYCLE EVENTS ==============
-      this.socket.on("room_joined", (payload) => {
-        try {
-          this.emit("room_joined", payload);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch room_joined:", e);
-        }
-      });
-
-      this.socket.on("room_left", (payload) => {
-        try {
-          this.emit("room_left", payload);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch room_left:", e);
-        }
-      });
-
-      this.socket.on("room_join_error", (payload) => {
-        try {
-          this.emit("room_join_error", payload);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch room_join_error:", e);
-        }
-      });
-
-      this.socket.on("room_leave_error", (payload) => {
-        try {
-          this.emit("room_leave_error", payload);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch room_leave_error:", e);
-        }
-      });
-
-      this.socket.on("user_joined", (payload) => {
-        try {
-          this.emit("user_joined", payload);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch user_joined:", e);
-        }
-      });
-
-      this.socket.on("user_left", (payload) => {
-        try {
-          this.emit("user_left", payload);
-        } catch (e) {
-          console.warn("⚠️ Failed to dispatch user_left:", e);
-        }
-      });
-
-      this.socket.on("on_user_delete", (userId) => {
-        this.emit("user_deleted", userId);
-      });
-
-      this.socket.on("on_asset_delete", (assetId) => {
-        this.emit("asset_deleted", assetId);
-      });
-
-      // Room participants realtime updates
-      this.socket.on(
-        "participants_list",
-        (payload: { roomId: string; participants: unknown[] }) => {
-          try {
-            this.emit("participants_list", payload);
-            const roomId = payload?.roomId as string;
-            if (roomId && this.participantsRoomHandlers.has(roomId)) {
-              const handlers = this.participantsRoomHandlers.get(roomId)!;
-              handlers.forEach((cb) => cb(payload));
-            }
-          } catch (e) {
-            console.warn("⚠️ Failed to dispatch participants_list:", e);
-          }
-        }
-      );
-    });
+  async connect(token: string): Promise<void> {
+    this.tokenSubject$.next(token);
   }
 
   disconnect(): void {
+    this.tokenSubject$.next(null);
+    this.joinedRooms.clear();
+    this.participantsRoomHandlers.clear();
+  }
+
+  // Redundant with RxJS implementation
+  disconnectOld(): void {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-    }
-    this.isConnecting = false;
-    this.currentToken = null;
-    this.connectionAttempts = 0; // Reset connection attempts
-    this.stopHeartbeat();
-    this.clearReconnectTimeout();
-
-    // Clear connection timeout
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
     }
   }
 
@@ -341,22 +232,16 @@ class WebSocketManager {
   }
 
   getIsConnecting(): boolean {
-    return this.isConnecting;
+    return this.statusSubject$.value === 'connecting';
   }
 
   getCurrentToken(): string | null {
-    return this.currentToken;
+    return this.tokenSubject$.value;
   }
 
   // Method để force reconnect với token mới
   async reconnectWithNewToken(token: string): Promise<void> {
-    // Force reconnecting with new token
-    this.disconnect();
-
-    // Đợi một chút để đảm bảo disconnect hoàn toàn
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    await this.connect(token);
+    this.tokenSubject$.next(token);
   }
 
   hasListeners(): boolean {
@@ -368,47 +253,17 @@ class WebSocketManager {
     this.eventCallbacks.clear();
   }
 
-  // Heartbeat để kiểm tra connection health
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.heartbeatInterval = setInterval(() => {
-      if (this.socket?.connected) {
-        this.socket.emit("ping");
-      }
-    }, 30000); // Ping mỗi 30 giây
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-  }
-
-  private clearReconnectTimeout(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-  }
-
-  // Method để schedule reconnect
+  // RxJS handles reconnection now
   scheduleReconnect(delay: number = 3000): void {
-    this.clearReconnectTimeout();
-    this.reconnectTimeout = setTimeout(() => {
-      if (this.currentToken && !this.isConnecting) {
-        // Scheduled reconnect triggered
-        this.connect(this.currentToken).catch(console.error);
-      }
-    }, delay);
+    // This is now managed by the retry logic in setupAutoConnection
   }
 
   // Debug method để kiểm tra trạng thái
   getDebugInfo() {
     return {
       isConnected: this.isConnected(),
-      isConnecting: this.isConnecting,
-      currentToken: this.currentToken,
+      status: this.statusSubject$.value,
+      currentToken: this.tokenSubject$.value,
       hasListeners: this.hasListeners(),
       socketId: this.socket?.id,
       socketConnected: this.socket?.connected,

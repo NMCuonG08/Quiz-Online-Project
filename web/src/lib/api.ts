@@ -1,6 +1,7 @@
 import { AuthenticationService } from "@/modules/auth/common/services/auth.service";
 import { detectLocaleFromPath, withLocalePrefix } from "@/lib/locale";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import { Subject, filter, take } from "rxjs";
 // Note: AuthenticationService will be dynamically imported to avoid circular dependencies
 // Enhanced error interface with comprehensive error information
 export interface StandardError extends Error {
@@ -134,12 +135,9 @@ const apiClient = axios.create({
 // Flag to prevent multiple logout calls
 let isLoggingOut = false;
 
-// Refresh token single-flight control
+// Refresh token logic with RxJS
 let isRefreshing = false;
-let refreshPromise: Promise<string | null> | null = null;
-
-// Flag to track if currently calling refresh endpoint (prevent interceptor loop)
-let isCallingRefreshEndpoint = false;
+let refreshTokenSubject = new Subject<string | null>();
 
 // Removed unused store access helpers
 
@@ -273,36 +271,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Helper: start a refresh single-flight
-const startTokenRefresh = async (): Promise<string | null> => {
-  if (isRefreshing && refreshPromise) {
-    return refreshPromise;
-  }
-  isRefreshing = true;
-  isCallingRefreshEndpoint = true; // Set flag before calling refresh
-  refreshPromise = (async () => {
-    try {
-      type RefreshResult =
-        | { token?: string; user?: unknown }
-        | { error: { message: string; code: string } };
-      const result: RefreshResult = await AuthenticationService.refreshToken();
-      if ("error" in result) {
-        return null;
-      }
-      const newToken = result.token || null;
-      if (newToken) {
-        setAccessToken(newToken);
-      }
-      return newToken;
-    } catch {
-      return null;
-    } finally {
-      isRefreshing = false;
-      isCallingRefreshEndpoint = false; // Reset flag after refresh completes
-    }
-  })();
-  return refreshPromise;
-};
+// Removed startTokenRefresh as we'll handle it in the interceptor using RxJS
 
 // Enhanced response interceptor with comprehensive error handling
 apiClient.interceptors.response.use(
@@ -326,8 +295,10 @@ apiClient.interceptors.response.use(
         _retry?: boolean;
       };
 
-      // If we're currently calling refresh endpoint and it fails, logout immediately
-      if (isCallingRefreshEndpoint) {
+      // Check if the error is from the refresh token endpoint itself
+      const isRefreshURL = originalConfig.url?.includes("/auth/refresh");
+
+      if (isRefreshURL) {
         console.warn(
           "⚠️ 401 on refresh endpoint - Refresh token invalid, auto logout"
         );
@@ -342,7 +313,7 @@ apiClient.interceptors.response.use(
       }
 
       if (originalConfig && originalConfig._retry) {
-        // Already retried, prevent loops -> logout
+        // Already retried once, prevent loops -> logout
         console.warn("🔄 401 Already retried - Auto logout");
         if (!isLoggingOut) {
           isLoggingOut = true;
@@ -354,14 +325,50 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Try to refresh token - only retry if refresh succeeds
-      try {
+      if (!isRefreshing) {
+        isRefreshing = true;
         console.log("🔄 Attempting token refresh...");
-        const newToken: string | null = await startTokenRefresh();
 
-        if (!newToken) {
-          // Refresh failed -> logout immediately
-          console.warn("⚠️ Token refresh failed - Auto logout");
+        try {
+          type RefreshResult =
+            | { token?: string; user?: unknown }
+            | { error: { message: string; code: string } };
+
+          const result: RefreshResult =
+            await AuthenticationService.refreshToken();
+
+          if ("error" in result || !result.token) {
+            console.warn("⚠️ Token refresh failed - Auto logout");
+            isRefreshing = false;
+            refreshTokenSubject.next(null);
+
+            if (!isLoggingOut) {
+              isLoggingOut = true;
+              await performLogout();
+              setTimeout(() => {
+                isLoggingOut = false;
+              }, 1000);
+            }
+            return Promise.reject(error);
+          }
+
+          const newToken = result.token;
+          setAccessToken(newToken);
+          isRefreshing = false;
+          refreshTokenSubject.next(newToken);
+
+          // Retry the original request
+          console.log("✅ Token refreshed successfully - Retrying request");
+          originalConfig._retry = true;
+          if (originalConfig.headers) {
+            originalConfig.headers.Authorization = `Bearer ${newToken}`;
+          }
+          return apiClient(originalConfig);
+        } catch (refreshError) {
+          console.error("❌ Token refresh error - Auto logout:", refreshError);
+          isRefreshing = false;
+          refreshTokenSubject.next(null);
+
           if (!isLoggingOut) {
             isLoggingOut = true;
             await performLogout();
@@ -369,28 +376,24 @@ apiClient.interceptors.response.use(
               isLoggingOut = false;
             }, 1000);
           }
-          return Promise.reject(error);
+          return Promise.reject(refreshError);
         }
-
-        // Retry once with new token
-        console.log("✅ Token refreshed successfully - Retrying request");
-        originalConfig._retry = true;
-        const hdrs: Record<string, unknown> =
-          (originalConfig.headers as Record<string, unknown>) || {};
-        hdrs["Authorization"] = `Bearer ${newToken}`;
-        originalConfig.headers = hdrs as AxiosRequestConfig["headers"];
-        return apiClient(originalConfig) as Promise<AxiosResponse>;
-      } catch (refreshError) {
-        // Refresh failed with error -> logout
-        console.error("❌ Token refresh error - Auto logout:", refreshError);
-        if (!isLoggingOut) {
-          isLoggingOut = true;
-          await performLogout();
-          setTimeout(() => {
-            isLoggingOut = false;
-          }, 1000);
-        }
-        return Promise.reject(refreshError);
+      } else {
+        // Wait for the token refresh to complete
+        console.log("⏳ Waiting for ongoing token refresh...");
+        return new Promise((resolve, reject) => {
+          refreshTokenSubject.pipe(take(1)).subscribe((token) => {
+            if (token) {
+              originalConfig._retry = true;
+              if (originalConfig.headers) {
+                originalConfig.headers.Authorization = `Bearer ${token}`;
+              }
+              resolve(apiClient(originalConfig));
+            } else {
+              reject(error);
+            }
+          });
+        });
       }
     }
 

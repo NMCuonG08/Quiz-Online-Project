@@ -642,6 +642,8 @@ export class RoomWebSocketGateway
         error,
       );
     }
+  }
+
   @SubscribeMessage('update_score')
   async handleUpdateScore(
     @MessageBody() data: { roomId: string; score: number; correctAnswers: number },

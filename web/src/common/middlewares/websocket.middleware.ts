@@ -40,35 +40,20 @@ export const forceReconnectWebSocket = createAction(
 websocketMiddleware.startListening({
   actionCreator: initWebSocket,
   effect: async (action, listenerApi) => {
-    // WebSocket middleware triggered
-
     // Get token from auth state (đã được restore)
     const state = listenerApi.getState() as RootState;
     const token = state.auth?.token || localStorage.getItem("auth_token") || "";
 
-
-
-    if (!token) {
-      // No auth token found, skipping WebSocket connection
-      return;
-    }
-
-    // Prevent multiple simultaneous connection attempts
-    if (wsManager.getIsConnecting() || isConnecting) {
-      // WebSocket already connecting, skipping
-      return;
-    }
+    if (!token) return;
 
     // Setup WebSocket event listeners (chỉ setup 1 lần)
     if (!listenersSetup) {
-      // Setting up WebSocket listeners
       setupWebSocketListeners(listenerApi.dispatch);
       listenersSetup = true;
     }
 
-    // Connect với retry logic
-    // Attempting WebSocket connection
-    await connectWebSocketWithRetry(listenerApi.dispatch, token);
+    // New RxJS-based connect
+    wsManager.connect(token);
   },
 });
 
@@ -80,16 +65,7 @@ websocketMiddleware.startListening({
     const token = state.auth?.token;
 
     if (token) {
-      // User logged in, connecting WebSocket
-
-      // Luôn force reconnect khi user đăng nhập để đảm bảo sync
-      if (wsManager.isConnected()) {
-        // User logged in, force reconnecting with new token
-        await wsManager.reconnectWithNewToken(token);
-      } else {
-        // User logged in, connecting WebSocket
-        await connectWebSocketWithRetry(listenerApi.dispatch, token);
-      }
+      wsManager.connect(token);
     }
   },
 });
@@ -102,16 +78,7 @@ websocketMiddleware.startListening({
     const token = state.auth?.token;
 
     if (token) {
-      // Google login successful, connecting WebSocket
-
-      // Luôn force reconnect khi user đăng nhập để đảm bảo sync
-      if (wsManager.isConnected()) {
-        // Google login successful, force reconnecting with new token
-        await wsManager.reconnectWithNewToken(token);
-      } else {
-        // Google login successful, connecting WebSocket
-        await connectWebSocketWithRetry(listenerApi.dispatch, token);
-      }
+      wsManager.connect(token);
     }
   },
 });
@@ -124,8 +91,7 @@ websocketMiddleware.startListening({
     const token = state.auth?.token || localStorage.getItem("auth_token") || "";
 
     if (token) {
-      // Force reconnecting WebSocket
-      await wsManager.reconnectWithNewToken(token);
+      wsManager.reconnectWithNewToken(token);
     }
   },
 });
@@ -133,7 +99,6 @@ websocketMiddleware.startListening({
 // Listen for auth state changes to trigger WebSocket reconnect
 websocketMiddleware.startListening({
   predicate: (action) => {
-    // Only listen for specific auth actions, not all auth actions
     return (
       action.type === "auth/restoreAuth/fulfilled" ||
       action.type === "auth/loginUser/fulfilled" ||
@@ -145,16 +110,8 @@ websocketMiddleware.startListening({
     const token = state.auth?.token;
     const isAuthenticated = state.auth?.isAuthenticated;
 
-    // Only connect if not already connected and not connecting
-    if (
-      isAuthenticated &&
-      token &&
-      !wsManager.isConnected() &&
-      !wsManager.getIsConnecting() &&
-      !isConnecting
-    ) {
-      // Auth state changed, ensuring WebSocket connection
-      await connectWebSocketWithRetry(listenerApi.dispatch, token);
+    if (isAuthenticated && token && !wsManager.isConnected()) {
+      wsManager.connect(token);
     }
   },
 });
@@ -182,35 +139,8 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
   });
 
   wsManager.on("disconnected", (reason: string) => {
-    // WebSocket disconnected
-    isConnecting = false; // Reset flag on disconnect
     dispatch(disconnected(reason));
-
-    // Auto-reconnect for all cases except explicit logout
-    if (reason === "User logged out") {
-      // Logout disconnect, skip auto-reconnect
-      return;
-    }
-
-    // Avoid overlapping connection attempts
-    if (wsManager.getIsConnecting() || isConnecting) {
-      // Already connecting, skip auto-reconnect
-      return;
-    }
-
-    // Quick retry with small delay to survive page reloads
-    setTimeout(() => {
-      const token = localStorage.getItem("auth_token");
-      if (
-        token &&
-        !wsManager.getIsConnecting() &&
-        !wsManager.isConnected() &&
-        !isConnecting
-      ) {
-        // Auto-reconnecting after disconnect
-        connectWebSocketWithRetry(dispatch, token);
-      }
-    }, 1000);
+    // Auto-reconnect is now handled internally by wsManager using RxJS
   });
 
   wsManager.on("error", (error: Error) => {
@@ -232,49 +162,4 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
   });
 }
 
-async function connectWebSocketWithRetry(
-  dispatch: Dispatch<AnyAction>,
-  token: string,
-  attempt: number = 1
-) {
-  if (!token) return;
-
-  // Set connecting flag
-  isConnecting = true;
-
-  const maxAttempts = 5;
-  const baseDelay = 1000; // 1 second
-  const maxDelay = 30000; // 30 seconds
-
-  try {
-    if (attempt === 1) {
-      dispatch(connecting());
-    } else {
-      dispatch(reconnectAttempt());
-    }
-
-    await wsManager.connect(token);
-    isConnecting = false; // Reset flag on success
-  } catch (error: unknown) {
-    // Connection attempt failed (silent)
-
-    if (attempt < maxAttempts) {
-      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
-      // Retrying connection
-
-      setTimeout(() => {
-        connectWebSocketWithRetry(dispatch, token, attempt + 1);
-      }, delay);
-    } else {
-      // Max reconnection attempts reached
-      isConnecting = false; // Reset flag on failure
-      dispatch(
-        connectionError(
-          error instanceof Error
-            ? error.message
-            : "Max reconnection attempts reached"
-        )
-      );
-    }
-  }
-}
+// connectWebSocketWithRetry is now removed as RxJS handles it

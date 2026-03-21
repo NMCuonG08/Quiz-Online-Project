@@ -265,14 +265,17 @@ export class QuizRepository extends BaseRepository<Quiz> {
     const baseWhere = where || {};
     const additionalFilters: Record<string, any> = {};
 
-    // Search by title or description
-    if (paginationDto?.search) {
+    // Search by title or description using Full Text Search
+    if (paginationDto?.search && paginationDto.search.trim() !== '') {
+      // Chuẩn hóa chuỗi search cho Postgres FTS. Ví dụ: 'react js' -> 'react | js' (tìm có từ react HOẶC js)
+      const formattedSearch = paginationDto.search.trim().split(/\s+/).join(' | ');
+
       additionalFilters.OR = [
         {
-          title: { contains: paginationDto.search, mode: 'insensitive' },
+          title: { search: formattedSearch },
         },
         {
-          description: { contains: paginationDto.search, mode: 'insensitive' },
+          description: { search: formattedSearch },
         },
       ];
     }

@@ -38,20 +38,18 @@ RUN apk add --no-cache wget redis postgresql-client
 
 WORKDIR /app
 
-# Copy package metadata required at runtime (version read in code)
-COPY package*.json ./
-
-# Copy built application và prisma files
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
-
-# Create non-root user
+# Step 1: Create user
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
-RUN chmod +x /app/entrypoint.sh && \
-    sed -i 's/\r$//' /app/entrypoint.sh
-RUN chown -R nestjs:nodejs /app
+
+# Step 2: Copy with ownership
+COPY --chown=nestjs:nodejs package*.json ./
+COPY --chown=nestjs:nodejs --from=builder /app/dist ./dist
+COPY --chown=nestjs:nodejs --from=builder /app/prisma ./prisma
+COPY --chown=nestjs:nodejs --from=builder /app/node_modules ./node_modules
+COPY --chown=nestjs:nodejs --from=builder /app/entrypoint.sh ./entrypoint.sh
+
+# Step 3: Permissions & User
+RUN chmod +x /app/entrypoint.sh && sed -i 's/\r$//' /app/entrypoint.sh
 USER nestjs
 
 # Expose port
