@@ -236,7 +236,7 @@ class WebSearchContractTests(unittest.IsolatedAsyncioTestCase):
 class TemporalToolContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_current_time_tool_is_server_generated(self):
         result, surface, citations = await AIAgentCore({})._execute_tool(
-            "get_current_time", {}, None, "guest", "learner"
+            "get_current_time", {}, None, "user-1", "learner"
         )
         self.assertIsNone(surface)
         self.assertEqual(citations, [])

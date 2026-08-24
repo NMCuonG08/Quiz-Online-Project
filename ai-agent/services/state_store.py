@@ -207,8 +207,7 @@ class AgentStateStore:
         if limit <= 0:
             return True
         # Authenticated users cannot evade limits by opening new chat sessions.
-        rate_subject = user_id if user_id != "guest" else f"guest:{session_id}"
-        subject = hashlib.sha256(rate_subject.encode("utf-8")).hexdigest()
+        subject = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
         window = int(time.time() // window_seconds)
         key = f"{self.key_prefix}rate:{subject}:{window}"
         client = await self._client()

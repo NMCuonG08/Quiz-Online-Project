@@ -49,6 +49,14 @@ class ChatApiContractTests(unittest.TestCase):
         })
         self.assertEqual(response.status_code, 401)
 
+    def test_stream_rejects_learner_without_bearer_token(self):
+        response = self.client.post("/chat/stream", json={
+            "message": "tìm quiz",
+            "session_id": "anonymous-learner-attempt",
+            "scope": "learner",
+        })
+        self.assertEqual(response.status_code, 401)
+
     def test_ready_requires_all_configured_dependencies(self):
         with patch.object(main.agent, "readiness", AsyncMock(return_value={
             "model_configured": True, "redis_ready": True, "ready": True,

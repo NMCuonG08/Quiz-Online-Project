@@ -164,7 +164,7 @@ class AIAgentCore:
     async def process_message(
         self,
         user_input: str,
-        user_id: str = "guest",
+        user_id: str = "",
         authorization: Optional[str] = None,
         session_id: str = "default",
         locale: str = "vi",
@@ -185,7 +185,7 @@ class AIAgentCore:
     async def stream_message(
         self,
         user_input: str,
-        user_id: str = "guest",
+        user_id: str = "",
         authorization: Optional[str] = None,
         session_id: str = "default",
         locale: str = "vi",

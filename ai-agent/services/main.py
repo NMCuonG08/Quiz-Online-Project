@@ -57,9 +57,7 @@ async def resolve_identity(
 ) -> tuple[str, str]:
     """Trust identity/role from NestJS, never from browser request fields."""
     if not authorization:
-        if request.scope != "learner":
-            raise HTTPException(status_code=401, detail="Đăng nhập để dùng chatbot quản lý quiz.")
-        return "guest", "learner"
+        raise HTTPException(status_code=401, detail="Đăng nhập để sử dụng Quiz AI.")
 
     backend_url = agent.tools.backend_url
     async with httpx.AsyncClient(timeout=10) as client:

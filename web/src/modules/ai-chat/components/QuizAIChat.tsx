@@ -56,8 +56,9 @@ export default function QuizAIChat() {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useLocalizedRouter();
-  const user = useAppSelector((state) => state.auth.user);
-  const principalKey = user?.id ? `user:${user.id}` : "guest";
+  const auth = useAppSelector((state) => state.auth);
+  const user = auth.user;
+  const principalKey = user?.id ? `user:${user.id}` : "unauthenticated";
   const sessionStorageKey = `quiz_ai_session_id:${principalKey}`;
   const scope: ChatScope = user?.isAdmin && pathname.includes("/admin")
     ? "admin"
@@ -224,6 +225,7 @@ export default function QuizAIChat() {
   };
 
   const sendMessage = async (rawMessage?: string) => {
+    if (!auth.isAuthenticated || !auth.token || !user?.id) return;
     const value = (rawMessage ?? input).trim();
     if (!value || isStreaming) return;
 
@@ -248,7 +250,7 @@ export default function QuizAIChat() {
     try {
       await streamAgentChat({
         message: value,
-        userId: user?.id || "guest",
+        userId: user.id,
         sessionId,
         locale,
         scope,
@@ -305,6 +307,8 @@ export default function QuizAIChat() {
     setInput("");
   };
 
+  if (!auth.isAuthenticated || !auth.token || !user?.id) return null;
+
   return (
     <div className="fixed bottom-4 right-4 z-[99990] sm:bottom-6 sm:right-6">
       {open && (
@@ -352,7 +356,7 @@ export default function QuizAIChat() {
                     <X className="size-3.5" />
                   </button>
                 </div>
-              )) : <p className="px-2 py-3 text-xs text-muted-foreground">{user ? "Chưa có lịch sử chat." : "Đăng nhập để lưu và mở lại lịch sử chat."}</p>}
+              )) : <p className="px-2 py-3 text-xs text-muted-foreground">Chưa có lịch sử chat.</p>}
             </div>
           )}
 
