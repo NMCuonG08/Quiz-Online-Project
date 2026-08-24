@@ -4,7 +4,6 @@ import React from "react";
 import { Badge } from "@/common/components/ui/badge";
 import { Progress } from "@/common/components/ui/progress";
 import { Button } from "@/common/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface GameHeaderProps {
   roomCode?: string;
@@ -105,7 +104,7 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
                   {isLoading ? "Đang tải..." : "Câu tiếp theo →"}
                 </Button>
               )}
-              {isLastQuestion && (
+              {isLastQuestion && onNextQuestion && (
                 <Button
                   size="lg"
                   variant="default"

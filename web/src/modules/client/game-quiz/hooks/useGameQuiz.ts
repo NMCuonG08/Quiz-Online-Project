@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Question } from "../../do-quiz/types/quiz.types";
 import { GameQuizState, GameQuizAnswer } from "../types/game-quiz.types";
-import { QuestionRendererFactory } from "../factory/QuestionRendererFactory";
 
 interface UseGameQuizProps {
   roomId: string;
@@ -11,6 +10,12 @@ interface UseGameQuizProps {
   questions: Question[];
   onAnswerSubmit?: (answer: GameQuizAnswer) => void;
   onGameEnd?: (finalScore: number) => void;
+}
+
+interface AuthoritativeGameState {
+  status: "WAITING" | "QUESTION" | "FINISHED";
+  questionIndex: number;
+  deadline?: number;
 }
 
 export const useGameQuiz = ({
@@ -36,16 +41,24 @@ export const useGameQuiz = ({
   });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const deadlineRef = useRef<number | null>(null);
+  const endNotifiedRef = useRef(false);
+  const scoredQuestionsRef = useRef(new Set<string>());
 
-  // Initialize game
-  const startGame = useCallback(() => {
+  const syncGameState = useCallback((snapshot: AuthoritativeGameState) => {
+    deadlineRef.current = snapshot.deadline || null;
+    if (timerRef.current) clearInterval(timerRef.current);
     setState((prev) => ({
       ...prev,
-      isGameStarted: true,
-      currentQuestionIndex: 0,
+      currentQuestionIndex: Math.max(0, Math.min(snapshot.questionIndex, Math.max(0, questions.length - 1))),
+      isGameStarted: snapshot.status === "QUESTION",
+      isGameEnded: snapshot.status === "FINISHED",
+      isAnswered: snapshot.questionIndex !== prev.currentQuestionIndex ? false : prev.isAnswered,
+      timeRemaining: snapshot.deadline
+        ? Math.max(0, Math.ceil((snapshot.deadline - Date.now()) / 1000))
+        : 0,
     }));
-    startTimerForCurrentQuestion();
-  }, []);
+  }, [questions.length]);
 
   // Start timer for current question
   const startTimerForCurrentQuestion = useCallback(() => {
@@ -56,25 +69,26 @@ export const useGameQuiz = ({
       clearInterval(timerRef.current);
     }
 
+    const deadline = deadlineRef.current || Date.now() + (currentQuestion.time_limit || 0) * 1000;
+    deadlineRef.current = deadline;
     setState((prev) => ({
       ...prev,
-      timeRemaining: currentQuestion.time_limit || 0,
+      timeRemaining: Math.max(0, Math.ceil((deadline - Date.now()) / 1000)),
     }));
 
     timerRef.current = setInterval(() => {
       setState((prev) => {
-        if (prev.timeRemaining <= 1) {
+        const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        if (remaining <= 0) {
           if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
           }
-          // Auto submit when time runs out
-          handleAutoSubmit();
           return { ...prev, timeRemaining: 0 };
         }
-        return { ...prev, timeRemaining: prev.timeRemaining - 1 };
+        return { ...prev, timeRemaining: remaining };
       });
-    }, 1000);
+    }, 250);
   }, [state.currentQuestionIndex, questions]);
 
   // Handle answer selection
@@ -118,10 +132,6 @@ export const useGameQuiz = ({
     const selectedAnswer = state.selectedAnswers.get(currentQuestion.id);
     if (!selectedAnswer) return;
 
-    // Validate answer
-    const strategy = QuestionRendererFactory.getStrategyForQuestion(currentQuestion);
-    const isCorrect = strategy.validateAnswer(currentQuestion, selectedAnswer);
-
     const answerData: GameQuizAnswer = {
       questionId: currentQuestion.id,
       selectedOptionId: typeof selectedAnswer === "string" ? selectedAnswer : undefined,
@@ -137,13 +147,9 @@ export const useGameQuiz = ({
       timeSpent: (currentQuestion.time_limit || 0) - state.timeRemaining,
     };
 
-    // Update score
-    const pointsEarned = isCorrect ? currentQuestion.points : 0;
     setState((prev) => ({
       ...prev,
       isAnswered: true,
-      score: prev.score + pointsEarned,
-      correctAnswersCount: prev.correctAnswersCount + (isCorrect ? 1 : 0),
     }));
 
     // Stop timer
@@ -156,47 +162,15 @@ export const useGameQuiz = ({
     onAnswerSubmit?.(answerData);
   }, [state, questions, onAnswerSubmit]);
 
-  // Auto submit when time runs out
-  const handleAutoSubmit = useCallback(() => {
-    const currentQuestion = questions[state.currentQuestionIndex];
-    if (!currentQuestion || state.isAnswered) return;
-
-    const selectedAnswer = state.selectedAnswers.get(currentQuestion.id);
-    if (!selectedAnswer) {
-      // Auto-select first option if no answer selected
-      const defaultAnswer = QuestionRendererFactory
-        .getStrategyForQuestion(currentQuestion)
-        .getDefaultAnswer();
-      if (defaultAnswer) {
-        selectAnswer(defaultAnswer);
-      }
-    }
-
-    setTimeout(() => {
-      submitAnswer();
-    }, 100);
-  }, [state, questions, selectAnswer, submitAnswer]);
-
-  // Move to next question
-  const nextQuestion = useCallback(() => {
-    if (state.currentQuestionIndex >= questions.length - 1) {
-      // Game ended
-      setState((prev) => ({
-        ...prev,
-        isGameEnded: true,
-      }));
-      onGameEnd?.(state.score);
-      return;
-    }
-
+  const applyAnswerResult = useCallback((questionId: string, isCorrect: boolean, points: number) => {
+    if (scoredQuestionsRef.current.has(questionId)) return;
+    scoredQuestionsRef.current.add(questionId);
     setState((prev) => ({
       ...prev,
-      currentQuestionIndex: prev.currentQuestionIndex + 1,
-      isAnswered: false,
+      score: prev.score + Number(points || 0),
+      correctAnswersCount: prev.correctAnswersCount + (isCorrect ? 1 : 0),
     }));
-
-    startTimerForCurrentQuestion();
-  }, [state.currentQuestionIndex, state.score, questions.length, onGameEnd, startTimerForCurrentQuestion]);
+  }, []);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -212,7 +186,14 @@ export const useGameQuiz = ({
     if (state.isGameStarted && !state.isAnswered) {
       startTimerForCurrentQuestion();
     }
-  }, [state.currentQuestionIndex, state.isGameStarted, startTimerForCurrentQuestion]);
+  }, [state.currentQuestionIndex, state.isAnswered, state.isGameStarted, startTimerForCurrentQuestion]);
+
+  useEffect(() => {
+    if (state.isGameEnded && !endNotifiedRef.current) {
+      endNotifiedRef.current = true;
+      onGameEnd?.(state.score);
+    }
+  }, [onGameEnd, state.isGameEnded, state.score]);
 
   const currentQuestion = questions[state.currentQuestionIndex];
   const selectedAnswer = currentQuestion
@@ -235,11 +216,11 @@ export const useGameQuiz = ({
     hasSelectedAnswer: !!selectedAnswer && (!Array.isArray(selectedAnswer) || selectedAnswer.length > 0),
     isLastQuestion: state.currentQuestionIndex >= questions.length - 1,
     selectedAnswers: state.selectedAnswers,
+    syncGameState,
     // Actions
-    startGame,
     selectAnswer,
     submitAnswer,
-    nextQuestion,
+    applyAnswerResult,
   };
 };
 

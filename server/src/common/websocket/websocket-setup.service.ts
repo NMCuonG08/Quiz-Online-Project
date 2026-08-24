@@ -71,7 +71,7 @@ export class WebSocketSetupService
     const token = client.handshake.auth?.token as string;
     // const token = client.handshake.headers.authorization?.split(' ')[1];
     this.logger.debug(`Authenticating WebSocket client: ${client.id}`);
-    this.logger.debug(`Token received: ${token}`);
+    this.logger.debug(`Token present: ${Boolean(token)}`);
     let lastError: Error | null = null;
     // Try with provided token first
     if (token) {

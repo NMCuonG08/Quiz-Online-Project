@@ -1,0 +1,40 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum by (outcome) (rate(quiz_ai_chat_requests_total[5m]))", "legendFormat": "{{outcome}}" }
+      ],
+      "title": "Chat outcomes / second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum by (tool, outcome) (rate(quiz_ai_tool_calls_total[5m]))", "legendFormat": "{{tool}} · {{outcome}}" }
+      ],
+      "title": "Tool calls / second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(quiz_ai_chat_duration_seconds_sum[5m])) / sum(rate(quiz_ai_chat_duration_seconds_count[5m]))", "legendFormat": "average" }
+      ],
+      "title": "Average chat duration",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "title": "Quiz AI",
+  "uid": "quiz-ai",
+  "version": 1
+}

@@ -58,6 +58,16 @@ export interface RoomData {
   updated_at: string;
 }
 
+export interface RoomGameStatePayload {
+  roomId: string;
+  status: "WAITING" | "QUESTION" | "FINISHED";
+  questionIndex: number;
+  questionId?: string;
+  deadline?: number;
+  version: number;
+  serverTime: number;
+}
+
 export interface ClientEventMap {
   on_user_delete: [string];
   on_asset_delete: [string];
@@ -74,10 +84,15 @@ export interface ClientEventMap {
   messages_list: [ChatMessage[]];
   participant_joined: [Participant];
   participant_left: [string];
-  participants_list: [{ roomId: string; participants: Participant[] }];
+  participants_list: [{ roomId: string; participants: Participant[]; revision?: number }];
   room_updated: [RoomData];
   score_updated: [{ userId: string; username: string; score: number; correctAnswers: number; timestamp: string }];
   leaderboard_update: [Array<{ userId: string; username: string; score: number; correctAnswers: number; timestamp: string }>];
+  answer_result: [{ commandId: string; questionId: string; isCorrect?: boolean; correctAnswer?: string; points?: number; duplicate?: boolean }];
+  answer_error: [{ commandId?: string; error: string }];
+  score_update_rejected: [{ error: string }];
+  game_state: [RoomGameStatePayload];
+  game_error: [{ error: string }];
 }
 
 export interface ServerEventMap {
@@ -89,6 +104,10 @@ export interface ServerEventMap {
   get_participants: [{ roomId: string }];
   invite_friends: [{ roomId: string; friendIds: string[] }];
   update_score: [{ roomId: string; score: number; correctAnswers: number }];
+  submit_answer: [{ roomId: string; questionId: string; selectedOptionId?: string; selectedOptionIds?: string[]; timeSpent?: number; commandId: string }];
+  start_game: [{ roomId: string }];
+  get_game_state: [{ roomId: string }];
+  advance_question: [{ roomId: string; expectedVersion: number }];
   get_leaderboard: [{ roomId: string }];
 }
 

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."QuestionType" ADD VALUE IF NOT EXISTS 'SINGLE_CHOICE';

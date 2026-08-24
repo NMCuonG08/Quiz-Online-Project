@@ -1,0 +1,5 @@
+[
+  {"query": "distributed systems scalability", "expected_slugs": ["ai-eval-distributed-systems"]},
+  {"query": "python variables functions", "expected_slugs": ["ai-eval-python-basics"]},
+  {"query": "zzzz-no-such-quiz", "expected_slugs": []}
+]

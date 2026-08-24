@@ -49,6 +49,11 @@ jobs:
           docker push $REGISTRY/quiz-frontend:latest
           docker push $REGISTRY/quiz-frontend:${{ steps.meta.outputs.sha }}
 
+          # Build AI Agent
+          docker build -t $REGISTRY/quiz-ai-agent:latest -t $REGISTRY/quiz-ai-agent:${{ steps.meta.outputs.sha }} ./ai-agent
+          docker push $REGISTRY/quiz-ai-agent:latest
+          docker push $REGISTRY/quiz-ai-agent:${{ steps.meta.outputs.sha }}
+
       # 4. Deploy lên Azure VM qua SSH
       - name: Deploy to Azure VM
         uses: appleboy/ssh-action@v1.2.0

@@ -29,6 +29,8 @@ export class CategoryController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('iconFile'))
   @Post()
+  @UseGuards(AuthGuard)
+  @Authenticated({ admin: true })
   createCategory(
     @Body() createCategoryDto: CreateCategoryDto,
     @UploadedFile() iconFile?: Express.Multer.File,
@@ -53,6 +55,8 @@ export class CategoryController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('icon'))
   @Patch(':id')
+  @UseGuards(AuthGuard)
+  @Authenticated({ admin: true })
   updateCategory(
     @Param('id') id: string,
     @Body() updateDto: UpdateCategoryDto,
@@ -68,8 +72,8 @@ export class CategoryController {
   }
 
   @Delete(':id')
-  // @UseGuards(AuthGuard)
-  // @Authenticated({ permission: Permission.AdminUserDelete })
+  @UseGuards(AuthGuard)
+  @Authenticated({ admin: true })
   @ApiOperation({ summary: 'Delete a category by ID' })
   @ApiResponse({
     status: 200,

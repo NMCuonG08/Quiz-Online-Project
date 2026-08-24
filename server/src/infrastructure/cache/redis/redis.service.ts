@@ -26,8 +26,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private getRedisConfig(): string {
     // Chỉ sử dụng REDIS_URL từ environment variable
     const url = this.configService.get<string>('REDIS_URL');
-    console.log('REDIS_URL from env:', url);
-
     if (!url) {
       throw new Error('REDIS_URL environment variable is required');
     }
@@ -45,7 +43,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     const config = this.getRedisConfig();
 
-    this.logger.log(`Using Redis URL: ${config}`);
+    this.logger.log('Using configured Redis endpoint');
 
     // Sử dụng lazyConnect để tránh auto-connect
     // Check if it's a rediss:// URL and add TLS options
@@ -162,6 +160,60 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const client = await this.ensureClient();
       await client.del(...keys);
     }
+  }
+
+  async incrementWithTtl(key: string, ttlSeconds: number): Promise<number> {
+    const client = await this.ensureClient();
+    const fullKey = this.withPrefix(key);
+    const count = await client.incr(fullKey);
+    if (count === 1 && ttlSeconds > 0) {
+      await client.expire(fullKey, ttlSeconds);
+    }
+    return count;
+  }
+
+  async listPushJson(key: string, value: unknown, maxItems: number, ttlSeconds: number): Promise<void> {
+    const client = await this.ensureClient();
+    const fullKey = this.withPrefix(key);
+    const pipeline = client.pipeline();
+    pipeline.rpush(fullKey, JSON.stringify(value));
+    pipeline.ltrim(fullKey, -Math.max(1, maxItems), -1);
+    pipeline.expire(fullKey, ttlSeconds);
+    await pipeline.exec();
+  }
+
+  async listRangeJson<T>(key: string, start = 0, end = -1): Promise<T[]> {
+    const client = await this.ensureClient();
+    const values = await client.lrange(this.withPrefix(key), start, end);
+    return values.flatMap((value) => {
+      try { return [JSON.parse(value) as T]; } catch { return []; }
+    });
+  }
+
+  async hashSetJson(key: string, field: string, value: unknown, ttlSeconds: number): Promise<void> {
+    const client = await this.ensureClient();
+    const fullKey = this.withPrefix(key);
+    const pipeline = client.pipeline();
+    pipeline.hset(fullKey, field, JSON.stringify(value));
+    pipeline.expire(fullKey, ttlSeconds);
+    await pipeline.exec();
+  }
+
+  async hashValuesJson<T>(key: string): Promise<T[]> {
+    const client = await this.ensureClient();
+    const values = await client.hvals(this.withPrefix(key));
+    return values.flatMap((value) => {
+      try { return [JSON.parse(value) as T]; } catch { return []; }
+    });
+  }
+
+  async setIfAbsent(key: string, value: unknown, ttlSeconds: number): Promise<boolean> {
+    const client = await this.ensureClient();
+    const payload = typeof value === 'string' ? value : JSON.stringify(value);
+    const result = await client.set(
+      this.withPrefix(key), payload, 'EX', ttlSeconds, 'NX',
+    );
+    return result === 'OK';
   }
 
   async flushNamespace(): Promise<void> {

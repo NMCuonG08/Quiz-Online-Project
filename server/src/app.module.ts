@@ -25,6 +25,10 @@ import { FriendshipModule } from './modules/friendships/friendships.module';
 import { CommunityModule } from './modules/community/community.module';
 import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { AiChatHistoryModule } from './modules/ai-chat-history/ai-chat-history.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -33,6 +37,12 @@ import { ReportsModule } from './modules/reports/reports.module';
       envFilePath: ['.env.local', '.env'],
       load: [configuration],
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
     // Import RedisModule trước để đảm bảo RedisService được khởi tạo
     RedisModule,
     BullModule.forRootAsync({
@@ -180,8 +190,17 @@ import { ReportsModule } from './modules/reports/reports.module';
     CommunityModule,
     AdminDashboardModule,
     ReportsModule,
+    KnowledgeModule,
+    AiChatHistoryModule,
   ],
   controllers: [AppController],
-  providers: [AppService, JobRepository],
+  providers: [
+    AppService,
+    JobRepository,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

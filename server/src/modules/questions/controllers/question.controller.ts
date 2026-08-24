@@ -26,7 +26,8 @@ import { QuestionPaginationQueryDto } from '../dtos/question-pagination.dto';
 import { QuestionResponseDto } from '../dtos/question-response.dto';
 import { PaginatedResponseDto } from '@/common/dtos/responses/base.response';
 import { Permission } from '@/common/enums/permisson';
-import { Authenticated, AuthGuard } from '@/common/guards/auth.guard';
+import { Auth, Authenticated, AuthGuard } from '@/common/guards/auth.guard';
+import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
 
 @ApiTags('Questions')
 @Controller('/api/questions')
@@ -133,8 +134,8 @@ export class QuestionController {
   }
 
   @Post()
-  // @UseGuards(AuthGuard)
-  // @Authenticated({ permission: Permission.QuizCreate })
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.QuizCreate })
   @ApiOperation({ summary: 'Create a new question with optional media upload' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('media'))
@@ -154,8 +155,11 @@ export class QuestionController {
   async createQuestion(
     @Body() question: CreateQuestionDto,
     @UploadedFile() media?: Express.Multer.File,
+    @Auth() auth?: AuthDto,
   ): Promise<QuestionResponseDto> {
-    return this.questionService.createQuestion(question, media);
+    return this.questionService.createQuestion(
+      question, media, auth?.user.id, auth?.user.isAdmin,
+    );
   }
 
   @Patch(':id')
@@ -181,6 +185,7 @@ export class QuestionController {
     @Param('id') id: string,
     @Body() question: UpdateQuestionDto,
     @UploadedFiles() files?: Express.Multer.File[],
+    @Auth() auth?: AuthDto,
   ): Promise<QuestionResponseDto> {
     // Separate question media from option media files
     const questionMedia = files?.find((f) => f.fieldname === 'media');
@@ -195,6 +200,8 @@ export class QuestionController {
       question,
       questionMedia,
       optionMediaFiles,
+      auth?.user.id,
+      auth?.user.isAdmin,
     );
   }
 
@@ -210,8 +217,10 @@ export class QuestionController {
     status: 404,
     description: 'Question not found',
   })
-  async deleteQuestion(@Param('id') id: string): Promise<void> {
-    return this.questionService.deleteQuestion(id);
+  async deleteQuestion(
+    @Param('id') id: string, @Auth() auth?: AuthDto,
+  ): Promise<void> {
+    return this.questionService.deleteQuestion(id, auth?.user.id, auth?.user.isAdmin);
   }
 
   @Post(':id/duplicate')
@@ -230,8 +239,11 @@ export class QuestionController {
   async duplicateQuestion(
     @Param('id') id: string,
     @Body() body?: { newQuizId?: string },
+    @Auth() auth?: AuthDto,
   ): Promise<QuestionResponseDto> {
-    return this.questionService.duplicateQuestion(id, body?.newQuizId);
+    return this.questionService.duplicateQuestion(
+      id, body?.newQuizId, auth?.user.id, auth?.user.isAdmin,
+    );
   }
 
   @Patch('quiz/:quizId/reorder')
@@ -249,7 +261,10 @@ export class QuestionController {
   async reorderQuestions(
     @Param('quizId') quizId: string,
     @Body() body: { questionOrders: { id: string; sort_order: number }[] },
+    @Auth() auth?: AuthDto,
   ): Promise<void> {
-    return this.questionService.reorderQuestions(quizId, body.questionOrders);
+    return this.questionService.reorderQuestions(
+      quizId, body.questionOrders, auth?.user.id, auth?.user.isAdmin,
+    );
   }
 }

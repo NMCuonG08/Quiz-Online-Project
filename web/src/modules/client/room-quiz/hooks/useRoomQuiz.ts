@@ -7,7 +7,6 @@ import {
   fetchRoomById,
   fetchRoomByCode,
   joinRoom,
-  sendMessage,
   fetchParticipants,
   clearRoomData,
   clearJoinError,
@@ -109,10 +108,7 @@ export function useRoomQuiz() {
   }, []);
 
   const getChatMessages = useCallback((roomId: string) => {
-    // Chỉ lấy qua WebSocket, không gọi API nữa
-    if (wsManager.isConnected()) {
-      wsManager.send("get_messages", { roomId });
-    }
+    wsManager.send("get_messages", { roomId });
   }, []);
 
   const sendMessageAction = useCallback(
@@ -131,9 +127,7 @@ export function useRoomQuiz() {
         })
       );
 
-      if (wsManager.isConnected()) {
-        wsManager.send("send_message", { roomId, message });
-      }
+      wsManager.send("send_message", { roomId, message });
     },
     [dispatch, getCurrentUserId]
   );
@@ -147,11 +141,10 @@ export function useRoomQuiz() {
       if (wsManager.isConnected()) {
         console.log("📡 Sending get_participants via WebSocket");
         wsManager.send("get_participants", { roomId });
-      } else {
-        console.log("⚠️ WebSocket not connected, using API fallback");
+        return;
       }
 
-      // Fallback to API if WebSocket not connected
+      console.log("⚠️ WebSocket not connected, using one API fallback");
       const action = dispatch(fetchParticipants(roomId));
       action.then((res: any) => {
         try {
@@ -251,7 +244,7 @@ export function useRoomQuiz() {
 
       const list = (data && (data as any).participants) || [];
       console.log("📊 Total participants (WS):", list.length);
-      dispatch(setParticipants(list));
+      dispatch(setParticipants(data));
     };
 
     const handleRoomUpdate = (roomData: RoomData) => {
@@ -263,8 +256,6 @@ export function useRoomQuiz() {
       console.log("✅ Room joined successfully:", data);
       const joinedRoomId = (data as any)?.room_id || (data as any)?.roomId;
       if (joinedRoomId) {
-        console.log("🔄 Fetching participants after join for:", joinedRoomId);
-        getParticipants(joinedRoomId);
         console.log("🔄 Fetching messages after join for:", joinedRoomId);
         getChatMessages(joinedRoomId);
       }
@@ -362,7 +353,7 @@ export function useRoomQuiz() {
       wsManager.off("user_joined", handleUserJoined);
       wsManager.off("user_left", handleUserLeft);
     };
-  }, [addMessageAction, dispatch, getParticipants]);
+  }, [addMessageAction, dispatch, getChatMessages]);
 
   return {
     // State

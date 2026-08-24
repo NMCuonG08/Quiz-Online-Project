@@ -9,9 +9,8 @@ import ReduxProvider from "@/common/contexts/ReduxProvider";
 import AuthRestorer from "@/common/contexts/AuthRestorer";
 import { WebSocketProvider } from "@/common/contexts/WebSocketProvider";
 import { NotificationContainer } from "@/common/components/NotificationContainer";
-import ClientOnly from "@/common/contexts/ClientOnly";
-import { WebSocketDebugger } from "@/components/WebSocketDebugger";
 import ErrorBoundary from "@/common/components/ErrorBoundary";
+import QuizAIChat from "@/modules/ai-chat/components/QuizAIChat";
 
 const comfortaa = Comfortaa({
   variable: "--font-comfortaa",
@@ -44,12 +43,6 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} suppressHydrationWarning>
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body
         className={`${comfortaa.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -60,8 +53,8 @@ export default async function RootLayout({
                 <AuthRestorer>
                   <WebSocketProvider autoConnect={true}>
                     {children}
+                    <QuizAIChat />
                     <NotificationContainer />
-                    <ClientOnly>{/* <WebSocketDebugger /> */}</ClientOnly>
                   </WebSocketProvider>
                 </AuthRestorer>
               </ReduxProvider>

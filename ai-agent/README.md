@@ -1,238 +1,173 @@
-README - AI Agent Integration Project
-Tổng quan dự án
-Dự án tích hợp AI Agent vào hệ thống website có sẵn (Frontend + Backend) với 2 luồng xử lý chính:
+# Quiz AI Agent
 
-Action Intent: Gọi API Backend cho thao tác CRUD (thêm/sửa/xóa)
-Query Intent: Truy vấn data bằng SQL được sinh tự động từ metadata trong OpenSearch
+AI Agent service cho Quiz Online. Bản hiện tại cung cấp một luồng chạy được từ
+web UI đến FastAPI bằng SSE, có intent orchestrator và contract cho các MCP tool.
 
-Kiến trúc tổng quan
-User Input (Tiếng Việt)
-    ↓
-AI Agent (Claude/GPT-4)
-    ↓
-┌─────────────────────┐
-│ Intent Classifier   │
-└─────────────────────┘
-    ↓
-    ├─→ [Action Intent] → MCP Backend API Tool → Gọi API của bạn
-    │
-    └─→ [Query Intent] → MCP SQL Tool → OpenSearch lấy metadata → Sinh SQL → Query DB → Trả kết quả
-Cấu trúc thư mục cần tạo thêm
-your-project/                    # Project hiện tại của bạn
-├── frontend/                    # Code FE của bạn (đã có)
-├── backend/                     # Code BE của bạn (đã có)
-├── database/                    # DB của bạn (đã có)
-│
-└── ai-agent/                    # [MỚI] Thêm thư mục này
-    ├── mcp-servers/
-    │   ├── backend-api/         # MCP server gọi API backend
-    │   │   ├── package.json
-    │   │   ├── tsconfig.json
-    │   │   └── src/
-    │   │       └── index.ts
-    │   │
-    │   └── sql-query/           # MCP server query database
-    │       ├── package.json
-    │       ├── tsconfig.json
-    │       └── src/
-    │           └── index.ts
-    │
-    ├── services/                # Agent logic
-    │   └── agent-service.py     # hoặc .ts tùy bạn
-    │
-    ├── config/
-    │   ├── mcp-config.json      # Config cho MCP servers
-    │   └── .env                 # Environment variables
-    │
-    ├── scripts/
-    │   └── sync-metadata.py     # Script đồng bộ DB schema lên OpenSearch
-    │
-    └── README.md                # File này
-Các bước triển khai
-Bước 1: Chuẩn bị OpenSearch
-Mục đích: Lưu metadata của database schema để AI Agent có thể tìm kiếm và sinh SQL
-Cần làm:
+## Luồng xử lý
 
-Cài đặt OpenSearch (hoặc dùng OpenSearch cloud)
-Tạo index table_metadata với mapping phù hợp
-Viết script đồng bộ schema từ database của bạn lên OpenSearch
+```text
+Quiz AI widget
+  -> POST /chat/stream
+  -> OpenAI Responses API agent loop
+  -> model tự chọn backend tool hoặc render_ui tool
+  -> MCPToolWrapper / Backend API tools
+  -> NestJS Backend API (PostgreSQL full-text search)
+  -> SSE: intent -> status -> token -> card -> actions -> done
+```
 
-Cấu trúc metadata cần lưu:
-json{
-  "table_name": "tên_bảng",
-  "table_description": "mô tả bảng",
-  "keywords_vi": ["từ khóa", "tiếng Việt"],
-  "columns": [
-    {
-      "column_name": "tên_cột",
-      "column_type": "kiểu_dữ_liệu",
-      "column_description": "mô tả cột",
-      "keywords_vi": ["từ khóa cột"]
-    }
-  ],
-  "relationships": [...],
-  "sample_queries": [...]
+UI không hard-code nội dung theo intent. Model gọi `render_ui` để gửi một surface
+gồm các block `notice`, `list`, `table`, `stats`, `form` và action. Frontend chỉ
+render schema này. Các action hỗ trợ:
+
+- `navigate`: mở trang tạo, sửa, danh sách quiz hoặc dashboard.
+- `prompt`: gửi một prompt tiếp theo để agent thu thập thêm thông tin.
+
+Các thao tác ghi/xóa không chạy ngay từ tin nhắn đầu tiên. Agent trả action để
+người dùng xem và xác nhận trước, sau đó mới được phép gọi write tool.
+
+## Chạy thực tế
+
+Backend phải chạy trước để agent lấy dữ liệu thật từ database:
+
+```powershell
+cd server
+pnpm start:dev
+```
+
+Sau đó chạy AI Agent (yêu cầu Python 3.10+):
+
+```powershell
+cd ai-agent
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item config\.env.example config\.env
+python -m uvicorn services.main:app --reload --port 8000
+```
+
+Frontend:
+
+```powershell
+cd web
+pnpm dev
+```
+
+Mặc định widget gọi `http://localhost:8000`. Có thể đổi bằng:
+
+```env
+NEXT_PUBLIC_AI_AGENT_URL=http://localhost:8000
+```
+
+Agent local mặc định gọi NestJS tại `http://localhost:3333`. Docker Compose
+ghi đè thành `http://app:5000`. Nếu backend không chạy,
+SSE sẽ trả lỗi kết nối rõ ràng thay vì dữ liệu giả.
+
+AI Agent cần model key thật:
+
+```env
+OPENAI_API_KEY=...
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4.1-mini
+LLM_API_MODE=responses
+```
+
+`responses` keeps multi-instance memory through `previous_response_id`. A provider
+that lacks Responses API support but supports Chat Completions + function calling
+can use `LLM_API_MODE=chat_completions`; Redis persists short-term history,
+with an in-process fallback only when Redis is unavailable.
+Redis now persists the bounded user/assistant history for this mode too; it
+expires with the chat session and never stores auth headers or tool payloads.
+
+Conversation state được giữ theo `user_id + session_id` bằng
+`previous_response_id`. Khi cấu hình Redis, session, approval token một lần,
+rate-limit và audit metadata được chia sẻ giữa instance.
+
+Retrieval MVP dùng PostgreSQL full-text search có sẵn cho title/description và
+trả citation đến quiz thật. Chưa thêm embedding hay vector database: chỉ thêm
+khi full-text search không đạt metric retrieval.
+
+Knowledge ingestion v1 lưu plain-text source, checksum, version và chunks trong
+PostgreSQL. Source đi qua `DRAFT -> REVIEW -> PUBLISHED|QUARANTINED`; chỉ
+`PUBLISHED + PUBLIC` mới được `search_knowledge` trả cho agent.
+
+Verification gate giữ final answer sau internal retrieval cho đến khi citation
+được tạo. Không có citation thì agent abstain thay vì kết luận từ kết quả rỗng.
+
+Golden dataset mẫu nằm ở `evals/retrieval_golden.json`. Baseline một database
+đang chạy dùng file gitignored `evals/retrieval_golden.local.json`, rồi chạy
+`python scripts/evaluate_retrieval.py --fixture evals/retrieval_golden.local.json`.
+Fixture dùng chung được nạp rõ ràng bằng
+`cd ../server && pnpm exec ts-node scripts/seed-ai-eval.ts`, sau đó chạy
+`python scripts/evaluate_retrieval.py --backend-url http://localhost:3333`.
+CI chỉ dùng fixture gắn với seed ổn định; không commit slug từ database cá nhân.
+Gate retrieval giữ `recall_at_k >= 0.90` trước khi thay đổi kiến trúc.
+
+## API và SSE protocol
+
+- `GET /`: health check.
+- `GET /tools`: danh mục tool và risk level.
+- `GET /ready`: readiness check; production yêu cầu model key và Redis.
+- `GET /metrics`: Prometheus metrics cho chat outcome/latency và tool success/error.
+
+Monitoring stack dùng `docker/docker-compose.monitoring.yml`. Chạy sau app
+compose và đặt `GRAFANA_ADMIN_PASSWORD` trong shell hoặc secret manager; Grafana
+được provision datasource/dashboard, Prometheus scrape `ai-agent:8000/metrics`.
+
+LangGraph là orchestrator mặc định: planner → assistant → ToolNode → assistant/END.
+Đặt `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` để Langfuse
+trace planner, graph node, LLM call và tool call; event `done` trả `trace_id`
+để tìm đúng trace.
+- `POST /chat`: phản hồi JSON, hữu ích cho test.
+- `POST /chat/stream`: phản hồi `text/event-stream` cho UI.
+
+Request:
+
+```json
+{
+  "message": "Tạo quiz 10 câu về Python",
+  "user_id": "user-id",
+  "session_id": "optional-session-id",
+  "locale": "vi"
 }
-Bước 2: Tạo MCP Servers
-MCP Server 1: Backend API
-
-Mục đích: Wrapper để AI Agent gọi được API backend của bạn
-Input: HTTP method, endpoint, request body
-Output: Response từ backend API của bạn
-
-MCP Server 2: SQL Query
-
-Mục đích:
-
-Tool 1: Search metadata từ OpenSearch
-Tool 2: Execute SQL SELECT (read-only)
-
-
-Input: Keywords hoặc SQL query
-Output: Metadata hoặc kết quả query
-
-Bước 3: Cấu hình MCP trong Claude Desktop/VSCode
-File: ai-agent/config/mcp-config.json
-json{
-  "mcpServers": {
-    "backend-api": {
-      "command": "node",
-      "args": ["./ai-agent/mcp-servers/backend-api/dist/index.js"],
-      "env": {
-        "BACKEND_URL": "URL_BACKEND_CỦA_BẠN",
-        "API_KEY": "API_KEY_CỦA_BẠN"
-      }
-    },
-    "sql-query": {
-      "command": "node",
-      "args": ["./ai-agent/mcp-servers/sql-query/dist/index.js"],
-      "env": {
-        "DB_HOST": "localhost",
-        "DB_PORT": "5432",
-        "DB_NAME": "TÊN_DATABASE_CỦA_BẠN",
-        "DB_USER": "readonly_user",
-        "DB_PASSWORD": "password",
-        "OPENSEARCH_URL": "http://localhost:9200"
-      }
-    }
-  }
-}
 ```
 
-### Bước 4: Tạo Agent Service
+Các event được định nghĩa trong `services/protocol.py`. Event `actions` chỉ chứa
+action đã được UI cho phép; client không thực thi URL hoặc JavaScript tùy ý.
 
-**Nhiệm vụ của Agent**:
-1. Nhận input từ user (tiếng Việt)
-2. Phân tích intent (query hay action)
-3. Gọi MCP tool phù hợp
-4. Format kết quả trả về user
+## Kết nối Backend API
 
-**Flow xử lý**:
+`MCPToolWrapper` là gateway/adapter kết nối trực tiếp với NestJS Backend API.
+Backend của dự án mặc định chạy ở cổng `5000`.
 
-**Query Intent**:
-```
-User: "Doanh thu tháng 1 của Hà Nội là bao nhiêu?"
-  ↓
-Extract keywords: ["doanh thu", "tháng 1", "Hà Nội"]
-  ↓
-Gọi MCP: search_table_metadata(keywords)
-  ↓
-Nhận metadata về bảng orders, cột revenue, created_at, store_name
-  ↓
-AI sinh SQL: SELECT SUM(revenue) FROM orders WHERE...
-  ↓
-Gọi MCP: execute_sql(sql)
-  ↓
-Format kết quả: "Doanh thu là 150 triệu đồng"
+```env
+BACKEND_URL=http://localhost:3333
+CORS_ORIGINS=http://localhost:5173
+REDIS_URL=redis://localhost:6379/0
+AI_RATE_LIMIT_PER_MINUTE=20
 ```
 
-**Action Intent**:
-```
-User: "Thêm sản phẩm iPhone 15 giá 25 triệu"
-  ↓
-Extract: {name: "iPhone 15", price: 25000000}
-  ↓
-Gọi MCP: call_backend_api(POST, /api/products, body)
-  ↓
-Backend xử lý
-  ↓
-Format: "Đã thêm sản phẩm thành công"
-Bước 5: Tích hợp vào Frontend
-Option 1: Chat widget riêng
+Khi bật live mode, bearer token từ phiên người dùng cần được forward tới NestJS
+và backend vẫn phải kiểm tra quyền. Không đặt database credential có quyền ghi
+trong agent process.
 
-Thêm component chat vào UI hiện tại
-Gọi API endpoint của Agent service
-Hiển thị kết quả
+## Kết nối MCP server thật
 
-Option 2: Copilot-style
+Thay phần thân của `call_backend_api`, `search_quizzes` và `execute_select` bằng
+MCP client transport (stdio hoặc streamable HTTP), nhưng giữ nguyên input/output
+contract. Nên tách ít nhất hai MCP server:
 
-Tích hợp như assistant trong VSCode
-User chat trực tiếp trong app
+1. `quiz-api-mcp`: wrapper các endpoint quiz/question/category của NestJS. Write
+   tool yêu cầu confirmation id và user authorization.
+2. `quiz-analytics-mcp`: kết nối DB bằng tài khoản read-only. Chỉ cho một câu
+   `SELECT`, có allowlist bảng/cột, timeout, row limit và audit log.
 
-Environment Variables cần thiết
-bash# Backend API
-BACKEND_URL=http://localhost:3000
-BACKEND_API_KEY=your_api_key
+Danh mục sẵn có gồm `quiz.search`, `quiz.get`, `quiz.create`, `quiz.update`,
+`quiz.delete`, `question.create`, `question.update`, `category.list`,
+`analytics.quiz` và `database.select`.
 
-# Database (Read-only user)
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=your_database
-DB_READONLY_USER=readonly_user
-DB_READONLY_PASSWORD=password
+## Việc nên làm tiếp theo
 
-# OpenSearch
-OPENSEARCH_URL=http://localhost:9200
-
-# AI Model
-ANTHROPIC_API_KEY=your_claude_api_key
-# hoặc
-OPENAI_API_KEY=your_openai_api_key
-Security Checklist
-
- Tạo database user READ-ONLY riêng cho SQL queries
- Validate SQL chỉ cho phép SELECT
- Rate limiting cho API calls
- Authentication cho Agent endpoints
- Log tất cả SQL queries được thực thi
- Không expose sensitive data trong responses
-
-Workflow làm việc
-
-Lập trình viên của bạn làm việc với codebase hiện tại bình thường
-VSCode Copilot đọc file README này để hiểu context
-Khi cần implement AI Agent, Copilot sẽ biết:
-
-Cần tạo MCP servers ở đâu
-Cần gọi API backend như thế nào
-Cần query OpenSearch ra sao
-Cần tạo database user read-only
-Workflow xử lý intent
-
-
-
-Lưu ý quan trọng
-⚠️ File này chỉ là hướng dẫn kiến trúc, KHÔNG có code cụ thể
-✅ Lập trình viên cần tự implement dựa trên:
-
-Framework đang dùng (React/Vue/Angular)
-Backend framework (Node/Python/Java/Go)
-Database hiện tại (PostgreSQL/MySQL/MongoDB)
-API structure hiện tại
-
-✅ MCP servers có thể viết bằng TypeScript hoặc Python
-✅ Agent service có thể dùng:
-
-Anthropic Claude API
-OpenAI GPT-4 API
-Hoặc self-hosted LLM
-
-Next Steps
-
-Đọc kỹ kiến trúc
-Quyết định dùng Claude hay GPT-4
-Setup OpenSearch
-Tạo MCP servers
-Implement agent service
-Tích hợp vào FE
-Test và deplo
+- Đo recall/groundedness của PostgreSQL retrieval bằng golden dataset.
+- Chỉ thêm embedding + vector retrieval khi metric không đạt.
+- Thêm ingestion có version, review và citation metadata cho nguồn tài liệu.
+- Thêm OpenTelemetry/Prometheus trước khi scale nhiều agent.

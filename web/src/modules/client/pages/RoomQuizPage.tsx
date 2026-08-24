@@ -49,8 +49,6 @@ const RoomQuizPage = () => {
     if (roomId) {
       console.log("Fetching room with ID:", roomId);
       getRoomById(roomId);
-      // Moved to run after room_joined event to avoid race/overwrite
-      getParticipants(roomId);
     }
 
     // Cleanup on unmount
@@ -83,8 +81,6 @@ const RoomQuizPage = () => {
     if (roomId) {
       console.log("Retrying fetch room with ID:", roomId);
       getRoomById(roomId);
-      // Moved to run after room_joined event to avoid race/overwrite
-      getParticipants(roomId);
     }
   };
 

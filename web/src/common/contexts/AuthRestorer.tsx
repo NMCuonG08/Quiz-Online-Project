@@ -6,7 +6,6 @@ import {
   restoreAuth,
   forceLogout,
 } from "@/modules/auth/common/slices/authSlice";
-import { initWebSocket } from "@/common/middlewares/websocket.middleware";
 
 /**
  * Component to restore auth state from localStorage on app startup
@@ -25,19 +24,6 @@ export default function AuthRestorer({
     // This ensures we have the latest state from sessionStorage
     dispatch(restoreAuth());
   }, [dispatch]);
-
-  // Single effect to handle WebSocket initialization after auth restore
-  useEffect(() => {
-    if (isAuthenticated && token) {
-      console.log("🔌 Auth state ready, initializing WebSocket...");
-      // Single timeout to prevent multiple triggers
-      const timeoutId = setTimeout(() => {
-        dispatch(initWebSocket());
-      }, 1000); // Wait 1 second for auth state to stabilize
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [dispatch, isAuthenticated, token]); // Only trigger when auth state is actually ready
 
   // Force logout if isAuthenticated but no token
   useEffect(() => {

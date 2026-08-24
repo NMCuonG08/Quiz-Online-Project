@@ -19,7 +19,7 @@ export class RoomRepository extends BaseRepository<QuizRoom> {
 
   findParticipants(room_id: string): Promise<RoomParticipant[]> {
     return this.prisma.roomParticipant.findMany({
-      where: { room_id },
+      where: { room_id, status: { in: ['JOINED', 'ACTIVE'] } },
       orderBy: { joined_at: 'asc' },
     });
   }

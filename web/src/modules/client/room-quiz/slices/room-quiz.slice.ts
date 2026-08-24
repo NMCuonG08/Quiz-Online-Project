@@ -22,6 +22,7 @@ interface RoomQuizState {
   participants: Participant[];
   participantsLoading: boolean;
   participantsError: string | null;
+  participantsRevision: number;
 }
 
 const initialState: RoomQuizState = {
@@ -39,6 +40,7 @@ const initialState: RoomQuizState = {
   participants: [],
   participantsLoading: false,
   participantsError: null,
+  participantsRevision: 0,
 };
 
 export const fetchRoomById = createAsyncThunk(
@@ -134,6 +136,7 @@ const roomQuizSlice = createSlice({
       state.participants = [];
       state.participantsLoading = false;
       state.participantsError = null;
+      state.participantsRevision = 0;
     },
     clearJoinError: (state) => {
       state.joinError = null;
@@ -185,6 +188,9 @@ const roomQuizSlice = createSlice({
     },
     setParticipants: (state, action) => {
       const payload = action.payload as any;
+      const revision = Number(payload?.revision || 0);
+      if (revision && revision < state.participantsRevision) return;
+      if (revision) state.participantsRevision = revision;
       const rawList = Array.isArray(payload)
         ? payload
         : Array.isArray(payload?.participants)
@@ -286,6 +292,7 @@ const roomQuizSlice = createSlice({
       })
       .addCase(fetchParticipants.fulfilled, (state, action) => {
         state.participantsLoading = false;
+        if (state.participantsRevision > 0) return;
         const payload = action.payload as any;
         const rawList = Array.isArray(payload)
           ? payload

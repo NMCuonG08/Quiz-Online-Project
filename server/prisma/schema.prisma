@@ -36,8 +36,11 @@ model User {
   leaderboards        Leaderboard[]
   userStatistics      UserStatistics?
   quizRatings         QuizRating[]
+  knowledgeSources    KnowledgeSource[] @relation("KnowledgeSourceOwner")
+  reviewedKnowledgeSources KnowledgeSource[] @relation("KnowledgeSourceReviewer")
   createdCourses      Course[]
   enrolledCourses     CourseEnrollment[]
+  aiChatConversations AiChatConversation[]
   
   // Friendship and Community
   friends             Friendship[]       @relation("UserFriends")
@@ -568,6 +571,78 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
+model AiChatConversation {
+  id         String          @id @default(uuid()) @db.Uuid
+  user_id    String          @db.Uuid
+  session_id String
+  title      String          @db.VarChar(160)
+  scope      String          @default("learner") @db.VarChar(24)
+  created_at DateTime        @default(now())
+  updated_at DateTime        @updatedAt
+  user       User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  messages   AiChatMessage[]
+
+  @@unique([user_id, session_id])
+  @@index([user_id, updated_at])
+  @@map("ai_chat_conversations")
+}
+
+model AiChatMessage {
+  id              String             @id @default(uuid()) @db.Uuid
+  conversation_id String             @db.Uuid
+  role            String             @db.VarChar(16)
+  content         String             @db.Text
+  created_at      DateTime           @default(now())
+  conversation    AiChatConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+  @@map("ai_chat_messages")
+}
+
+model KnowledgeSource {
+  id               String                @id @default(uuid()) @db.Uuid
+  owner_id         String                @db.Uuid
+  reviewed_by      String?               @db.Uuid
+  title            String
+  source_type      String                @default("MANUAL")
+  source_uri       String?
+  content          String                @db.Text
+  checksum         String
+  version          Int                   @default(1)
+  visibility       KnowledgeVisibility   @default(PRIVATE)
+  status           KnowledgeSourceStatus @default(DRAFT)
+  rejection_reason String?               @db.Text
+  metadata         Json                  @default("{}")
+  created_at       DateTime              @default(now())
+  updated_at       DateTime              @updatedAt
+  published_at     DateTime?
+
+  owner    User  @relation("KnowledgeSourceOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  reviewer User? @relation("KnowledgeSourceReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  chunks   KnowledgeChunk[]
+
+  @@index([owner_id, status])
+  @@index([status, visibility])
+  @@index([published_at])
+  @@map("knowledge_sources")
+}
+
+model KnowledgeChunk {
+  id          String   @id @default(uuid()) @db.Uuid
+  source_id   String   @db.Uuid
+  chunk_index Int
+  content     String   @db.Text
+  token_count Int
+  metadata    Json     @default("{}")
+  created_at  DateTime @default(now())
+
+  source KnowledgeSource @relation(fields: [source_id], references: [id], onDelete: Cascade)
+
+  @@unique([source_id, chunk_index])
+  @@index([source_id])
+  @@map("knowledge_chunks")
+}
+
 model SystemLog {
   id         String   @id @default(uuid()) @db.Uuid
   level      LogLevel
@@ -936,6 +1011,18 @@ enum FeedbackStatus {
   PENDING
   REVIEWED
   RESOLVED
+}
+
+enum KnowledgeSourceStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  QUARANTINED
+}
+
+enum KnowledgeVisibility {
+  PUBLIC
+  PRIVATE
 }
 
 enum FriendshipStatus {

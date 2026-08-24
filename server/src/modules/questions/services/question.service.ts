@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -95,12 +96,15 @@ export class QuestionService extends BaseService {
   async createQuestion(
     question: CreateQuestionDto,
     media?: Express.Multer.File,
+    userId?: string,
+    isAdmin = false,
   ): Promise<QuestionResponseDto> {
     // Verify quiz exists
     const quiz = await this.quizRepository.findByIdRaw(question.quiz_id);
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
     }
+    await this.assertQuizOwner(quiz.id, userId, isAdmin);
 
     // Check slug availability if provided
     if (question.slug) {
@@ -155,6 +159,8 @@ export class QuestionService extends BaseService {
     updateData: UpdateQuestionDto,
     media?: Express.Multer.File,
     optionMediaFiles?: Express.Multer.File[],
+    userId?: string,
+    isAdmin = false,
   ): Promise<QuestionResponseDto> {
     console.log('Update Question Request:', {
       id,
@@ -165,6 +171,7 @@ export class QuestionService extends BaseService {
     if (!existingQuestion) {
       throw new NotFoundException('Question not found');
     }
+    await this.assertQuizOwner(existingQuestion.quiz_id, userId, isAdmin);
 
     // Check slug availability if slug is being updated
     if (updateData.slug) {
@@ -293,17 +300,27 @@ export class QuestionService extends BaseService {
     return updated;
   }
 
-  async deleteQuestion(id: string): Promise<void> {
+  async deleteQuestion(id: string, userId?: string, isAdmin = false): Promise<void> {
     const existingQuestion = await this.questionRepository.findByIdRaw(id);
     if (!existingQuestion) {
       throw new NotFoundException('Question not found');
     }
+    await this.assertQuizOwner(existingQuestion.quiz_id, userId, isAdmin);
 
     await this.questionRepository.deleteQuestion(id);
     await this.eventRepository.emit('QuestionDeleted', {
       id,
       quizId: '',
     } as any);
+  }
+
+  private async assertQuizOwner(quizId: string, userId?: string, isAdmin = false): Promise<void> {
+    if (isAdmin) return;
+    if (!userId) throw new ForbiddenException('User not authenticated');
+    const quiz = await this.quizRepository.findByIdRaw(quizId);
+    if (!quiz || quiz.creator_id !== userId) {
+      throw new ForbiddenException('You are not authorized to modify this quiz questions');
+    }
   }
 
   async getQuestionsByQuizId(quizId: string): Promise<QuestionResponseDto[]> {
@@ -326,11 +343,21 @@ export class QuestionService extends BaseService {
   async reorderQuestions(
     quizId: string,
     questionOrders: { id: string; sort_order: number }[],
+    userId?: string,
+    isAdmin = false,
   ): Promise<void> {
     // Verify quiz exists
     const quiz = await this.quizRepository.findByIdRaw(quizId);
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
+    }
+    await this.assertQuizOwner(quizId, userId, isAdmin);
+    const questionIds = questionOrders.map((item) => item.id);
+    const matchingQuestions = await this.prisma.question.count({
+      where: { id: { in: questionIds }, quiz_id: quizId },
+    });
+    if (matchingQuestions !== questionIds.length) {
+      throw new BadRequestException('All reordered questions must belong to this quiz');
     }
 
     // Update sort orders in a transaction
@@ -347,11 +374,14 @@ export class QuestionService extends BaseService {
   async duplicateQuestion(
     id: string,
     newQuizId?: string,
+    userId?: string,
+    isAdmin = false,
   ): Promise<QuestionResponseDto> {
-    const existingQuestion = await this.questionRepository.findById(id);
+    const existingQuestion = await this.questionRepository.findByIdRaw(id);
     if (!existingQuestion) {
       throw new NotFoundException('Question not found');
     }
+    await this.assertQuizOwner(existingQuestion.quiz_id, userId, isAdmin);
 
     // If newQuizId is provided, verify it exists
     if (newQuizId) {
@@ -359,26 +389,37 @@ export class QuestionService extends BaseService {
       if (!quiz) {
         throw new NotFoundException('Target quiz not found');
       }
+      await this.assertQuizOwner(newQuizId, userId, isAdmin);
     }
+
+    const sourceQuestion = await this.questionRepository.findById(id);
+    if (!sourceQuestion) throw new NotFoundException('Question not found');
 
     // Prepare duplicate data
     const duplicateData: CreateQuestionDto = {
       quiz_id: newQuizId || existingQuestion.quiz_id,
-      question_text: `${existingQuestion.question_text} (Copy)`,
-      slug: existingQuestion.slug ? `${existingQuestion.slug}-copy` : undefined,
-      question_type: existingQuestion.question_type as QuestionTypeEnum,
-      points: existingQuestion.points,
-      time_limit: existingQuestion.time_limit,
-      explanation: existingQuestion.explanation,
-      media_id: existingQuestion.media_id,
-      media_type: existingQuestion.media_type as MediaTypeEnum,
+      question_text: `${sourceQuestion.question_text} (Copy)`,
+      slug: sourceQuestion.slug ? `${sourceQuestion.slug}-copy` : undefined,
+      question_type: sourceQuestion.question_type as QuestionTypeEnum,
+      points: sourceQuestion.points,
+      time_limit: sourceQuestion.time_limit,
+      explanation: sourceQuestion.explanation,
+      media_id: sourceQuestion.media_id,
+      media_type: sourceQuestion.media_type as MediaTypeEnum,
       difficulty_level:
-        existingQuestion.difficulty_level as DifficultyLevelEnum,
-      sort_order: existingQuestion.sort_order + 1,
-      is_required: existingQuestion.is_required,
-      settings: existingQuestion.settings,
+        sourceQuestion.difficulty_level as DifficultyLevelEnum,
+      sort_order: sourceQuestion.sort_order + 1,
+      is_required: sourceQuestion.is_required,
+      settings: sourceQuestion.settings,
+      options: sourceQuestion.options?.map((option) => ({
+        option_text: option.option_text,
+        is_correct: option.is_correct,
+        sort_order: option.sort_order,
+        explanation: option.explanation,
+        media_url: option.media_url,
+      })),
     };
 
-    return await this.createQuestion(duplicateData);
+    return await this.createQuestion(duplicateData, undefined, userId, isAdmin);
   }
 }

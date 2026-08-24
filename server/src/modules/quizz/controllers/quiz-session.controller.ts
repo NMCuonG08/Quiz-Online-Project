@@ -72,6 +72,7 @@ export class QuizSessionController {
 
   @Post()
   @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
   @ApiOperation({ summary: 'Start a quiz session' })
   async startSession(@Auth() auth: AuthDto, @Body() dto: CreateQuizSessionDto) {
     return this.quizSessionService.startSession(auth.user.id, dto);
@@ -150,9 +151,13 @@ export class QuizSessionController {
   }
 
   @Get(':sessionId/result')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
   @ApiOperation({ summary: 'Get session result' })
-  async getResult(@Param('sessionId') sessionId: string) {
-    return this.quizSessionService.getSessionResult(sessionId);
+  async getResult(@Param('sessionId') sessionId: string, @Auth() auth: AuthDto) {
+    return this.quizSessionService.getSessionResult(
+      sessionId, auth.user.id, auth.user.isAdmin,
+    );
   }
 
   @Delete(':sessionId')

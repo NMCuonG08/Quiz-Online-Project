@@ -12,9 +12,7 @@ import ScrollReveal from "../../../components/ScrollReveal";
 const Home = () => {
   return (
     <div className="w-full flex flex-col" style={{ overflow: "visible" }}>
-      <ScrollReveal animation="fadeInUp" delay={0} duration={800}>
-        <QuizSection />
-      </ScrollReveal>
+      <QuizSection />
 
       <ScrollReveal animation="fadeInUp" delay={200} duration={800}>
         <OffersSection />

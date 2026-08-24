@@ -10,6 +10,10 @@ build/
 coverage/
 .next/
 out/
+__pycache__/
+*.py[cod]
+.venv/
+ai-agent/evals/*.local.json
 
 # env & secrets
 .env

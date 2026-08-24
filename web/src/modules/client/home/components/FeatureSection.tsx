@@ -37,7 +37,6 @@ const FeatureSection = () => {
               alt={feature.title}
               width={100}
               height={100}
-              priority={index === 0}
               className="w-[100px] h-[100px] object-cover rounded-lg"
             />
           </div>

@@ -22,10 +22,6 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Debug Redis connection
-  console.log('Environment variables:');
-  console.log('REDIS_URL:', process.env.REDIS_URL);
-  console.log('REDIS_HOST:', process.env.REDIS_HOST);
-  console.log('REDIS_PORT:', process.env.REDIS_PORT);
 
   // Helper function to map validation errors to error codes
   const getValidationErrorCode = (error: any) => {

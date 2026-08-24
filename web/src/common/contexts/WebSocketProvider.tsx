@@ -4,7 +4,6 @@ import React, {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useCallback,
   ReactNode,
 } from "react";
@@ -79,37 +78,22 @@ export function WebSocketProvider({
   const dispatch = useAppDispatch();
   const websocketState = useAppSelector((state) => state.websocket);
   const authState = useAppSelector((state) => state.auth);
-  const hasInitialized = useRef(false);
 
   const { isConnected, isConnecting, error, reconnectAttempts } =
     websocketState;
 
   // Auto-connect when authenticated
   useEffect(() => {
-    if (!autoConnect || hasInitialized.current) return;
-
+    if (!autoConnect) return;
     if (authState.isAuthenticated && authState.token) {
-      hasInitialized.current = true;
       dispatch(initWebSocket());
     }
   }, [authState.isAuthenticated, authState.token, autoConnect, dispatch]);
-
-  // Reconnect when token changes
-  useEffect(() => {
-    if (
-      authState.isAuthenticated &&
-      authState.token &&
-      wsManager.getCurrentToken() !== authState.token
-    ) {
-      dispatch(forceReconnectWebSocket());
-    }
-  }, [authState.token, authState.isAuthenticated, dispatch]);
 
   // Disconnect on logout
   useEffect(() => {
     if (!authState.isAuthenticated) {
       wsManager.disconnect();
-      hasInitialized.current = false;
     }
   }, [authState.isAuthenticated]);
 

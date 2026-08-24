@@ -365,7 +365,7 @@ export class AuthService extends BaseService {
     const { adminRoute, sharedLinkRoute, uri } = metadata;
     const requestedPermission = metadata.permission ?? Permission.All;
 
-    if (!authDto.user && adminRoute) {
+    if (adminRoute && (!authDto.user || !authDto.user.isAdmin)) {
       this.logger.warn(`Denied access to admin only route: ${uri}`);
       throw new ForbiddenException('Forbidden');
     }

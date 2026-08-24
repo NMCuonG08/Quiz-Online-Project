@@ -176,7 +176,7 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.ActivityRead })
+  @Authenticated({ permission: false })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User logout' })
@@ -281,7 +281,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.ActivityRead })
+  @Authenticated({ permission: false })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user info' })
   @ApiResponse({
@@ -299,7 +299,7 @@ export class AuthController {
       },
     },
   })
-  @Authenticated({ permission: Permission.ActivityRead })
+  @Authenticated({ permission: false })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getCurrentUser(@Auth() auth: AuthDto) {
     return auth.user;

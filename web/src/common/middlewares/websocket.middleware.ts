@@ -14,9 +14,7 @@ import {
 } from "@/common/slices/websocket.slice";
 import { notificationReceived } from "@/common/slices/notification.slice";
 import {
-  loginUser,
   logout,
-  loginWithGoogleCode,
 } from "@/modules/auth/common/slices/authSlice";
 import type { NotificationData } from "@/common/types";
 import type { RootState } from "@/store";
@@ -25,8 +23,6 @@ export const websocketMiddleware = createListenerMiddleware();
 
 // Flag to prevent multiple listener setups
 let listenersSetup = false;
-// Flag to prevent multiple connection attempts
-let isConnecting = false;
 
 // Action creator để trigger WebSocket initialization
 export const initWebSocket = createAction("INIT_WEBSOCKET");
@@ -57,32 +53,6 @@ websocketMiddleware.startListening({
   },
 });
 
-// Listen for successful login actions
-websocketMiddleware.startListening({
-  actionCreator: loginUser.fulfilled,
-  effect: async (action, listenerApi) => {
-    const state = listenerApi.getState() as RootState;
-    const token = state.auth?.token;
-
-    if (token) {
-      wsManager.connect(token);
-    }
-  },
-});
-
-// Listen for Google login success
-websocketMiddleware.startListening({
-  actionCreator: loginWithGoogleCode.fulfilled,
-  effect: async (action, listenerApi) => {
-    const state = listenerApi.getState() as RootState;
-    const token = state.auth?.token;
-
-    if (token) {
-      wsManager.connect(token);
-    }
-  },
-});
-
 // Listen for force reconnect action
 websocketMiddleware.startListening({
   actionCreator: forceReconnectWebSocket,
@@ -92,26 +62,6 @@ websocketMiddleware.startListening({
 
     if (token) {
       wsManager.reconnectWithNewToken(token);
-    }
-  },
-});
-
-// Listen for auth state changes to trigger WebSocket reconnect
-websocketMiddleware.startListening({
-  predicate: (action) => {
-    return (
-      action.type === "auth/restoreAuth/fulfilled" ||
-      action.type === "auth/loginUser/fulfilled" ||
-      action.type === "auth/loginWithGoogleCode/fulfilled"
-    );
-  },
-  effect: async (action, listenerApi) => {
-    const state = listenerApi.getState() as RootState;
-    const token = state.auth?.token;
-    const isAuthenticated = state.auth?.isAuthenticated;
-
-    if (isAuthenticated && token && !wsManager.isConnected()) {
-      wsManager.connect(token);
     }
   },
 });
@@ -132,9 +82,15 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
   // Clear all existing listeners first to prevent duplicates
   wsManager.clearListeners();
 
+  wsManager.on("connecting", () => {
+    dispatch(connecting());
+  });
+
+  wsManager.on("reconnect_attempt", () => {
+    dispatch(reconnectAttempt());
+  });
+
   wsManager.on("connected", () => {
-    // WebSocket connected successfully
-    isConnecting = false; // Reset flag on successful connection
     dispatch(connected());
   });
 

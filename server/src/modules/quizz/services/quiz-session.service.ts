@@ -296,7 +296,7 @@ export class QuizSessionService extends BaseService {
     });
   }
 
-  async getSessionResult(sessionId: string) {
+  async getSessionResult(sessionId: string, userId?: string, isAdmin = false) {
     const attempt = await this.prisma.quizAttempt.findUnique({
       where: { id: sessionId },
       include: {
@@ -310,6 +310,9 @@ export class QuizSessionService extends BaseService {
     });
 
     if (!attempt) throw new NotFoundException('Session not found');
+    if (!isAdmin && attempt.user_id !== userId) {
+      throw new NotFoundException('Session not found');
+    }
 
     const totalQuestions = attempt.quiz?._count?.questions || 0;
     const correctAnswers = attempt.responses.filter((r) => r.is_correct).length;

@@ -84,7 +84,7 @@ export class QuizController {
 
   @Patch(':id')
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizRead })
+  @Authenticated({ permission: Permission.QuizUpdate })
   @ApiOperation({ summary: 'Update a quiz by id' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('thumbnail'))
@@ -103,7 +103,7 @@ export class QuizController {
     @UploadedFile() thumbnail?: Express.Multer.File,
   ): Promise<QuizResponseDto> {
     const creatorId = auth.user.id;
-    return await this.quizService.updateQuiz(id, quiz, creatorId, thumbnail);
+    return await this.quizService.updateQuiz(id, quiz, creatorId, thumbnail, auth.user.isAdmin);
   }
 
   @Get('category/:categoryId')
@@ -211,7 +211,7 @@ export class QuizController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('thumbnail'))
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizRead })
+  @Authenticated({ permission: Permission.QuizCreate })
   @ApiResponse({
     status: 201,
     description: 'Successfully created quiz',
@@ -233,13 +233,13 @@ export class QuizController {
 
   @Delete(':id')
   @UseGuards(AuthGuard)
-  @Authenticated({ permission: Permission.QuizRead })
+  @Authenticated({ permission: Permission.QuizDelete })
   @ApiResponse({
     status: 200,
     description: 'Successfully deleted quiz',
   })
   async deleteQuiz(@Param('id') id: string, @Auth() auth: AuthDto) {
     const creatorId = auth.user.id;
-    return this.quizService.remove(id, creatorId);
+    return this.quizService.remove(id, creatorId, auth.user.isAdmin);
   }
 }

@@ -208,12 +208,13 @@ export class QuizService extends BaseService {
     updateData: Record<string, any>,
     creatorId: string,
     thumbnail?: Express.Multer.File,
+    isAdmin = false,
   ): Promise<QuizResponseDto> {
     const existingQuiz = await this.quizRepository.findByIdRaw(id);
     if (!existingQuiz) {
       throw new NotFoundException('Quiz not found');
     }
-    if (existingQuiz.creator_id !== creatorId) {
+    if (!isAdmin && existingQuiz.creator_id !== creatorId) {
       throw new ForbiddenException(
         'You are not authorized to update this quiz',
       );
@@ -251,12 +252,12 @@ export class QuizService extends BaseService {
     return updated;
   }
 
-  async remove(id: string, creatorId: string) {
+  async remove(id: string, creatorId: string, isAdmin = false) {
     const existingQuiz = await this.quizRepository.findByIdRaw(id);
     if (!existingQuiz) {
       throw new NotFoundException('Quiz not found');
     }
-    if (existingQuiz.creator_id !== creatorId) {
+    if (!isAdmin && existingQuiz.creator_id !== creatorId) {
       throw new ForbiddenException(
         'You are not authorized to delete this quiz',
       );

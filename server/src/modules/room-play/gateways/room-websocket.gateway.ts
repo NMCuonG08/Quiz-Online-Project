@@ -6,15 +6,36 @@ import {
   ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
 import { RoomService } from '../services/room.service';
 import { EventRepository } from '@/common/repositories/event.repository';
 import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
+import { RedisService } from '@/infrastructure/cache/redis/redis.service';
+import { AuthService } from '@/modules/auth/services/auth.service';
 
 interface AuthenticatedSocket extends Socket {
   user?: AuthDto;
+}
+
+interface RoomScoreEntry {
+  userId: string;
+  username: string;
+  score: number;
+  correctAnswers: number;
+  timestamp: string;
+}
+
+interface RoomGameState {
+  roomId: string;
+  status: 'WAITING' | 'QUESTION' | 'FINISHED';
+  questionIndex: number;
+  questionId?: string;
+  deadline?: number;
+  version: number;
+  serverTime: number;
 }
 
 @Injectable()
@@ -24,7 +45,7 @@ interface AuthenticatedSocket extends Socket {
   transports: ['websocket'],
 })
 export class RoomWebSocketGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
   server: Server;
@@ -50,50 +71,94 @@ export class RoomWebSocketGateway
     string,
     Map<
       string,
-      {
-        userId: string;
-        username: string;
-        score: number;
-        correctAnswers: number;
-        timestamp: string;
-      }
+      RoomScoreEntry
     >
   > = new Map();
+  private readonly disconnectGraceMs = 5000;
+  private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+  private readonly gameTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly roomService: RoomService,
     private readonly eventRepository: EventRepository,
+    private readonly redisService: RedisService,
+    private readonly authService: AuthService,
   ) {}
+
+  afterInit(server: Server) {
+    server.use((socket: AuthenticatedSocket, next) => {
+      void this.authenticateClient(socket).then(() => next()).catch((error) => {
+        this.logger.warn(`Room socket authentication rejected: ${error instanceof Error ? error.message : String(error)}`);
+        next(new Error('Unauthorized'));
+      });
+    });
+  }
+
+  private async authenticateClient(client: AuthenticatedSocket): Promise<void> {
+    const token = client.handshake.auth?.token ||
+      client.handshake.headers?.authorization?.replace('Bearer ', '');
+    if (!token) throw new Error('No token provided');
+    const authDto = await this.authService.authenticate({
+      headers: {
+        authorization: `Bearer ${token}`,
+        cookie: client.handshake.headers.cookie || '',
+      },
+      queryParams: {},
+      metadata: {
+        sharedLinkRoute: false,
+        adminRoute: false,
+        permission: false,
+        uri: '/websocket/room',
+      },
+    });
+    client.user = authDto;
+    client.data.userId = authDto.user.id;
+    (client as any).token = token;
+  }
+
+  private async enforceSocketRateLimit(
+    client: AuthenticatedSocket,
+    event: string,
+    limit: number,
+    windowSeconds: number,
+  ): Promise<boolean> {
+    try {
+      const userId = this.extractUserIdFromToken(client);
+      const identity =
+        userId && userId !== 'temp-user-id' ? userId : `socket:${client.id}`;
+      const key = `ratelimit:ws:${event}:${identity}`;
+      const countRaw: number = await this.redisService.incrementWithTtl(
+        key,
+        windowSeconds,
+      );
+      const count = Number(countRaw);
+
+      if (count > limit) {
+        client.emit('rate_limit_exceeded', {
+          event,
+          limit,
+          windowSeconds,
+          message: `Too many ${event} requests. Please try again later.`,
+        });
+        this.logger.warn(
+          `🚫 WebSocket rate limit exceeded for ${identity} on ${event}: ${count}/${limit} in ${windowSeconds}s`,
+        );
+        return true;
+      }
+    } catch (error) {
+      // Fail-open to avoid blocking user flow when Redis has transient issues.
+      this.logger.warn(
+        `⚠️ Failed to evaluate socket rate limit for ${event}:`,
+        error,
+      );
+    }
+
+    return false;
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     this.logger.log(`🔌 Room WebSocket connected: ${client.id}`);
-
-    try {
-      // Get user from JWT token in handshake
-      const token =
-        client.handshake.auth?.token ||
-        client.handshake.headers?.authorization?.replace('Bearer ', '');
-      if (!token) {
-        this.logger.warn(`❌ No token provided for client: ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      // TODO: Verify JWT token and get user info
-      // For now, we'll assume authentication is handled elsewhere
-      this.logger.log(
-        `✅ Client ${client.id} authenticated with token: ${token.substring(0, 20)}...`,
-      );
-
-      // Store token in socket for later use
-      (client as any).token = token;
-    } catch (error) {
-      this.logger.error(
-        `❌ Authentication failed for client ${client.id}:`,
-        error,
-      );
-      client.disconnect();
-    }
+    this.logger.log(`✅ Room socket authenticated: ${client.id}`);
   }
 
   async handleDisconnect(client: AuthenticatedSocket) {
@@ -121,59 +186,10 @@ export class RoomWebSocketGateway
         joinedRooms,
       );
 
-      // Process each room the user was in
+      // Delay DB leave so short network drops/reconnects do not flap presence.
       for (const socketRoom of joinedRooms) {
         const roomId = socketRoom.replace(roomPrefix, '');
-
-        if (!roomId) {
-          this.logger.warn(
-            `⚠️ Invalid room format: ${socketRoom} for client ${client.id}`,
-          );
-          continue;
-        }
-
-        try {
-          this.logger.log(
-            `🔄 Processing disconnect for user ${userId} from room ${roomId}`,
-          );
-
-          // Leave room via service (update database)
-          await this.roomService.leaveRoomViaWebSocket(userId, roomId);
-
-          // Notify other participants in the room
-          this.server.to(socketRoom).emit('user_left', {
-            userId,
-            roomId,
-            message: `User left the room`,
-          });
-
-          this.logger.log(
-            `📢 Notified room ${socketRoom} about participant leaving`,
-          );
-
-          // Broadcast updated participants list to the room
-          try {
-            const participants = await this.roomService.getParticipants(roomId);
-            this.server.to(socketRoom).emit('participants_list', {
-              roomId,
-              participants: participants.participants,
-            });
-            this.logger.log(
-              `👥 Broadcasted participants_list to ${socketRoom} (${participants.participants.length} users)`,
-            );
-          } catch (err) {
-            this.logger.warn(
-              `⚠️ Failed to broadcast participants_list after disconnect:`,
-              err,
-            );
-          }
-        } catch (error) {
-          this.logger.error(
-            `❌ Failed to process disconnect for room ${roomId}:`,
-            error,
-          );
-          // Continue processing other rooms even if one fails
-        }
+        if (roomId) this.scheduleDisconnectCleanup(userId, roomId);
       }
 
       this.logger.log(
@@ -190,60 +206,147 @@ export class RoomWebSocketGateway
   }
 
   private extractUserIdFromToken(client: AuthenticatedSocket): string {
-    // 1) Try decode token first (most reliable)
-    try {
-      const token = (client as any).token;
-      if (token) {
-        const payload = JSON.parse(
-          Buffer.from(token.split('.')[1], 'base64').toString(),
-        );
-        const userId = payload.sub || payload.userId || payload.id;
-        if (userId) {
-          this.logger.log(
-            `✅ Extracted user ID from token: ${userId} for client ${client.id}`,
-          );
-          return userId;
-        }
-        this.logger.warn(
-          `❌ No user ID fields (sub/userId/id) in token for client ${client.id}`,
-        );
-      } else {
-        this.logger.warn(`❌ No token found for client ${client.id}`);
-      }
-    } catch (error) {
-      this.logger.warn(
-        `⚠️ Failed to decode token for client ${client.id}, fallback to rooms`,
-        error,
-      );
-    }
+    const authenticatedUserId = client.user?.user?.id || client.data?.userId;
+    if (!authenticatedUserId) throw new Error('Socket is not authenticated');
+    return String(authenticatedUserId);
+  }
 
-    // 2) Fallback: derive from joined rooms. Rooms may have prefix "room:".
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const candidate = Array.from(client.rooms).find((r) => {
-      const trimmed = r.startsWith('room:') ? r.slice(5) : r;
-      return uuidRegex.test(trimmed);
+  private disconnectKey(userId: string, roomId: string): string {
+    return `${userId}:${roomId}`;
+  }
+
+  private cancelDisconnectCleanup(userId: string, roomId: string): void {
+    const key = this.disconnectKey(userId, roomId);
+    const timer = this.disconnectTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.disconnectTimers.delete(key);
+  }
+
+  private scheduleDisconnectCleanup(userId: string, roomId: string): void {
+    this.cancelDisconnectCleanup(userId, roomId);
+    const key = this.disconnectKey(userId, roomId);
+    const timer = setTimeout(() => {
+      void this.finalizeDisconnect(userId, roomId)
+        .catch((error) => {
+          this.logger.warn(`Disconnect cleanup skipped for room ${roomId}: ${error instanceof Error ? error.message : String(error)}`);
+        })
+        .finally(() => {
+          this.disconnectTimers.delete(key);
+        });
+    }, this.disconnectGraceMs);
+    this.disconnectTimers.set(key, timer);
+  }
+
+  private async finalizeDisconnect(userId: string, roomId: string): Promise<void> {
+    const socketRoom = `room:${roomId}`;
+    const sockets = await this.server.in(socketRoom).fetchSockets();
+    if (sockets.some((socket) => String(socket.data?.userId || '') === userId)) {
+      return;
+    }
+    await this.roomService.leaveRoomViaWebSocket(userId, roomId);
+    this.server.to(socketRoom).emit('user_left', { userId, roomId, message: 'User left the room' });
+    await this.broadcastParticipants(roomId);
+  }
+
+  private async broadcastParticipants(roomId: string): Promise<void> {
+    const participants = await this.roomService.getParticipants(roomId);
+    const revision = await this.nextRoomRevision(roomId);
+    this.server.to(`room:${roomId}`).emit('participants_list', {
+      roomId,
+      participants: participants.participants,
+      revision,
     });
-    if (candidate) {
-      const trimmed = candidate.startsWith('room:')
-        ? candidate.slice(5)
-        : candidate;
-      this.logger.log(
-        `✅ Derived user ID from client rooms: ${trimmed} for ${client.id}`,
-      );
-      return trimmed;
-    }
+  }
 
-    // 3) Last resort
-    this.logger.warn(
-      `❌ Unable to derive user ID for client ${client.id}; using temp-user-id`,
+  private async nextRoomRevision(roomId: string): Promise<number> {
+    try {
+      return await this.redisService.incrementWithTtl(`room:${roomId}:revision`, 86400);
+    } catch {
+      return Date.now();
+    }
+  }
+
+  private async currentRoomRevision(roomId: string): Promise<number> {
+    try {
+      return Number(await this.redisService.get<number>(`room:${roomId}:revision`)) || 0;
+    } catch {
+      return Date.now();
+    }
+  }
+
+  private async getGameState(roomId: string): Promise<RoomGameState | null> {
+    return this.redisService.get<RoomGameState>(`room:${roomId}:game`);
+  }
+
+  private async setGameState(state: RoomGameState): Promise<void> {
+    await this.redisService.set(`room:${state.roomId}:game`, state, 21600);
+    await this.roomService.persistGameSnapshot(state.roomId, state as unknown as Record<string, unknown>);
+  }
+
+  private async nextGameRevision(roomId: string): Promise<number> {
+    return this.redisService.incrementWithTtl(`room:${roomId}:game:revision`, 21600);
+  }
+
+  private emitGameState(state: RoomGameState, client?: AuthenticatedSocket): void {
+    const payload = { ...state, serverTime: Date.now() };
+    if (client) client.emit('game_state', payload);
+    else this.server.to(`room:${state.roomId}`).emit('game_state', payload);
+  }
+
+  private scheduleGameAdvance(state: RoomGameState): void {
+    const current = this.gameTimers.get(state.roomId);
+    if (current) clearTimeout(current);
+    if (state.status !== 'QUESTION' || !state.deadline) return;
+    const timer = setTimeout(() => {
+      void this.advanceGameState(state.roomId, state.version).catch((error) => {
+        this.logger.error(`Scheduled game advance failed for room ${state.roomId}: ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }, Math.max(0, state.deadline - Date.now()) + 25);
+    this.gameTimers.set(state.roomId, timer);
+  }
+
+  private async advanceGameState(roomId: string, expectedVersion: number): Promise<RoomGameState | null> {
+    const state = await this.getGameState(roomId);
+    if (!state || state.status !== 'QUESTION' || state.version !== expectedVersion) return state;
+    const lock = await this.redisService.setIfAbsent(
+      `room:${roomId}:game:advance:${expectedVersion}`, '1', 300,
     );
-    return 'temp-user-id';
+    if (!lock) return this.getGameState(roomId);
+    const nextIndex = state.questionIndex + 1;
+    const question = await this.roomService.getNextQuestion(roomId, nextIndex);
+    const version = await this.nextGameRevision(roomId);
+    if (!question) {
+      const room = await this.roomService.getRoom(roomId);
+      const finalLeaderboard = await this.redisService.hashValuesJson<RoomScoreEntry>(
+        `room:${roomId}:scores`,
+      );
+      await this.roomService.persistFinalLeaderboard(roomId, finalLeaderboard);
+      await this.roomService.endGame(roomId, room.owner_id);
+      const finished: RoomGameState = {
+        roomId, status: 'FINISHED', questionIndex: state.questionIndex,
+        version, serverTime: Date.now(),
+      };
+      await this.setGameState(finished);
+      this.emitGameState(finished);
+      return finished;
+    }
+    const nextState: RoomGameState = {
+      roomId, status: 'QUESTION', questionIndex: nextIndex,
+      questionId: question.questionId,
+      deadline: Date.now() + Number(question.timeLimit || 30) * 1000,
+      version, serverTime: Date.now(),
+    };
+    await this.setGameState(nextState);
+    this.emitGameState(nextState);
+    this.scheduleGameAdvance(nextState);
+    return nextState;
   }
 
   private extractUsernameFromToken(
     client: AuthenticatedSocket,
   ): string | undefined {
+    const user = client.user?.user;
+    if (user) return user.name || user.email || undefined;
     try {
       const token = (client as any).token;
       if (!token) return undefined;
@@ -265,6 +368,16 @@ export class RoomWebSocketGateway
   ) {
     this.logger.log(`🏠 Join room request from ${client.id}:`, data);
 
+    const isLimited = await this.enforceSocketRateLimit(
+      client,
+      'join_room',
+      20,
+      60,
+    );
+    if (isLimited) {
+      return;
+    }
+
     try {
       if (!data.roomId) {
         this.logger.warn(`❌ No roomId provided by client ${client.id}`);
@@ -274,6 +387,7 @@ export class RoomWebSocketGateway
 
       // Extract user ID from JWT token
       const userId = this.extractUserIdFromToken(client);
+      this.cancelDisconnectCleanup(userId, data.roomId);
 
       this.logger.log(
         `🔄 Attempting to join room ${data.roomId} for user ${userId}`,
@@ -313,23 +427,11 @@ export class RoomWebSocketGateway
         `📢 Notified room ${result.socket_room} about new participant`,
       );
 
-      // Broadcast updated participants list to the room
-      try {
-        const participants = await this.roomService.getParticipants(
-          result.room_id,
-        );
-        this.server.to(result.socket_room).emit('participants_list', {
-          roomId: result.room_id,
-          participants: participants.participants,
-        });
-        this.logger.log(
-          `👥 Broadcasted participants_list to ${result.socket_room} (${participants.participants.length} users)`,
-        );
-      } catch (err) {
-        this.logger.warn(
-          `⚠️ Failed to broadcast participants_list after join:`,
-          err,
-        );
+      await this.broadcastParticipants(result.room_id);
+      const gameState = await this.getGameState(result.room_id);
+      if (gameState) {
+        this.emitGameState(gameState, client);
+        this.scheduleGameAdvance(gameState);
       }
     } catch (error) {
       this.logger.error(
@@ -359,13 +461,11 @@ export class RoomWebSocketGateway
 
       // Extract user ID from JWT token
       const userId = this.extractUserIdFromToken(client);
+      this.cancelDisconnectCleanup(userId, data.roomId);
 
       this.logger.log(
         `🔄 Attempting to leave room ${data.roomId} for user ${userId}`,
       );
-
-      // Leave room via service
-      await this.roomService.leaveRoomViaWebSocket(userId, data.roomId);
 
       // Leave socket from room
       const socketRoom = `room:${data.roomId}`;
@@ -389,6 +489,13 @@ export class RoomWebSocketGateway
         message: `Successfully left room`,
       });
 
+      const remainingSockets = await this.server.in(socketRoom).fetchSockets();
+      if (remainingSockets.some((socket) => String(socket.data?.userId || '') === userId)) {
+        return;
+      }
+
+      await this.roomService.leaveRoomViaWebSocket(userId, data.roomId);
+
       // Notify other participants in the room
       client.to(socketRoom).emit('user_left', {
         userId,
@@ -400,24 +507,7 @@ export class RoomWebSocketGateway
         `📢 Notified room ${socketRoom} about participant leaving`,
       );
 
-      // Broadcast updated participants list to the room
-      try {
-        const participants = await this.roomService.getParticipants(
-          data.roomId,
-        );
-        this.server.to(socketRoom).emit('participants_list', {
-          roomId: data.roomId,
-          participants: participants.participants,
-        });
-        this.logger.log(
-          `👥 Broadcasted participants_list to ${socketRoom} (${participants.participants.length} users)`,
-        );
-      } catch (err) {
-        this.logger.warn(
-          `⚠️ Failed to broadcast participants_list after leave:`,
-          err,
-        );
-      }
+      await this.broadcastParticipants(data.roomId);
     } catch (error) {
       this.logger.error(
         `❌ Failed to leave room for client ${client.id}:`,
@@ -449,14 +539,11 @@ export class RoomWebSocketGateway
         `✅ Found ${participants.participants.length} participants in room ${data.roomId}`,
       );
 
-      // Log chi tiết participants
-      this.logger.log(`👥 Participants details:`, participants.participants);
-      this.logger.log(`🔌 Live sockets:`, participants.live_sockets);
-
       // Send participants list to client
       client.emit('participants_list', {
         roomId: data.roomId,
         participants: participants.participants,
+        revision: await this.currentRoomRevision(data.roomId),
       });
     } catch (error) {
       this.logger.error(
@@ -472,6 +559,16 @@ export class RoomWebSocketGateway
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     this.logger.log(`💬 Send message request from ${client.id}:`, data);
+
+    const isLimited = await this.enforceSocketRateLimit(
+      client,
+      'send_message',
+      40,
+      60,
+    );
+    if (isLimited) {
+      return;
+    }
 
     try {
       if (!data.roomId || !data.message) {
@@ -522,11 +619,16 @@ export class RoomWebSocketGateway
 
       // Broadcast message to all clients in the room
       const socketRoom = `room:${data.roomId}`;
-      // Store in-memory
-      if (!this.roomMessages.has(data.roomId)) {
-        this.roomMessages.set(data.roomId, []);
+      try {
+        await this.redisService.listPushJson(
+          `room:${data.roomId}:messages`, messageData, 200, 86400,
+        );
+      } catch {
+        if (!this.roomMessages.has(data.roomId)) this.roomMessages.set(data.roomId, []);
+        const fallback = this.roomMessages.get(data.roomId)!;
+        fallback.push(messageData);
+        if (fallback.length > 200) fallback.splice(0, fallback.length - 200);
       }
-      this.roomMessages.get(data.roomId)!.push(messageData);
       this.server.to(socketRoom).emit('room_message', messageData);
 
       this.logger.log(`✅ Message broadcasted to room ${socketRoom}`);
@@ -551,8 +653,14 @@ export class RoomWebSocketGateway
         return;
       }
 
-      // Return in-memory messages for now
-      const messages = this.roomMessages.get(data.roomId) || [];
+      let messages;
+      try {
+        messages = await this.redisService.listRangeJson(
+          `room:${data.roomId}:messages`, 0, -1,
+        );
+      } catch {
+        messages = this.roomMessages.get(data.roomId) || [];
+      }
 
       this.logger.log(
         `📨 Sending ${messages.length} messages to client ${client.id}`,
@@ -644,53 +752,147 @@ export class RoomWebSocketGateway
     }
   }
 
+  @SubscribeMessage('start_game')
+  async handleStartGame(
+    @MessageBody() data: { roomId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    try {
+      const userId = this.extractUserIdFromToken(client);
+      const room = await this.roomService.getRoom(data.roomId);
+      if (room.owner_id !== userId) throw new Error('Only room owner can start the game');
+      const existing = await this.getGameState(data.roomId);
+      if (existing?.status === 'QUESTION' || existing?.status === 'FINISHED') {
+        this.emitGameState(existing, client);
+        return;
+      }
+      await this.roomService.startGame(data.roomId, userId);
+      const question = await this.roomService.getNextQuestion(data.roomId, 0);
+      if (!question) throw new Error('Quiz has no questions');
+      const state: RoomGameState = {
+        roomId: data.roomId,
+        status: 'QUESTION',
+        questionIndex: 0,
+        questionId: question.questionId,
+        deadline: Date.now() + Number(question.timeLimit || 30) * 1000,
+        version: await this.nextGameRevision(data.roomId),
+        serverTime: Date.now(),
+      };
+      await this.setGameState(state);
+      this.emitGameState(state);
+      this.scheduleGameAdvance(state);
+    } catch (error) {
+      client.emit('game_error', { error: error instanceof Error ? error.message : 'Failed to start game' });
+    }
+  }
+
+  @SubscribeMessage('get_game_state')
+  async handleGetGameState(
+    @MessageBody() data: { roomId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    try {
+      let state = await this.getGameState(data.roomId);
+      if (state?.status === 'QUESTION' && state.deadline && state.deadline <= Date.now()) {
+        state = await this.advanceGameState(data.roomId, state.version);
+      }
+      if (!state) {
+        const room = await this.roomService.getRoom(data.roomId);
+        const settings = room.settings && typeof room.settings === 'object' && !Array.isArray(room.settings)
+          ? room.settings as Record<string, unknown>
+          : {};
+        const persisted = settings.gameSnapshot as RoomGameState | undefined;
+        state = persisted || {
+          roomId: data.roomId,
+          status: room.status === 'CLOSED' ? 'FINISHED' : 'WAITING',
+          questionIndex: 0, version: 0, serverTime: Date.now(),
+        };
+      }
+      this.emitGameState(state, client);
+    } catch (error) {
+      client.emit('game_error', { error: error instanceof Error ? error.message : 'Failed to load game state' });
+    }
+  }
+
+  @SubscribeMessage('advance_question')
+  async handleAdvanceQuestion(
+    @MessageBody() data: { roomId: string; expectedVersion: number },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    try {
+      const userId = this.extractUserIdFromToken(client);
+      const room = await this.roomService.getRoom(data.roomId);
+      if (room.owner_id !== userId) throw new Error('Only room owner can advance questions');
+      await this.advanceGameState(data.roomId, Number(data.expectedVersion));
+    } catch (error) {
+      client.emit('game_error', { error: error instanceof Error ? error.message : 'Failed to advance question' });
+    }
+  }
+
+  @SubscribeMessage('submit_answer')
+  async handleSubmitAnswer(
+    @MessageBody() data: {
+      roomId: string;
+      questionId: string;
+      selectedOptionId?: string;
+      selectedOptionIds?: string[];
+      timeSpent?: number;
+      commandId: string;
+    },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    try {
+      if (!data.roomId || !data.questionId || !data.commandId) {
+        client.emit('answer_error', { error: 'roomId, questionId and commandId are required' });
+        return;
+      }
+      const userId = this.extractUserIdFromToken(client);
+      const firstExecution = await this.redisService.setIfAbsent(
+        `room:${data.roomId}:answer:${userId}:${data.commandId}`, '1', 21600,
+      );
+      if (!firstExecution) {
+        client.emit('answer_result', { commandId: data.commandId, questionId: data.questionId, duplicate: true });
+        return;
+      }
+      const answer = data.selectedOptionIds?.length
+        ? data.selectedOptionIds
+        : data.selectedOptionId || '';
+      const result = await this.roomService.submitAnswer(
+        userId, data.roomId, data.questionId, answer, data.timeSpent || 0,
+      );
+      const username = this.extractUsernameFromToken(client) || 'Unknown';
+      const scoreKey = `room:${data.roomId}:scores`;
+      const leaderboard = await this.redisService.hashValuesJson<RoomScoreEntry>(scoreKey);
+      const previous = leaderboard.find((entry) => entry.userId === userId);
+      const updateData = {
+        userId,
+        username,
+        score: Number(previous?.score || 0) + result.points,
+        correctAnswers: Number(previous?.correctAnswers || 0) + (result.isCorrect ? 1 : 0),
+        timestamp: new Date().toISOString(),
+      };
+      await this.redisService.hashSetJson(scoreKey, userId, updateData, 21600);
+      const updatedLeaderboard = await this.redisService.hashValuesJson(scoreKey);
+      client.emit('answer_result', { commandId: data.commandId, questionId: data.questionId, ...result });
+      this.server.to(`room:${data.roomId}`).emit('score_updated', updateData);
+      this.server.to(`room:${data.roomId}`).emit('leaderboard_update', updatedLeaderboard);
+    } catch (error) {
+      client.emit('answer_error', {
+        commandId: data.commandId,
+        error: error instanceof Error ? error.message : 'Failed to submit answer',
+      });
+    }
+  }
+
   @SubscribeMessage('update_score')
   async handleUpdateScore(
     @MessageBody() data: { roomId: string; score: number; correctAnswers: number },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
-    this.logger.log(`📈 Update score request from ${client.id}:`, data);
-
-    try {
-      if (!data.roomId) {
-        this.logger.warn(`❌ No roomId provided by client ${client.id}`);
-        return;
-      }
-
-      const userId = this.extractUserIdFromToken(client);
-      const username = this.extractUsernameFromToken(client) || 'Unknown';
-
-      const updateData = {
-        userId,
-        username,
-        score: data.score,
-        correctAnswers: data.correctAnswers,
-        timestamp: new Date().toISOString(),
-      };
-
-      // Save in memory
-      if (!this.roomScores.has(data.roomId)) {
-        this.roomScores.set(data.roomId, new Map());
-      }
-      this.roomScores.get(data.roomId)!.set(userId, updateData);
-
-      const socketRoom = `room:${data.roomId}`;
-      // Broadcast single score update
-      this.server.to(socketRoom).emit('score_updated', updateData);
-
-      // Also broadcast full leaderboard update
-      const fullLeaderboard = Array.from(
-        this.roomScores.get(data.roomId)!.values(),
-      );
-      this.server.to(socketRoom).emit('leaderboard_update', fullLeaderboard);
-
-      this.logger.log(`✅ Score and Leaderboard broadcasted to room ${socketRoom}`);
-    } catch (error) {
-      this.logger.error(
-        `❌ Failed to update score for client ${client.id}:`,
-        error,
-      );
-    }
+    void data;
+    client.emit('score_update_rejected', {
+      error: 'Client-controlled score updates are disabled. Use submit_answer.',
+    });
   }
 
   @SubscribeMessage('get_leaderboard')
@@ -703,9 +905,16 @@ export class RoomWebSocketGateway
     try {
       if (!data.roomId) return;
       
-      const leaderboard = this.roomScores.has(data.roomId)
-        ? Array.from(this.roomScores.get(data.roomId)!.values())
-        : [];
+      let leaderboard;
+      try {
+        leaderboard = await this.redisService.hashValuesJson(
+          `room:${data.roomId}:scores`,
+        );
+      } catch {
+        leaderboard = this.roomScores.has(data.roomId)
+          ? Array.from(this.roomScores.get(data.roomId)!.values())
+          : [];
+      }
         
       client.emit('leaderboard_update', leaderboard);
     } catch (error) {

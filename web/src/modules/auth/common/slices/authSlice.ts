@@ -8,6 +8,7 @@ interface User {
   email: string;
   avatarUrl?: string;
   isPremium?: boolean;
+  isAdmin?: boolean;
 }
 
 interface AuthState {

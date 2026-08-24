@@ -5,9 +5,9 @@ import rootReducer from "./rootReducer";
 import { websocketMiddleware } from "@/common/middlewares/websocket.middleware";
 // Main persist config - auth persistence is handled in rootReducer
 const persistConfig = {
-  key: "root",
+  key: "root-v2",
   storage,
-  whitelist: ["auth", "quiz", "question", "category", "quizPlay"], // Persist these slices
+  whitelist: ["auth"],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

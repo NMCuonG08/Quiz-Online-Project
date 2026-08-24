@@ -1,9 +1,10 @@
 import { io, Socket } from "socket.io-client";
-import { BehaviorSubject, Subject, Observable, of, timer, fromEvent, merge } from "rxjs";
-import { switchMap, retry, tap, map, distinctUntilChanged, catchError, takeUntil, filter, share } from "rxjs/operators";
-import type { ServerEventMap, ClientEventMap } from "@/common/types/websocket-event.type";
+import { BehaviorSubject, Subject, Observable, of } from "rxjs";
+import { switchMap, distinctUntilChanged, takeUntil } from "rxjs/operators";
+import type { ServerEventMap } from "@/common/types/websocket-event.type";
 
 class WebSocketManager {
+  private static readonly MAX_PENDING_EMITS = 100;
   private socket: Socket | null = null;
   private eventCallbacks = new Map<string, ((...args: unknown[]) => void)[]>();
   
@@ -22,6 +23,53 @@ class WebSocketManager {
     Set<(payload: { roomId: string; participants: unknown[] }) => void>
   >();
   private pendingEmits: Array<{ event: string; args: unknown[] }> = [];
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private getRoomIdFromArgs(args: unknown[]): string | null {
+    const payload = args[0] as { roomId?: unknown } | undefined;
+    if (!payload || typeof payload.roomId !== "string") {
+      return null;
+    }
+    return payload.roomId;
+  }
+
+  private enqueueEmit(event: string, args: unknown[]): void {
+    const roomId = this.getRoomIdFromArgs(args);
+
+    if (!roomId) {
+      if (this.pendingEmits.length >= WebSocketManager.MAX_PENDING_EMITS) {
+        this.pendingEmits.shift();
+      }
+      this.pendingEmits.push({ event, args });
+      return;
+    }
+
+    // Keep only the latest event per room for high-frequency room-scoped events.
+    if (
+      event === "join_room" ||
+      event === "leave_room" ||
+      event === "get_participants" ||
+      event === "get_messages"
+    ) {
+      this.pendingEmits = this.pendingEmits.filter((item) => {
+        const pendingRoomId = this.getRoomIdFromArgs(item.args);
+        if (pendingRoomId !== roomId) {
+          return true;
+        }
+
+        if (event === "leave_room") {
+          return !(item.event === "join_room" || item.event === "get_participants" || item.event === "get_messages");
+        }
+
+        return item.event !== event;
+      });
+    }
+
+    if (this.pendingEmits.length >= WebSocketManager.MAX_PENDING_EMITS) {
+      this.pendingEmits.shift();
+    }
+    this.pendingEmits.push({ event, args });
+  }
 
   constructor() {
     this.setupAutoConnection();
@@ -37,8 +85,9 @@ class WebSocketManager {
         }
 
         return new Observable<Socket>(observer => {
-          console.log("🔌 Attempting WebSocket connection with RxJS...");
+          console.log("🔌 Attempting WebSocket connection...");
           this.statusSubject$.next('connecting');
+          this.emit("connecting");
 
           const socket = io(
             process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3333",
@@ -46,15 +95,25 @@ class WebSocketManager {
               auth: { token },
               transports: ["websocket"],
               path: "/api/socket.io",
-              reconnection: false, // Let RxJS handle reconnection logic
+              reconnection: true,
+              reconnectionAttempts: Infinity,
+              reconnectionDelay: 1000,
+              reconnectionDelayMax: 30000,
+              randomizationFactor: 0.5,
+              timeout: 10000,
             }
           );
 
           socket.on("connect", () => {
-            console.log("✅ WebSocket connected via RxJS");
+            console.log("✅ WebSocket connected");
             this.socket = socket;
             this.socketSubject$.next(socket);
             this.statusSubject$.next('connected');
+            this.emit("connected");
+            if (this.reconnectTimer) {
+              clearTimeout(this.reconnectTimer);
+              this.reconnectTimer = null;
+            }
             
             // Handle post-connection logic
             this.handlePostConnect();
@@ -65,25 +124,25 @@ class WebSocketManager {
           socket.on("disconnect", (reason) => {
             console.log("🔌 WebSocket disconnected:", reason);
             this.statusSubject$.next('disconnected');
+            this.emit("disconnected", reason);
             this.socket = null;
             this.socketSubject$.next(null);
 
-            if (reason === "io client disconnect" || reason === "transport close") {
-              // Intentional or normal close
-              if (this.tokenSubject$.value) {
-                observer.error(new Error(reason)); // Trigger retry if we still have a token
-              } else {
-                observer.complete();
-              }
-            } else {
-              observer.error(new Error(reason));
-            }
+            if (!this.tokenSubject$.value) observer.complete();
           });
 
           socket.on("connect_error", (error) => {
             console.error("🚨 WebSocket connection error:", error.message);
             this.statusSubject$.next('error');
-            observer.error(error);
+            this.emit("error", error);
+          });
+
+          socket.io.on("reconnect_attempt", (attempt) => {
+            this.statusSubject$.next('connecting');
+            this.emit("reconnect_attempt", attempt);
+          });
+          socket.io.on("reconnect", () => {
+            this.statusSubject$.next('connected');
           });
 
           // Register all listeners from eventCallbacks
@@ -95,25 +154,17 @@ class WebSocketManager {
             this.socket = null;
             this.socketSubject$.next(null);
           };
-        }).pipe(
-          retry({
-            delay: (error, retryCount) => {
-              const delayTime = Math.min(Math.pow(2, retryCount - 1) * 1000, 30000);
-              console.log(`⏳ Reconnecting in ${delayTime}ms (attempt ${retryCount})...`);
-              return timer(delayTime);
-            }
-          }),
-          catchError(err => {
-            console.error("❌ Max retries reached or fatal error:", err);
-            return of(null);
-          })
-        );
+        });
       }),
       takeUntil(this.destroy$)
     ).subscribe();
   }
 
   private cleanupSocket() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -170,12 +221,25 @@ class WebSocketManager {
           this.participantsRoomHandlers.get(roomId)!.forEach(cb => cb(payload));
         }
       });
+      s.on("score_updated", (payload) => this.emit("score_updated", payload));
+      s.on("leaderboard_update", (payload) => this.emit("leaderboard_update", payload));
+      s.on("answer_result", (payload) => this.emit("answer_result", payload));
+      s.on("answer_error", (payload) => this.emit("answer_error", payload));
+      s.on("score_update_rejected", (payload) => this.emit("score_update_rejected", payload));
+      s.on("game_state", (payload) => this.emit("game_state", payload));
+      s.on("game_error", (payload) => this.emit("game_error", payload));
     };
 
     setupCommonListeners(socket);
   }
 
   async connect(token: string): Promise<void> {
+    if (this.tokenSubject$.value === token) {
+      if (this.socket && !this.socket.connected && !this.socket.active) {
+        this.socket.connect();
+      }
+      return;
+    }
     this.tokenSubject$.next(token);
   }
 
@@ -222,9 +286,7 @@ class WebSocketManager {
       return;
     }
     // Queue emit until connection is available
-    this.pendingEmits.push({ event: event as string, args });
-    // Try to reconnect soon
-    this.scheduleReconnect(100);
+    this.enqueueEmit(event as string, args as unknown[]);
   }
 
   isConnected(): boolean {
@@ -241,6 +303,8 @@ class WebSocketManager {
 
   // Method để force reconnect với token mới
   async reconnectWithNewToken(token: string): Promise<void> {
+    // Force a stream transition even when token value is unchanged.
+    this.tokenSubject$.next(null);
     this.tokenSubject$.next(token);
   }
 
@@ -255,13 +319,29 @@ class WebSocketManager {
 
   // RxJS handles reconnection now
   scheduleReconnect(delay: number = 3000): void {
-    // This is now managed by the retry logic in setupAutoConnection
+    const token = this.tokenSubject$.value;
+    if (!token || this.isConnected() || this.getIsConnecting()) {
+      return;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    this.reconnectTimer = setTimeout(() => {
+      if (this.socket && !this.socket.connected) {
+        this.socket.connect();
+      } else if (!this.socket) {
+        this.reconnectWithNewToken(token).catch((err) => {
+          console.error("❌ Forced reconnect failed:", err);
+        });
+      }
+    }, delay);
   }
 
   // Debug method để kiểm tra trạng thái
   getDebugInfo() {
     return {
       isConnected: this.isConnected(),
+      isConnecting: this.getIsConnecting(),
       status: this.statusSubject$.value,
       currentToken: this.tokenSubject$.value,
       hasListeners: this.hasListeners(),

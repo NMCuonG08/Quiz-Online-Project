@@ -11,14 +11,23 @@ import { GameQuizAnswer } from "../types/game-quiz.types";
 import { Leaderboard } from "../components/Leaderboard";
 import { useWebSocketState } from "@/common/hooks/useWebSocket";
 import { wsManager } from "@/lib/websocket";
-import { Trophy, Home } from "lucide-react";
+import { Home } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
+import type { RoomGameStatePayload } from "@/common/types/websocket-event.type";
 
 interface GameQuizPageProps {
   questions: Question[];
   roomCode?: string;
   onExit?: () => void;
+}
+
+interface LeaderboardScore {
+  userId: string;
+  username: string;
+  score: number;
+  correctAnswers: number;
+  timestamp?: string;
 }
 
 const GameQuizPage: React.FC<GameQuizPageProps> = ({
@@ -32,9 +41,11 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
   const roomId = params?.id as string;
   const quizId = (params?.quizId as string) || "";
 
-  const [leaderboard, setLeaderboard] = useState<Map<string, any>>(new Map());
+  const [leaderboard, setLeaderboard] = useState<Map<string, LeaderboardScore>>(new Map());
+  const [gameVersion, setGameVersion] = useState(0);
   const { isConnected } = useWebSocketState();
   const user = useSelector((state: RootState) => state.auth.user);
+  const roomData = useSelector((state: RootState) => state.roomQuiz.data);
   const currentUserId = user?.id;
 
   const {
@@ -52,25 +63,32 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     hasSelectedAnswer,
     isLastQuestion,
     selectedAnswers,
-    startGame,
     selectAnswer,
     submitAnswer,
-    nextQuestion,
+    applyAnswerResult,
+    syncGameState,
   } = useGameQuiz({
     roomId: roomId || "",
     quizId,
     questions,
     onAnswerSubmit: (answer: GameQuizAnswer) => {
-      // Periodic score update if we wanted live leaderboard
+      if (roomId) {
+        wsManager.send("submit_answer", {
+          roomId,
+          questionId: answer.questionId,
+          selectedOptionId: answer.selectedOptionId,
+          selectedOptionIds: answer.selectedOptionIds,
+          timeSpent: answer.timeSpent,
+          commandId: typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${answer.questionId}-${answer.answeredAt.getTime()}`,
+        });
+      }
     },
     onGameEnd: (finalScore: number) => {
       console.log("Game ended with score:", finalScore);
-      if (wsManager.isConnected() && roomId) {
-        wsManager.send("update_score", { 
-          roomId, 
-          score: finalScore, 
-          correctAnswers: correctAnswersCount 
-        });
+      if (roomId) {
+        wsManager.send("get_leaderboard", { roomId });
       }
     },
   });
@@ -79,7 +97,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
   useEffect(() => {
     if (!isConnected) return;
 
-    const handleScoreUpdate = (data: any) => {
+    const handleScoreUpdate = (data: LeaderboardScore) => {
       setLeaderboard((prev) => {
         const next = new Map(prev);
         next.set(data.userId, data);
@@ -87,7 +105,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
       });
     };
 
-    const handleLeaderboardUpdate = (list: any[]) => {
+    const handleLeaderboardUpdate = (list: LeaderboardScore[]) => {
       console.log("🏆 Leaderboard update received:", list);
       setLeaderboard((prev) => {
         const next = new Map(prev);
@@ -96,8 +114,21 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
       });
     };
 
+    const handleAnswerResult = (result: {
+      questionId: string; isCorrect?: boolean; points?: number; duplicate?: boolean;
+    }) => {
+      if (!result.duplicate) {
+        applyAnswerResult(
+          result.questionId,
+          Boolean(result.isCorrect),
+          Number(result.points || 0),
+        );
+      }
+    };
+
     wsManager.on("score_updated", handleScoreUpdate);
     wsManager.on("leaderboard_update", handleLeaderboardUpdate);
+    wsManager.on("answer_result", handleAnswerResult);
 
     // Initial fetch if game already ended
     if (isGameEnded && roomId) {
@@ -107,8 +138,25 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     return () => {
       wsManager.off("score_updated", handleScoreUpdate);
       wsManager.off("leaderboard_update", handleLeaderboardUpdate);
+      wsManager.off("answer_result", handleAnswerResult);
     };
-  }, [isConnected, isGameEnded, roomId]);
+  }, [applyAnswerResult, isConnected, isGameEnded, roomId]);
+
+  useEffect(() => {
+    if (!isConnected || !roomId) return;
+    const handleGameState = (snapshot: RoomGameStatePayload) => {
+      if (snapshot.roomId !== roomId || snapshot.version < gameVersion) return;
+      setGameVersion(snapshot.version);
+      syncGameState(snapshot);
+    };
+    wsManager.on("game_state", handleGameState);
+    wsManager.joinRoom(roomId);
+    wsManager.send("get_game_state", { roomId });
+    if (roomData?.owner_id === currentUserId) {
+      wsManager.send("start_game", { roomId });
+    }
+    return () => wsManager.off("game_state", handleGameState);
+  }, [currentUserId, gameVersion, isConnected, roomData?.owner_id, roomId, syncGameState]);
 
   // Calculate results for QuizResults component
   const quizResultData = useMemo((): QuizResult | null => {
@@ -218,11 +266,11 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isGameStarted && questions.length > 0) {
-      startGame();
+  const handleNextQuestion = () => {
+    if (roomData?.owner_id === currentUserId) {
+      wsManager.send("advance_question", { roomId, expectedVersion: gameVersion });
     }
-  }, [isGameStarted, questions.length, startGame]);
+  };
 
   const handleExit = () => {
     if (onExit) {
@@ -232,7 +280,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     }
   };
 
-  if (!mounted || !isGameStarted) {
+  if (!mounted || (!isGameStarted && !isGameEnded)) {
     return <GameLoading />;
   }
 
@@ -303,7 +351,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
             totalScore={totalScore}
             onExit={handleExit}
             onSubmitAnswer={submitAnswer}
-            onNextQuestion={nextQuestion}
+            onNextQuestion={roomData?.owner_id === currentUserId ? handleNextQuestion : undefined}
             isAnswered={isAnswered}
             hasSelectedAnswer={hasSelectedAnswer}
             isLastQuestion={isLastQuestion}
