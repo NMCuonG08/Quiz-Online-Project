@@ -77,9 +77,19 @@ export default function UserLayout({
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
 
-  const displayName = user?.username || "User";
+  const profileUser = user as (typeof user & {
+    full_name?: string;
+    fullName?: string;
+    avatar?: string;
+  });
+  const displayName =
+    profileUser?.full_name ||
+    profileUser?.fullName ||
+    profileUser?.username ||
+    profileUser?.email?.split("@")[0] ||
+    "User";
   const email = user?.email || "";
-  const avatarUrl = user?.avatarUrl;
+  const avatarUrl = profileUser?.avatarUrl || profileUser?.avatar;
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -163,16 +173,16 @@ export default function UserLayout({
 
       {/* User Profile Section */}
       <div className="border-t border-border pt-3 mx-2">
-        <div className="flex items-center gap-3 px-1">
-          <Avatar className="size-9 ring-2 ring-border">
+        <div className="flex min-w-0 items-center gap-3 px-1 pb-1">
+          <Avatar className="size-9 ring-2 ring-border shadow-sm">
             <AvatarImage src={avatarUrl} alt={displayName} />
             <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
               {initials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">{displayName}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{email}</p>
+            <p className="truncate text-sm font-semibold" title={displayName}>{displayName}</p>
+            <p className="truncate text-[11px] text-muted-foreground" title={email}>{email}</p>
           </div>
           <Button
             variant="ghost"
@@ -180,6 +190,7 @@ export default function UserLayout({
             className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
             onClick={handleLogout}
             title="Đăng xuất"
+            disableShadow
           >
             <LogOut size={16} />
           </Button>

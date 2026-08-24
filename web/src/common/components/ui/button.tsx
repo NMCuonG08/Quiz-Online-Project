@@ -52,6 +52,7 @@ function Button({
     disableShadow?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
+  const showShadow = !disableShadow && variant !== "ghost" && variant !== "link";
 
   // Extract width classes from className
   const widthMatch = className?.match(/\bw-(?:full|fit|auto|\d+|\[.*?\])\b/);
@@ -72,7 +73,7 @@ function Button({
       style={{ overflow: "visible" }}
     >
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
-      {!disableShadow && (
+      {showShadow && (
         <div
           className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active/button:bottom-0 group-active/button:right-0 -z-10"
           style={{ overflow: "visible" }}
