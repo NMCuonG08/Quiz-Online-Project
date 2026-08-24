@@ -14,6 +14,7 @@ export interface ChatAction {
   value: string;
   variant?: "primary" | "secondary" | "danger";
   icon?: string;
+  disabled?: boolean;
 }
 
 export interface UIItem {

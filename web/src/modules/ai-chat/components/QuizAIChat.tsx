@@ -59,6 +59,68 @@ function toolLabel(tool: string) {
   return TOOL_LABELS[tool] || tool.replaceAll("_", " ");
 }
 
+type PersistedMessage = {
+  id: string;
+  role: ChatRole;
+  content: string;
+  created_at: string;
+  metadata?: unknown;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function disableApproval(surface: UISurface, resolvedTokens: Set<string>, expiresAt?: string): UISurface {
+  const expired = Boolean(expiresAt && Date.parse(expiresAt) <= Date.now());
+  return {
+    ...surface,
+    actions: surface.actions.map((action) => {
+      if (action.kind !== "approve") return action;
+      const resolved = resolvedTokens.has(action.value);
+      if (!resolved && !expired) return action;
+      return {
+        ...action,
+        disabled: true,
+        label: resolved ? "Đã thực hiện" : "Đã hết hạn",
+      };
+    }),
+  };
+}
+
+function hydrateHistoryMessages(items: PersistedMessage[]): ChatMessage[] {
+  const resolvedTokens = new Set(
+    items.map((item) => asRecord(item.metadata).resolved_approval_token)
+      .filter((value): value is string => typeof value === "string"),
+  );
+  return items.map((item) => {
+    const metadata = asRecord(item.metadata);
+    const rawSurface = metadata.surface;
+    const surface = rawSurface && typeof rawSurface === "object"
+      ? disableApproval(
+          rawSurface as UISurface,
+          resolvedTokens,
+          typeof metadata.approval_expires_at === "string" ? metadata.approval_expires_at : undefined,
+        )
+      : undefined;
+    return {
+      id: item.id,
+      role: item.role,
+      content: item.content,
+      createdAt: Date.parse(item.created_at),
+      agent: typeof metadata.agent === "string" ? metadata.agent : undefined,
+      tool: typeof metadata.tool === "string" ? metadata.tool : undefined,
+      surface,
+      citations: Array.isArray(metadata.citations) ? metadata.citations as ChatMessage["citations"] : undefined,
+      traceId: typeof metadata.trace_id === "string" ? metadata.trace_id : undefined,
+      traceSteps: Array.isArray(metadata.trace_steps) ? metadata.trace_steps as ChatMessage["traceSteps"] : undefined,
+      error: metadata.error === true,
+    };
+  });
+}
+
 export default function QuizAIChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
@@ -109,9 +171,7 @@ export default function QuizAIChat() {
         return;
       }
       const payload = await response.json();
-      setMessages((payload.data?.messages || []).map((item: { id: string; role: ChatRole; content: string; created_at: string }) => ({
-        id: item.id, role: item.role, content: item.content, createdAt: Date.parse(item.created_at),
-      })));
+      setMessages(hydrateHistoryMessages(payload.data?.messages || []));
     }).catch((error: unknown) => {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         setHistoryUnavailable(true);
@@ -156,7 +216,7 @@ export default function QuizAIChat() {
       const payload = await response.json();
       setSessionId(targetSessionId);
       localStorage.setItem(sessionStorageKey, targetSessionId);
-      setMessages((payload.data?.messages || []).map((item: { id: string; role: ChatRole; content: string; created_at: string }) => ({ id: item.id, role: item.role, content: item.content, createdAt: Date.parse(item.created_at) })));
+      setMessages(hydrateHistoryMessages(payload.data?.messages || []));
       setHistoryOpen(false);
       setHistoryUnavailable(false);
     } catch {
@@ -243,7 +303,7 @@ export default function QuizAIChat() {
     }
   };
 
-  const sendMessage = async (rawMessage?: string) => {
+  const sendMessage = async (rawMessage?: string, hideUserMessage = false) => {
     if (!auth.isAuthenticated || !auth.token || !user?.id) return;
     const value = (rawMessage ?? input).trim();
     if (!value || isStreaming) return;
@@ -253,7 +313,7 @@ export default function QuizAIChat() {
     const assistantId = uid("assistant");
     setMessages((current) => [
       ...current,
-      { id: uid("user"), role: "user", content: value, createdAt: Date.now() },
+      ...(!hideUserMessage ? [{ id: uid("user"), role: "user" as const, content: value, createdAt: Date.now() }] : []),
       {
         id: assistantId,
         role: "assistant",
@@ -266,6 +326,7 @@ export default function QuizAIChat() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let approvalCompleted = false;
     try {
       await streamAgentChat({
         message: value,
@@ -275,9 +336,18 @@ export default function QuizAIChat() {
         scope,
         context: { route: pathname || "/" },
         signal: controller.signal,
-        onEvent: (event) => onAgentEvent(assistantId, event),
+        onEvent: (event) => {
+          if (event.type === "done" && event.intent === "approved_write") approvalCompleted = true;
+          onAgentEvent(assistantId, event);
+        },
       });
       patchAssistant(assistantId, { isStreaming: false, status: undefined });
+      if (approvalCompleted && hideUserMessage) {
+        const resolvedToken = value.slice("__approve__:".length);
+        setMessages((current) => current.map((message) => message.surface
+          ? { ...message, surface: disableApproval(message.surface, new Set([resolvedToken])) }
+          : message));
+      }
       if (!open) setUnread(true);
     } catch {
       patchAssistant(assistantId, {
@@ -308,7 +378,8 @@ export default function QuizAIChat() {
 
   const handleAction = (action: ChatAction) => {
     if (action.kind === "approve") {
-      void sendMessage("__approve__:" + action.value);
+      if (action.disabled) return;
+      void sendMessage("__approve__:" + action.value, true);
     } else if (action.kind === "navigate") {
       if (!action.value.startsWith("/")) return;
       setOpen(false);
@@ -561,8 +632,9 @@ function DynamicSurface({
             <button
               key={action.id}
               onClick={() => onAction(action)}
+              disabled={action.disabled}
               className={cn(
-                "inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold",
+                "inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground",
                 action.variant === "primary" && "border-[#FDD239] bg-[#FDD239] text-slate-950 hover:bg-[#f5c923]",
                 action.variant === "danger" && "border-red-500 bg-red-500 text-white hover:bg-red-600",
                 (!action.variant || action.variant === "secondary") && "border-border bg-background hover:bg-muted",

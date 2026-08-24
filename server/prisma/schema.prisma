@@ -592,6 +592,7 @@ model AiChatMessage {
   conversation_id String             @db.Uuid
   role            String             @db.VarChar(16)
   content         String             @db.Text
+  metadata        Json               @default("{}")
   created_at      DateTime           @default(now())
   conversation    AiChatConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
 

@@ -145,7 +145,7 @@ class MCPToolWrapper:
         ))
 
     async def append_chat_history(
-        self, session_id: str, scope: str, messages: list[dict[str, str]], authorization: str
+        self, session_id: str, scope: str, messages: list[dict[str, Any]], authorization: str
     ) -> Any:
         return self.data(await self.call_backend_api(
             "POST", f"/api/ai-chat/conversations/{session_id}/messages",

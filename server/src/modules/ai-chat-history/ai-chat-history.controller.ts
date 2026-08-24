@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/c
 import { Auth, Authenticated, AuthGuard } from '@/common/guards/auth.guard';
 import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
 import { AiChatHistoryService } from './ai-chat-history.service';
+import type { HistoryMessage } from './ai-chat-history.service';
 
 @Controller('/api/ai-chat/conversations')
 @UseGuards(AuthGuard)
@@ -18,7 +19,7 @@ export class AiChatHistoryController {
 
   @Post(':sessionId/messages')
   @Authenticated({ permission: false })
-  append(@Param('sessionId') sessionId: string, @Body() body: { scope?: string; messages?: Array<{ role: 'user' | 'assistant'; content: string }> }, @Auth() auth: AuthDto) { return this.history.append(auth.user.id, sessionId, body.scope || 'learner', body.messages || []); }
+  append(@Param('sessionId') sessionId: string, @Body() body: { scope?: string; messages?: HistoryMessage[] }, @Auth() auth: AuthDto) { return this.history.append(auth.user.id, sessionId, body.scope || 'learner', body.messages || []); }
 
   @Delete(':sessionId')
   @Authenticated({ permission: false })

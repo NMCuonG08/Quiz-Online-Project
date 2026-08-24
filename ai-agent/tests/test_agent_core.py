@@ -100,6 +100,50 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["difficulty_level"], "EASY")
         self.assertEqual(payload["quiz_type"], "MULTIPLE_CHOICE")
 
+    async def test_stream_persists_render_metadata_for_reload(self):
+        async def fake_events(*_args, **_kwargs):
+            yield {"type": "token", "delta": "Đề xuất đã sẵn sàng."}
+            yield {"type": "ui", "surface": {
+                "title": "Xác nhận tạo quiz", "description": "Kiểm tra thông tin",
+                "blocks": [],
+                "actions": [{
+                    "id": "approve", "label": "Tạo quiz", "kind": "approve",
+                    "value": "approval-token", "variant": "primary",
+                }],
+            }}
+            yield {"type": "trace", "trace_id": "trace-1", "node": "graph", "event": "approval_stop"}
+            yield {"type": "done", "intent": "quiz_create", "agent": "test-model", "tool": "create_quiz"}
+
+        self.core._stream_message_events = fake_events
+        events = [event async for event in self.core.stream_message(
+            "Tạo quiz Python", "user-1", "Bearer token", "session-1", scope="creator",
+        )]
+
+        self.assertEqual(events[-1]["type"], "done")
+        messages = self.core.tools.append_chat_history.await_args.args[2]
+        self.assertEqual(messages[0], {"role": "user", "content": "Tạo quiz Python"})
+        metadata = messages[1]["metadata"]
+        self.assertEqual(metadata["surface"]["actions"][0]["value"], "approval-token")
+        self.assertEqual(metadata["tool"], "create_quiz")
+        self.assertEqual(metadata["trace_id"], "trace-1")
+        self.assertIn("approval_expires_at", metadata)
+
+    async def test_approval_persistence_hides_transport_message_and_marks_token_resolved(self):
+        async def fake_events(*_args, **_kwargs):
+            yield {"type": "token", "delta": "Quiz đã được tạo."}
+            yield {"type": "done", "intent": "approved_write", "agent": "test-model", "tool": "create_quiz"}
+
+        self.core._stream_message_events = fake_events
+        _ = [event async for event in self.core.stream_message(
+            "__approve__:approval-token", "user-1", "Bearer token", "session-1", scope="creator",
+        )]
+
+        messages = self.core.tools.append_chat_history.await_args.args[2]
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]["role"], "assistant")
+        self.assertEqual(messages[0]["metadata"]["resolved_approval_token"], "approval-token")
+        self.assertNotIn("__approve__", str(messages))
+
     async def test_legacy_pending_approval_is_normalized_before_execution(self):
         await self.core.state_store.create_approval("legacy-token", {
             "name": "create_quiz",

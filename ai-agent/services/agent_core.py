@@ -8,7 +8,7 @@ import secrets
 import hashlib
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, Optional
@@ -192,10 +192,11 @@ class AIAgentCore:
         self.sessions: Dict[str, SessionState] = {}
         self.metrics: AgentMetrics = self.config.get("metrics") or AgentMetrics()
         self.require_redis = bool(self.config.get("require_redis", False))
+        self.approval_ttl_seconds = int(self.config.get("approval_ttl_seconds", 300))
         self.state_store = AgentStateStore(
             redis_url=self.config.get("redis_url"),
             session_ttl_seconds=int(self.config.get("session_ttl_seconds", 60 * 60 * 24 * 7)),
-            approval_ttl_seconds=int(self.config.get("approval_ttl_seconds", 300)),
+            approval_ttl_seconds=self.approval_ttl_seconds,
             audit_ttl_seconds=int(self.config.get("audit_ttl_seconds", 60 * 60 * 24 * 30)),
             chat_history_max_messages=int(self.config.get("chat_history_max_messages", 20)),
             key_prefix=self.config.get("redis_key_prefix", "quiz-ai:"),
@@ -242,6 +243,106 @@ class AIAgentCore:
         return {"answer": answer, "surfaces": surfaces, "session_id": session_id}
 
     async def stream_message(
+        self,
+        user_input: str,
+        user_id: str = "",
+        authorization: Optional[str] = None,
+        session_id: str = "default",
+        locale: str = "vi",
+        scope: str = "learner",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        is_approval = user_input.startswith("__approve__:")
+        approval_token = user_input[12:] if is_approval else ""
+        content = ""
+        surface: Optional[dict[str, Any]] = None
+        citations: list[dict[str, Any]] = []
+        trace_steps: list[dict[str, Any]] = []
+        tool: Optional[str] = None
+        agent_name: Optional[str] = None
+        trace_id: Optional[str] = None
+        is_error = False
+        persisted = False
+
+        async def persist_history() -> None:
+            nonlocal persisted
+            if persisted or not authorization:
+                return
+            metadata: dict[str, Any] = {}
+            if agent_name:
+                metadata["agent"] = agent_name
+            if tool:
+                metadata["tool"] = tool
+            if surface:
+                metadata["surface"] = surface
+                actions = surface.get("actions") if isinstance(surface, dict) else None
+                if isinstance(actions, list) and any(
+                    isinstance(action, dict) and action.get("kind") == "approve" for action in actions
+                ):
+                    metadata["approval_expires_at"] = (
+                        datetime.now(timezone.utc) + timedelta(seconds=self.approval_ttl_seconds)
+                    ).isoformat()
+            if citations:
+                metadata["citations"] = citations
+            if trace_id:
+                metadata["trace_id"] = trace_id
+            if trace_steps:
+                metadata["trace_steps"] = trace_steps
+            if is_error:
+                metadata["error"] = True
+            if approval_token:
+                metadata["resolved_approval_token"] = approval_token
+
+            history_messages: list[dict[str, Any]] = []
+            if not is_approval:
+                history_messages.append({"role": "user", "content": user_input})
+            if content.strip() or surface:
+                history_messages.append({
+                    "role": "assistant",
+                    "content": content.strip() or "Xem nội dung tương tác bên dưới.",
+                    "metadata": metadata,
+                })
+            if not history_messages:
+                return
+            persisted = True
+            try:
+                await self.tools.append_chat_history(
+                    session_id, scope, history_messages, authorization,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "ai_history trace=%s status=error error=%s",
+                    trace_id or "-", self._safe_tool_error(exc),
+                )
+
+        async for event in self._stream_message_events(
+            user_input, user_id, authorization, session_id, locale, scope, context
+        ):
+            event_type = event.get("type")
+            if event_type == "token":
+                content += str(event.get("delta") or "")
+            elif event_type == "ui":
+                surface = event.get("surface")
+            elif event_type == "citations":
+                citations = list(event.get("items") or [])
+            elif event_type == "trace":
+                trace_steps.append(dict(event))
+                trace_id = str(event.get("trace_id") or trace_id or "") or None
+            elif event_type == "status" and event.get("tool"):
+                tool = str(event["tool"])
+            elif event_type == "done":
+                tool = str(event.get("tool") or tool or "") or None
+                agent_name = str(event.get("agent") or "") or None
+                trace_id = str(event.get("trace_id") or trace_id or "") or None
+                await persist_history()
+            elif event_type == "error":
+                content = str(event.get("message") or "Agent chưa thể xử lý yêu cầu.")
+                is_error = True
+            yield event
+
+        await persist_history()
+
+    async def _stream_message_events(
         self,
         user_input: str,
         user_id: str = "",
@@ -605,11 +706,6 @@ class AIAgentCore:
         ])
         state.chat_messages = state.chat_messages[-20:]
         await self.state_store.set_chat_messages(user_id, session_id, state.chat_messages)
-        if authorization:
-            try:
-                await self.tools.append_chat_history(session_id, scope, state.chat_messages[-2:], authorization)
-            except Exception as exc:
-                logger.warning("ai_history trace=%s status=error error=%s", trace_id, self._safe_tool_error(exc))
         logger.info("ai_graph trace=%s event=request_end tools=%s", trace_id, ",".join(used_tools) or "-")
         yield {
             "type": "done",
@@ -875,14 +971,6 @@ class AIAgentCore:
             history = await self.state_store.get_chat_messages(user_id, session_id)
             history.append({"role": "assistant", "content": memory_text})
             await self.state_store.set_chat_messages(user_id, session_id, history)
-            if authorization:
-                try:
-                    await self.tools.append_chat_history(
-                        session_id, scope, [{"role": "assistant", "content": memory_text}], authorization,
-                    )
-                except Exception as history_exc:
-                    logger.warning("ai_history approval tool=%s status=error error=%s", name, self._safe_tool_error(history_exc))
-
             resource_id = str(result.get("id") or "") if isinstance(result, dict) else ""
             resource_title = str(result.get("title") or result.get("name") or name) if isinstance(result, dict) else name
             yield {"type": "token", "delta": f"Đã thực thi {name}: {resource_title}{f' (ID: {resource_id})' if resource_id else ''}."}
