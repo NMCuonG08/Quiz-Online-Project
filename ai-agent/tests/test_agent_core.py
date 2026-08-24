@@ -166,6 +166,24 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["difficulty_level"], "EASY")
         self.assertEqual(payload["quiz_type"], "MULTIPLE_CHOICE")
 
+    async def test_vietnamese_quiz_enums_are_normalized_before_execution(self):
+        self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-vi", "title": "AI for beginner"})
+
+        result = await self.core._execute_write("create_quiz", {
+            "title": "AI for beginner", "slug": "ai-for-beginner", "category_id": "category-1",
+            "difficulty_level": "Dễ", "quiz_type": "Trắc nghiệm", "time_limit": 600,
+        }, "Bearer token")
+
+        self.assertEqual(result["id"], "quiz-vi")
+        payload = self.core.tools.create_quiz.await_args.args[0]
+        self.assertEqual(payload["difficulty_level"], "EASY")
+        self.assertEqual(payload["quiz_type"], "MULTIPLE_CHOICE")
+        question = self.core._normalize_write_args("create_question", {
+            "difficulty_level": "Trung bình", "question_type": "Đúng / Sai",
+        })
+        self.assertEqual(question["difficulty_level"], "MEDIUM")
+        self.assertEqual(question["question_type"], "TRUE_FALSE")
+
     async def test_complete_quiz_tool_creates_draft_then_questions(self):
         self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-1", "title": "Python"})
         self.core.tools.create_question = AsyncMock(side_effect=[{"id": "q-1"}, {"id": "q-2"}])

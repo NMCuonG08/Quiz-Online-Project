@@ -7,6 +7,7 @@ import os
 import secrets
 import hashlib
 import time
+import unicodedata
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -1108,30 +1109,41 @@ class AIAgentCore:
         normalized = dict(args)
         difficulty_aliases = {
             "BEGINNER": "EASY", "EASY": "EASY",
+            "DE": "EASY", "CO_BAN": "EASY",
             "INTERMEDIATE": "MEDIUM", "MEDIUM": "MEDIUM",
+            "TRUNG_BINH": "MEDIUM",
             "ADVANCED": "HARD", "HARD": "HARD",
+            "KHO": "HARD", "NANG_CAO": "HARD",
         }
         quiz_type_aliases = {
             "SINGLE": "SINGLE_CHOICE", "SINGLE_CHOICE": "SINGLE_CHOICE",
+            "MOT_DAP_AN": "SINGLE_CHOICE", "TRAC_NGHIEM_MOT_DAP_AN": "SINGLE_CHOICE",
             "MULTIPLE": "MULTIPLE_CHOICE", "MULTIPLE_CHOICE": "MULTIPLE_CHOICE",
+            "NHIEU_DAP_AN": "MULTIPLE_CHOICE", "TRAC_NGHIEM": "MULTIPLE_CHOICE",
+            "TRAC_NGHIEM_NHIEU_DAP_AN": "MULTIPLE_CHOICE",
             "TRUE_FALSE": "TRUE_FALSE", "BOOLEAN": "TRUE_FALSE",
+            "DUNG_SAI": "TRUE_FALSE",
             "FILL_BLANK": "FILL_IN_THE_BLANK", "FILL_IN_THE_BLANK": "FILL_IN_THE_BLANK",
+            "DIEN_VAO_CHO_TRONG": "FILL_IN_THE_BLANK", "DIEN_KHUYET": "FILL_IN_THE_BLANK",
             "ESSAY": "ESSAY",
+            "TU_LUAN": "ESSAY",
         }
         question_type_aliases = {
             **quiz_type_aliases,
             "FILL_BLANK": "FILL_BLANK", "FILL_IN_THE_BLANK": "FILL_BLANK",
+            "DIEN_VAO_CHO_TRONG": "FILL_BLANK", "DIEN_KHUYET": "FILL_BLANK",
             "MATCHING": "MATCHING",
+            "GHEP_CAP": "MATCHING",
         }
 
         if normalized.get("difficulty_level"):
-            raw = str(normalized["difficulty_level"]).strip().upper().replace("-", "_").replace(" ", "_")
+            raw = AIAgentCore._enum_key(normalized["difficulty_level"])
             normalized["difficulty_level"] = difficulty_aliases.get(raw, raw)
         if normalized.get("quiz_type"):
-            raw = str(normalized["quiz_type"]).strip().upper().replace("-", "_").replace(" ", "_")
+            raw = AIAgentCore._enum_key(normalized["quiz_type"])
             normalized["quiz_type"] = quiz_type_aliases.get(raw, raw)
         if normalized.get("question_type"):
-            raw = str(normalized["question_type"]).strip().upper().replace("-", "_").replace(" ", "_")
+            raw = AIAgentCore._enum_key(normalized["question_type"])
             normalized["question_type"] = question_type_aliases.get(raw, raw)
         if name == "create_quiz_with_questions":
             normalized["questions"] = [
@@ -1139,6 +1151,13 @@ class AIAgentCore:
                 for question in normalized.get("questions") or []
             ]
         return normalized
+
+    @staticmethod
+    def _enum_key(value: Any) -> str:
+        source = str(value).replace("Đ", "D").replace("đ", "d")
+        ascii_value = unicodedata.normalize("NFKD", source).encode("ascii", "ignore").decode("ascii")
+        words = "".join(character if character.isalnum() else " " for character in ascii_value)
+        return "_".join(words.upper().split())
 
     async def _build_approval_surface(
         self, name: str, args: Dict[str, Any], approval_token: str,
