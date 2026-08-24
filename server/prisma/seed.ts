@@ -74,6 +74,10 @@ async function main() {
     Permission.AssetDownload,
     Permission.AssetUpload,
     Permission.QuizRead,
+    Permission.QuizCreate,
+    Permission.QuizUpdate,
+    Permission.QuizDelete,
+    Permission.QuizStatistics,
   ];
 
   await assignPermissionsToRole(userRole.id, userPermissions);

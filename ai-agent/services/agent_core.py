@@ -521,6 +521,12 @@ class AIAgentCore:
             final_text = "Xem lại thay đổi và bấm Accept để thực thi."
         else:
             final_text = str(final_message.content or "").strip()
+        if (
+            policy_surface is not None
+            and planned_intent in {"quiz_create", "auth_required"}
+            and not approval_requested
+        ):
+            final_text = "Xem thông tin và thao tác phù hợp bên dưới."
         if require_grounded_answer and not citations:
             final_text = (
                 "Không đủ nguồn nội bộ đáng tin cậy để kết luận. "
