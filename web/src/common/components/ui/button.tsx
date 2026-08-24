@@ -68,7 +68,7 @@ function Button({
 
   return (
     <div
-      className={cn("relative group/button inline-block", widthClass)}
+      className={cn("relative isolate group/button inline-block", widthClass)}
       style={{ overflow: "visible" }}
     >
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
