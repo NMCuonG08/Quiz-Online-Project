@@ -93,6 +93,65 @@ WRITE_TOOLS = {
     "import_knowledge_url", "submit_knowledge_review", "review_knowledge",
     "create_category", "update_category", "delete_category",
 }
+
+WRITE_OPERATION_LABELS = {
+    "create_quiz": ("Tạo quiz", "Xác nhận tạo quiz", "Tạo quiz"),
+    "create_quiz_with_questions": ("Tạo quiz hoàn chỉnh", "Xác nhận tạo quiz", "Tạo quiz"),
+    "update_quiz": ("Cập nhật quiz", "Xác nhận cập nhật quiz", "Lưu thay đổi"),
+    "delete_quiz": ("Xóa quiz", "Xác nhận xóa quiz", "Xóa quiz"),
+    "publish_quiz": ("Xuất bản quiz", "Xác nhận xuất bản", "Xuất bản"),
+    "unpublish_quiz": ("Gỡ xuất bản quiz", "Xác nhận gỡ xuất bản", "Gỡ xuất bản"),
+    "create_question": ("Tạo câu hỏi", "Xác nhận tạo câu hỏi", "Tạo câu hỏi"),
+    "update_question": ("Cập nhật câu hỏi", "Xác nhận cập nhật câu hỏi", "Lưu thay đổi"),
+    "delete_question": ("Xóa câu hỏi", "Xác nhận xóa câu hỏi", "Xóa câu hỏi"),
+    "start_quiz": ("Bắt đầu quiz", "Xác nhận bắt đầu quiz", "Bắt đầu"),
+    "duplicate_question": ("Sao chép câu hỏi", "Xác nhận sao chép", "Sao chép"),
+    "reorder_questions": ("Sắp xếp câu hỏi", "Xác nhận thứ tự câu hỏi", "Lưu thứ tự"),
+    "import_knowledge_url": ("Nhập nguồn kiến thức", "Xác nhận nhập nguồn", "Nhập nguồn"),
+    "submit_knowledge_review": ("Gửi duyệt nguồn", "Xác nhận gửi duyệt", "Gửi duyệt"),
+    "review_knowledge": ("Duyệt nguồn kiến thức", "Xác nhận kết quả duyệt", "Xác nhận"),
+    "create_category": ("Tạo danh mục", "Xác nhận tạo danh mục", "Tạo danh mục"),
+    "update_category": ("Cập nhật danh mục", "Xác nhận cập nhật danh mục", "Lưu thay đổi"),
+    "delete_category": ("Xóa danh mục", "Xác nhận xóa danh mục", "Xóa danh mục"),
+}
+
+APPROVAL_FIELD_LABELS = {
+    "title": "Tên",
+    "description": "Mô tả",
+    "category_id": "Danh mục",
+    "difficulty_level": "Độ khó",
+    "time_limit": "Thời gian",
+    "max_attempts": "Số lượt làm",
+    "passing_score": "Điểm đạt",
+    "quiz_type": "Loại quiz",
+    "instructions": "Hướng dẫn",
+    "is_active": "Trạng thái",
+    "question_text": "Nội dung câu hỏi",
+    "question_type": "Loại câu hỏi",
+    "points": "Điểm",
+    "is_required": "Bắt buộc",
+    "quiz_id": "Quiz",
+    "question_id": "Câu hỏi",
+    "source_id": "Nguồn kiến thức",
+    "url": "Đường dẫn",
+    "visibility": "Phạm vi",
+    "status": "Trạng thái duyệt",
+    "rejection_reason": "Lý do từ chối",
+    "name": "Tên danh mục",
+    "questions": "Câu hỏi",
+    "question_ids": "Câu hỏi",
+}
+
+DIFFICULTY_LABELS = {"EASY": "Dễ", "MEDIUM": "Trung bình", "HARD": "Khó"}
+QUIZ_TYPE_LABELS = {
+    "SINGLE_CHOICE": "Một đáp án",
+    "MULTIPLE_CHOICE": "Nhiều đáp án",
+    "TRUE_FALSE": "Đúng / Sai",
+    "FILL_IN_THE_BLANK": "Điền vào chỗ trống",
+    "FILL_BLANK": "Điền vào chỗ trống",
+    "ESSAY": "Tự luận",
+    "MATCHING": "Ghép cặp",
+}
 CREATOR_WRITE_TOOLS = WRITE_TOOLS - {
     "review_knowledge", "create_category", "update_category", "delete_category",
 }
@@ -297,7 +356,7 @@ class AIAgentCore:
                 next_input = tool_outputs
                 previous_response_id = response.id
                 if approval_requested:
-                    yield {"type": "token", "delta": "Xem lại thay đổi và bấm Accept để thực thi."}
+                    yield {"type": "token", "delta": "Đề xuất đã sẵn sàng."}
                     break
             else:
                 raise RuntimeError("Agent vượt quá giới hạn 12 vòng gọi tool")
@@ -518,7 +577,7 @@ class AIAgentCore:
         while not live_events.empty():
             yield await live_events.get()
         if approval_requested:
-            final_text = "Xem lại thay đổi và bấm Accept để thực thi."
+            final_text = "Đề xuất đã sẵn sàng."
         else:
             final_text = str(final_message.content or "").strip()
         if (
@@ -650,7 +709,7 @@ class AIAgentCore:
                 })
 
             if approval_requested:
-                final_text = "Xem lại thay đổi và bấm Accept để thực thi."
+                final_text = "Đề xuất đã sẵn sàng."
                 break
         else:
             raise RuntimeError("Agent vượt quá giới hạn 12 vòng gọi tool")
@@ -744,6 +803,8 @@ class AIAgentCore:
             return await self.tools.get_current_user(token), None, []
         if name == "get_my_permissions":
             return await self.tools.get_my_permissions(token), None, []
+        if name in WRITE_TOOLS:
+            args = self._normalize_write_args(name, args)
         if name == "publish_quiz":
             build_status = await self.tools.get_quiz_build_status(args["quiz_id"], token)
             if not build_status.get("ready_to_publish"):
@@ -767,16 +828,7 @@ class AIAgentCore:
                 "authorization_fingerprint": self.state_store.authorization_fingerprint(token),
             })
             await self.state_store.audit(user_id, scope, "write_proposed", name)
-            surface = UISurface(
-                title="Xác nhận thao tác",
-                description="Kiểm tra lại thay đổi này. Bấm Accept để thực thi một lần.",
-                blocks=[{
-                    "id": "write-proposal", "type": "notice",
-                    "title": name, "description": json.dumps(args, ensure_ascii=False, default=str),
-                    "tone": "warning",
-                }],
-                actions=[{"id": "approve", "label": "Accept", "kind": "approve", "value": approval_token, "variant": "primary"}],
-            )
+            surface = await self._build_approval_surface(name, args, approval_token)
             return {"approval_required": True, "operation": name}, surface, []
         if name == "get_my_quizzes":
             return await self.tools.get_my_quizzes(token, args.get("limit", 10)), None, []
@@ -959,6 +1011,132 @@ class AIAgentCore:
         if name == "delete_category":
             return await self.tools.delete_category(args["category_id"], token)
         raise ValueError(f"Write tool không tồn tại: {name}")
+
+    @staticmethod
+    def _normalize_write_args(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = dict(args)
+        difficulty_aliases = {
+            "BEGINNER": "EASY", "EASY": "EASY",
+            "INTERMEDIATE": "MEDIUM", "MEDIUM": "MEDIUM",
+            "ADVANCED": "HARD", "HARD": "HARD",
+        }
+        quiz_type_aliases = {
+            "SINGLE": "SINGLE_CHOICE", "SINGLE_CHOICE": "SINGLE_CHOICE",
+            "MULTIPLE": "MULTIPLE_CHOICE", "MULTIPLE_CHOICE": "MULTIPLE_CHOICE",
+            "TRUE_FALSE": "TRUE_FALSE", "BOOLEAN": "TRUE_FALSE",
+            "FILL_BLANK": "FILL_IN_THE_BLANK", "FILL_IN_THE_BLANK": "FILL_IN_THE_BLANK",
+            "ESSAY": "ESSAY",
+        }
+        question_type_aliases = {
+            **quiz_type_aliases,
+            "FILL_BLANK": "FILL_BLANK", "FILL_IN_THE_BLANK": "FILL_BLANK",
+            "MATCHING": "MATCHING",
+        }
+
+        if normalized.get("difficulty_level"):
+            raw = str(normalized["difficulty_level"]).strip().upper().replace("-", "_").replace(" ", "_")
+            normalized["difficulty_level"] = difficulty_aliases.get(raw, raw)
+        if normalized.get("quiz_type"):
+            raw = str(normalized["quiz_type"]).strip().upper().replace("-", "_").replace(" ", "_")
+            normalized["quiz_type"] = quiz_type_aliases.get(raw, raw)
+        if normalized.get("question_type"):
+            raw = str(normalized["question_type"]).strip().upper().replace("-", "_").replace(" ", "_")
+            normalized["question_type"] = question_type_aliases.get(raw, raw)
+        if name == "create_quiz_with_questions":
+            normalized["questions"] = [
+                AIAgentCore._normalize_write_args("create_question", question)
+                for question in normalized.get("questions") or []
+            ]
+        return normalized
+
+    async def _build_approval_surface(
+        self, name: str, args: Dict[str, Any], approval_token: str,
+    ) -> UISurface:
+        operation_label, title, action_label = WRITE_OPERATION_LABELS.get(
+            name, ("Thao tác", "Xác nhận thao tác", "Xác nhận")
+        )
+        category_names: Dict[str, str] = {}
+        if args.get("category_id"):
+            try:
+                category_payload = await self.tools.list_categories()
+                if isinstance(category_payload, dict):
+                    categories = category_payload.get("items") or category_payload.get("data") or []
+                else:
+                    categories = category_payload if isinstance(category_payload, list) else []
+                category_names = {
+                    str(item.get("id")): str(item.get("name") or item.get("title") or "")
+                    for item in categories if isinstance(item, dict) and item.get("id")
+                }
+            except Exception as exc:
+                logger.info("approval_category_lookup status=skipped error=%s", self._safe_tool_error(exc))
+
+        hidden_fields = {"slug", "confirmed", "options", "sort_order"}
+        preferred_order = [
+            "title", "name", "question_text", "category_id", "difficulty_level", "quiz_type",
+            "question_type", "time_limit", "points", "passing_score", "max_attempts", "is_active",
+            "instructions", "description", "questions", "question_ids", "url", "visibility", "status",
+            "rejection_reason", "quiz_id", "question_id", "source_id",
+        ]
+        ordered_keys = [key for key in preferred_order if key in args]
+        ordered_keys.extend(key for key in args if key not in ordered_keys and key not in hidden_fields)
+        items = []
+        for key in ordered_keys:
+            if key in hidden_fields or args.get(key) in (None, "", []):
+                continue
+            value = self._format_approval_value(key, args[key], category_names)
+            items.append({"label": APPROVAL_FIELD_LABELS.get(key, key.replace("_", " ").capitalize()), "value": value})
+
+        destructive = name.startswith("delete_")
+        description = (
+            "Thao tác này sẽ xóa dữ liệu và không thể hoàn tác. Hãy kiểm tra kỹ trước khi tiếp tục."
+            if destructive else
+            "Kiểm tra thông tin trước khi tiếp tục. Hệ thống chỉ thực hiện sau khi bạn xác nhận."
+        )
+        return UISurface(
+            title=title,
+            description=description,
+            blocks=[{
+                "id": "write-summary", "type": "list",
+                "title": "Thông tin đề xuất", "description": operation_label,
+                "tone": "danger" if destructive else "warning", "items": items,
+            }],
+            actions=[{
+                "id": "approve", "label": action_label, "kind": "approve", "value": approval_token,
+                "variant": "danger" if destructive else "primary",
+            }],
+        )
+
+    @staticmethod
+    def _format_approval_value(key: str, value: Any, category_names: Dict[str, str]) -> str:
+        if key == "category_id":
+            return category_names.get(str(value)) or "Danh mục đã chọn"
+        if key == "difficulty_level":
+            return DIFFICULTY_LABELS.get(str(value), str(value))
+        if key in {"quiz_type", "question_type"}:
+            return QUIZ_TYPE_LABELS.get(str(value), str(value).replace("_", " ").title())
+        if key == "time_limit":
+            seconds = int(float(value))
+            return f"{seconds // 60} phút" if seconds >= 60 and seconds % 60 == 0 else f"{seconds} giây"
+        if key == "passing_score":
+            return f"{value}%"
+        if key == "max_attempts":
+            return "Không giới hạn" if float(value) == 0 else f"{value} lượt"
+        if key == "is_active":
+            return "Đang hoạt động" if value is True else "Bản nháp"
+        if key == "is_required":
+            return "Có" if value is True else "Không"
+        if key == "questions" and isinstance(value, list):
+            return f"{len(value)} câu hỏi"
+        if key == "question_ids" and isinstance(value, list):
+            return f"{len(value)} câu hỏi"
+        if key.endswith("_id"):
+            identifier = str(value)
+            return f"…{identifier[-8:]}" if len(identifier) > 8 else identifier
+        if isinstance(value, dict):
+            return f"{len(value)} mục"
+        if isinstance(value, list):
+            return f"{len(value)} mục"
+        return str(value)
 
     @staticmethod
     def _require_auth(authorization: Optional[str]) -> str:

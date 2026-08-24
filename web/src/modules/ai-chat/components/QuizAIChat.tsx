@@ -40,6 +40,25 @@ function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+const TOOL_LABELS: Record<string, string> = {
+  create_quiz: "Tạo quiz",
+  create_quiz_with_questions: "Tạo quiz hoàn chỉnh",
+  update_quiz: "Cập nhật quiz",
+  delete_quiz: "Xóa quiz",
+  publish_quiz: "Xuất bản quiz",
+  unpublish_quiz: "Gỡ xuất bản quiz",
+  create_question: "Tạo câu hỏi",
+  update_question: "Cập nhật câu hỏi",
+  delete_question: "Xóa câu hỏi",
+  list_categories: "Đọc danh mục",
+  get_my_quizzes: "Đọc quiz của bạn",
+  search_quizzes: "Tìm quiz",
+};
+
+function toolLabel(tool: string) {
+  return TOOL_LABELS[tool] || tool.replaceAll("_", " ");
+}
+
 export default function QuizAIChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
@@ -427,7 +446,7 @@ function MessageBubble({
       )}
       <div className={cn("max-w-[88%]", !assistant && "flex flex-col items-end")}>
         {assistant && message.tool && (
-          <span className="mb-1.5 rounded-md bg-violet-500/10 px-1.5 py-1 text-[9px] font-semibold text-violet-600 dark:text-violet-300">Tool · {message.tool}</span>
+          <span className="mb-1.5 inline-flex rounded-full bg-violet-500/10 px-2 py-1 text-[9px] font-semibold text-violet-600 dark:text-violet-300">Tác vụ · {toolLabel(message.tool)}</span>
         )}
         <div className={cn(
           "text-[13px] leading-5",

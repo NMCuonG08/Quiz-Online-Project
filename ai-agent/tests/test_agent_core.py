@@ -68,10 +68,25 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_create_quiz_approval_keeps_resource_id_and_followup_actions(self):
+        self.core.tools.list_categories = AsyncMock(return_value={
+            "items": [{"id": "category-1", "name": "Lập trình"}],
+        })
         _, surface, _ = await self.core._execute_tool(
-            "create_quiz", {"title": "Python", "slug": "python", "category_id": "category-1"},
+            "create_quiz", {
+                "title": "Python", "slug": "python", "category_id": "category-1",
+                "difficulty_level": "beginner", "quiz_type": "multiple_choice", "time_limit": 600,
+            },
             "Bearer token", "user-1", "creator",
         )
+        self.assertEqual(surface.title, "Xác nhận tạo quiz")
+        self.assertEqual(surface.actions[0].label, "Tạo quiz")
+        self.assertEqual(surface.blocks[0].type, "list")
+        summary = {item.label: item.value for item in surface.blocks[0].items}
+        self.assertEqual(summary["Danh mục"], "Lập trình")
+        self.assertEqual(summary["Độ khó"], "Dễ")
+        self.assertEqual(summary["Loại quiz"], "Nhiều đáp án")
+        self.assertEqual(summary["Thời gian"], "10 phút")
+        self.assertNotIn("category-1", str(surface.model_dump()))
         self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-1", "title": "Python"})
         events = [event async for event in self.core._approve(
             surface.actions[0].value, "Bearer token", "user-1", "creator", "session-1",
@@ -81,6 +96,9 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result_surface["actions"][0]["kind"], "prompt")
         memory = await self.core.state_store.get_chat_messages("user-1", "session-1")
         self.assertIn("quiz-1", memory[-1]["content"])
+        payload = self.core.tools.create_quiz.await_args.args[0]
+        self.assertEqual(payload["difficulty_level"], "EASY")
+        self.assertEqual(payload["quiz_type"], "MULTIPLE_CHOICE")
 
     async def test_complete_quiz_tool_creates_draft_then_questions(self):
         self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-1", "title": "Python"})
