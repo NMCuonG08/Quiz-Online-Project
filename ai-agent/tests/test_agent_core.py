@@ -100,6 +100,28 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["difficulty_level"], "EASY")
         self.assertEqual(payload["quiz_type"], "MULTIPLE_CHOICE")
 
+    async def test_legacy_pending_approval_is_normalized_before_execution(self):
+        await self.core.state_store.create_approval("legacy-token", {
+            "name": "create_quiz",
+            "args": {
+                "title": "Python", "slug": "python", "category_id": "category-1",
+                "difficulty_level": "beginner", "quiz_type": "multiple_choice", "time_limit": 600,
+            },
+            "user_id": "user-1",
+            "scope": "creator",
+            "authorization_fingerprint": self.core.state_store.authorization_fingerprint("Bearer token"),
+        })
+        self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-legacy", "title": "Python"})
+
+        events = [event async for event in self.core._approve(
+            "legacy-token", "Bearer token", "user-1", "creator", "session-1",
+        )]
+
+        self.assertEqual(events[-1]["intent"], "approved_write")
+        payload = self.core.tools.create_quiz.await_args.args[0]
+        self.assertEqual(payload["difficulty_level"], "EASY")
+        self.assertEqual(payload["quiz_type"], "MULTIPLE_CHOICE")
+
     async def test_complete_quiz_tool_creates_draft_then_questions(self):
         self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-1", "title": "Python"})
         self.core.tools.create_question = AsyncMock(side_effect=[{"id": "q-1"}, {"id": "q-2"}])

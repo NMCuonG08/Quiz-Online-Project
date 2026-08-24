@@ -923,6 +923,9 @@ class AIAgentCore:
 
     async def _execute_write(self, name: str, args: Dict[str, Any], authorization: Optional[str]) -> Any:
         token = self._require_auth(authorization)
+        # Approval records may outlive a deployment. Normalize again at the
+        # execution boundary so legacy pending payloads cannot bypass aliases.
+        args = self._normalize_write_args(name, args)
         if name == "create_quiz":
             payload = {key: value for key, value in args.items() if value not in (None, "")}
             payload.setdefault("description", ""); payload.setdefault("max_attempts", 0); payload.setdefault("passing_score", 0); payload.setdefault("is_active", False); payload.setdefault("instructions", "")
