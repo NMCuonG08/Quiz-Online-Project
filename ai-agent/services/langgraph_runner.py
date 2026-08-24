@@ -6,6 +6,7 @@ from langchain_core._api.deprecation import suppress_langchain_deprecation_warni
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
 with suppress_langchain_deprecation_warning():
     from langgraph.graph import END, START, MessagesState, StateGraph
     from langgraph.prebuilt import ToolNode, tools_condition
@@ -13,6 +14,29 @@ with suppress_langchain_deprecation_warning():
 
 
 ToolDispatcher = Callable[[str, dict[str, Any]], Awaitable[str]]
+
+DifficultyLevel = Literal["EASY", "MEDIUM", "HARD"]
+QuizType = Literal["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]
+QuestionType = Literal["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]
+
+
+class QuestionOptionInput(BaseModel):
+    option_text: str = Field(min_length=1, description="Visible answer text")
+    is_correct: bool
+    sort_order: int = Field(ge=0)
+    explanation: str = ""
+
+
+class QuestionDraftInput(BaseModel):
+    question_text: str = Field(min_length=1)
+    question_type: QuestionType
+    options: list[QuestionOptionInput]
+    points: float = 1
+    time_limit: float = 0
+    explanation: str = ""
+    difficulty_level: Optional[DifficultyLevel] = None
+    sort_order: int = 0
+    is_required: bool = True
 
 
 class LangGraphQuizRunner:
@@ -314,8 +338,8 @@ class LangGraphQuizRunner:
         if include("create_quiz"):
             @tool
             async def create_quiz(
-                title: str, slug: str, category_id: str, difficulty_level: str,
-                time_limit: float, quiz_type: str, description: str = "",
+                title: str, slug: str, category_id: str, difficulty_level: DifficultyLevel,
+                time_limit: float, quiz_type: QuizType, description: str = "",
                 max_attempts: float = 0, passing_score: float = 0,
                 is_active: bool = False, instructions: str = "",
             ) -> str:
@@ -332,8 +356,8 @@ class LangGraphQuizRunner:
         if include("create_quiz_with_questions"):
             @tool
             async def create_quiz_with_questions(
-                title: str, slug: str, category_id: str, difficulty_level: str,
-                time_limit: float, quiz_type: str, questions: list[dict[str, Any]],
+                title: str, slug: str, category_id: str, difficulty_level: DifficultyLevel,
+                time_limit: float, quiz_type: QuizType, questions: list[QuestionDraftInput],
                 description: str = "", max_attempts: float = 0,
                 passing_score: float = 0, instructions: str = "",
             ) -> str:
@@ -341,7 +365,8 @@ class LangGraphQuizRunner:
                 return await dispatch("create_quiz_with_questions", {
                     "title": title, "slug": slug, "category_id": category_id,
                     "difficulty_level": difficulty_level, "time_limit": time_limit,
-                    "quiz_type": quiz_type, "questions": questions,
+                    "quiz_type": quiz_type,
+                    "questions": [question.model_dump(exclude_none=True) for question in questions],
                     "description": description, "max_attempts": max_attempts,
                     "passing_score": passing_score, "instructions": instructions,
                 })
@@ -398,16 +423,17 @@ class LangGraphQuizRunner:
         if include("create_question"):
             @tool
             async def create_question(
-                quiz_id: str, question_text: str, question_type: str,
-                options: list[dict[str, Any]], points: float = 1,
+                quiz_id: str, question_text: str, question_type: QuestionType,
+                options: list[QuestionOptionInput], points: float = 1,
                 time_limit: float = 0, explanation: str = "",
-                difficulty_level: str = "", sort_order: int = 0,
+                difficulty_level: Optional[DifficultyLevel] = None, sort_order: int = 0,
                 is_required: bool = True,
             ) -> str:
                 """Propose creating a question; execution still requires Accept."""
                 return await dispatch("create_question", {
                     "quiz_id": quiz_id, "question_text": question_text,
-                    "question_type": question_type, "options": options, "points": points,
+                    "question_type": question_type,
+                    "options": [option.model_dump() for option in options], "points": points,
                     "time_limit": time_limit, "explanation": explanation,
                     "difficulty_level": difficulty_level, "sort_order": sort_order,
                     "is_required": is_required,
@@ -418,11 +444,11 @@ class LangGraphQuizRunner:
             @tool
             async def update_question(
                 question_id: str, question_text: Optional[str] = None,
-                question_type: Optional[str] = None, points: Optional[float] = None,
+                question_type: Optional[QuestionType] = None, points: Optional[float] = None,
                 time_limit: Optional[float] = None, explanation: Optional[str] = None,
-                difficulty_level: Optional[str] = None, sort_order: Optional[int] = None,
+                difficulty_level: Optional[DifficultyLevel] = None, sort_order: Optional[int] = None,
                 is_required: Optional[bool] = None,
-                options: Optional[list[dict[str, Any]]] = None,
+                options: Optional[list[QuestionOptionInput]] = None,
             ) -> str:
                 """Propose updating a question; execution still requires Accept."""
                 return await dispatch("update_question", {
@@ -430,7 +456,8 @@ class LangGraphQuizRunner:
                     "question_type": question_type, "points": points,
                     "time_limit": time_limit, "explanation": explanation,
                     "difficulty_level": difficulty_level, "sort_order": sort_order,
-                    "is_required": is_required, "options": options,
+                    "is_required": is_required,
+                    "options": [option.model_dump() for option in options] if options is not None else None,
                 })
             tools.append(update_question)
 

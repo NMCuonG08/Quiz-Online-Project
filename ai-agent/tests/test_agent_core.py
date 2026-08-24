@@ -184,6 +184,43 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(question["difficulty_level"], "MEDIUM")
         self.assertEqual(question["question_type"], "TRUE_FALSE")
 
+    async def test_question_option_aliases_are_normalized_and_rendered_for_review(self):
+        _, surface, _ = await self.core._execute_tool("create_question", {
+            "quiz_id": "quiz-1", "question_text": "AI là gì?",
+            "question_type": "single_choice",
+            "options": [
+                {"content": "Trí tuệ nhân tạo", "is_correct": True, "sort_order": 1},
+                {"text": "Một hệ điều hành", "is_correct": False, "sort_order": 2},
+            ],
+        }, "Bearer token", "user-1", "creator")
+
+        options_block = next(block for block in surface.blocks if block.id == "question-options")
+        self.assertEqual(options_block.rows[0][1], "Trí tuệ nhân tạo")
+        self.assertEqual(options_block.rows[0][2], "Đúng")
+
+    async def test_question_without_option_text_is_rejected_before_approval(self):
+        with self.assertRaisesRegex(ValueError, "QUESTION_OPTION_TEXT_REQUIRED"):
+            await self.core._execute_tool("create_question", {
+                "quiz_id": "quiz-1", "question_text": "AI là gì?",
+                "question_type": "SINGLE_CHOICE",
+                "options": [
+                    {"is_correct": True, "sort_order": 1},
+                    {"is_correct": False, "sort_order": 2},
+                ],
+            }, "Bearer token", "user-1", "creator")
+
+        self.core.tools.create_question = AsyncMock(return_value={"id": "should-not-run"})
+        with self.assertRaisesRegex(ValueError, "QUESTION_OPTION_TEXT_REQUIRED"):
+            await self.core._execute_write("create_question", {
+                "quiz_id": "quiz-1", "question_text": "AI là gì?",
+                "question_type": "SINGLE_CHOICE",
+                "options": [
+                    {"is_correct": True, "sort_order": 1},
+                    {"is_correct": False, "sort_order": 2},
+                ],
+            }, "Bearer token")
+        self.core.tools.create_question.assert_not_awaited()
+
     async def test_complete_quiz_tool_creates_draft_then_questions(self):
         self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-1", "title": "Python"})
         self.core.tools.create_question = AsyncMock(side_effect=[{"id": "q-1"}, {"id": "q-2"}])
@@ -191,8 +228,14 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
             "title": "Python", "slug": "python", "category_id": "category-1",
             "difficulty_level": "EASY", "time_limit": 600, "quiz_type": "MULTIPLE_CHOICE",
             "questions": [
-                {"question_text": "Q1", "question_type": "SINGLE_CHOICE", "options": []},
-                {"question_text": "Q2", "question_type": "SINGLE_CHOICE", "options": []},
+                {"question_text": "Q1", "question_type": "SINGLE_CHOICE", "options": [
+                    {"option_text": "A", "is_correct": True, "sort_order": 1},
+                    {"option_text": "B", "is_correct": False, "sort_order": 2},
+                ]},
+                {"question_text": "Q2", "question_type": "SINGLE_CHOICE", "options": [
+                    {"option_text": "A", "is_correct": False, "sort_order": 1},
+                    {"option_text": "B", "is_correct": True, "sort_order": 2},
+                ]},
             ],
         }, "Bearer token")
         self.assertEqual(result["id"], "quiz-1")
@@ -309,6 +352,18 @@ class LangGraphContractTests(unittest.TestCase):
         self.assertNotIn("review_knowledge", creator_names)
         self.assertNotIn("create_category", creator_names)
         self.assertNotIn("list_audit_events", creator_names)
+
+    def test_create_question_schema_requires_option_text(self):
+        async def dispatch(_name, _args):
+            return "{}"
+
+        runner = LangGraphQuizRunner("test-model", "test-key", "https://example.test/v1")
+        tools = runner._build_tools(SCOPE_TOOLS["creator"], dispatch)
+        create_question = next(item for item in tools if item.name == "create_question")
+        schema = create_question.args_schema.model_json_schema()
+        option_schema = schema["$defs"]["QuestionOptionInput"]
+        self.assertIn("option_text", option_schema["required"])
+        self.assertEqual(option_schema["properties"]["option_text"]["minLength"], 1)
 
     def test_graph_step_limit_defaults_to_twelve(self):
         core = AIAgentCore({})

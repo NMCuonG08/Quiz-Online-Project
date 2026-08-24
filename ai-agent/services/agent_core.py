@@ -1015,6 +1015,11 @@ class AIAgentCore:
         # Approval records may outlive a deployment. Normalize again at the
         # execution boundary so legacy pending payloads cannot bypass aliases.
         args = self._normalize_write_args(name, args)
+        if name in {"create_question", "update_question"}:
+            self._validate_question_payload(args)
+        if name == "create_quiz_with_questions":
+            for question in args.get("questions") or []:
+                self._validate_question_payload(question)
         if name == "create_quiz":
             payload = {key: value for key, value in args.items() if value not in (None, "")}
             payload.setdefault("description", ""); payload.setdefault("max_attempts", 0); payload.setdefault("passing_score", 0); payload.setdefault("is_active", False); payload.setdefault("instructions", "")
@@ -1145,11 +1150,30 @@ class AIAgentCore:
         if normalized.get("question_type"):
             raw = AIAgentCore._enum_key(normalized["question_type"])
             normalized["question_type"] = question_type_aliases.get(raw, raw)
+        if isinstance(normalized.get("options"), list):
+            normalized["options"] = [
+                AIAgentCore._normalize_question_option(option)
+                for option in normalized["options"]
+            ]
         if name == "create_quiz_with_questions":
             normalized["questions"] = [
                 AIAgentCore._normalize_write_args("create_question", question)
                 for question in normalized.get("questions") or []
             ]
+        return normalized
+
+    @staticmethod
+    def _normalize_question_option(option: Any) -> Dict[str, Any]:
+        if not isinstance(option, dict):
+            return {}
+        normalized = dict(option)
+        if not str(normalized.get("option_text") or "").strip():
+            for alias in ("text", "content", "label", "value"):
+                if str(normalized.get(alias) or "").strip():
+                    normalized["option_text"] = normalized[alias]
+                    break
+        for alias in ("text", "content", "label", "value"):
+            normalized.pop(alias, None)
         return normalized
 
     @staticmethod
@@ -1202,14 +1226,29 @@ class AIAgentCore:
             if destructive else
             "Kiểm tra thông tin trước khi tiếp tục. Hệ thống chỉ thực hiện sau khi bạn xác nhận."
         )
+        blocks: list[dict[str, Any]] = [{
+            "id": "write-summary", "type": "list",
+            "title": "Thông tin đề xuất", "description": operation_label,
+            "tone": "danger" if destructive else "warning", "items": items,
+        }]
+        options = args.get("options")
+        if name in {"create_question", "update_question"} and isinstance(options, list) and options:
+            blocks.append({
+                "id": "question-options", "type": "table", "title": "Đáp án",
+                "description": f"{len(options)} lựa chọn",
+                "columns": ["#", "Nội dung", "Kết quả"],
+                "rows": [
+                    [
+                        str(index), str(option.get("option_text") or ""),
+                        "Đúng" if option.get("is_correct") is True else "Sai",
+                    ]
+                    for index, option in enumerate(options, start=1) if isinstance(option, dict)
+                ],
+            })
         return UISurface(
             title=title,
             description=description,
-            blocks=[{
-                "id": "write-summary", "type": "list",
-                "title": "Thông tin đề xuất", "description": operation_label,
-                "tone": "danger" if destructive else "warning", "items": items,
-            }],
+            blocks=blocks,
             actions=[{
                 "id": "approve", "label": action_label, "kind": "approve", "value": approval_token,
                 "variant": "danger" if destructive else "primary",
@@ -1258,6 +1297,11 @@ class AIAgentCore:
     def _validate_question_payload(payload: Dict[str, Any]) -> None:
         question_type = str(payload.get("question_type") or "")
         options = payload.get("options") or []
+        for index, option in enumerate(options, start=1):
+            if not isinstance(option, dict) or not str(option.get("option_text") or "").strip():
+                raise ValueError(
+                    f"QUESTION_OPTION_TEXT_REQUIRED: Đáp án {index} cần có nội dung option_text"
+                )
         if question_type in {"SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE"}:
             if len(options) < 2:
                 raise ValueError("QUESTION_OPTIONS_REQUIRED: Câu hỏi lựa chọn cần ít nhất 2 đáp án")

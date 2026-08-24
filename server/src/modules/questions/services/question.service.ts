@@ -16,6 +16,32 @@ import {
   MediaTypeEnum,
 } from '@/common/enums';
 
+export function parseQuestionOptions(value: unknown): Record<string, any>[] | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  let parsed: unknown = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new BadRequestException('Dữ liệu đáp án không phải JSON hợp lệ');
+    }
+  }
+  if (!Array.isArray(parsed)) {
+    throw new BadRequestException('Danh sách đáp án phải là một mảng');
+  }
+  return parsed.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new BadRequestException(`Đáp án ${index + 1} không hợp lệ`);
+    }
+    const option = item as Record<string, any>;
+    const optionText = option.option_text ?? option.text ?? option.content ?? option.label ?? option.value;
+    if (typeof optionText !== 'string' || !optionText.trim()) {
+      throw new BadRequestException(`Đáp án ${index + 1} thiếu nội dung option_text`);
+    }
+    return { ...option, option_text: optionText.trim() };
+  });
+}
+
 @Injectable()
 export class QuestionService extends BaseService {
   async getQuestions(
@@ -124,17 +150,7 @@ export class QuestionService extends BaseService {
     }
 
     // Parse options if provided
-    let optionsData: any[] | undefined;
-    if (question.options) {
-      try {
-        optionsData =
-          typeof question.options === 'string'
-            ? JSON.parse(question.options)
-            : question.options;
-      } catch (e) {
-        console.error('Failed to parse options:', e);
-      }
-    }
+    const optionsData = parseQuestionOptions(question.options);
 
     // Prepare question data without options
     const { options, ...restOfQuestion } = question;
@@ -192,17 +208,7 @@ export class QuestionService extends BaseService {
     }
 
     // Parse options if provided
-    let optionsData: any[] | undefined;
-    if (updateData.options) {
-      try {
-        optionsData =
-          typeof updateData.options === 'string'
-            ? JSON.parse(updateData.options)
-            : updateData.options;
-      } catch (e) {
-        console.error('Failed to parse options:', e);
-      }
-    }
+    const optionsData = parseQuestionOptions(updateData.options);
 
     // Handle option media files if provided
     if (optionsData && optionMediaFiles && optionMediaFiles.length > 0) {
