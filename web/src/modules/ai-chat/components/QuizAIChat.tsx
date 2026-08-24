@@ -144,6 +144,30 @@ export default function QuizAIChat() {
     }
   };
 
+  const deleteHistoryConversation = async (targetSessionId: string) => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return;
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333").replace(/\/$/, "");
+    try {
+      const response = await fetch(
+        `${baseUrl}/api/ai-chat/conversations/${targetSessionId}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) return;
+      setHistory((current) => current.filter((item) => item.session_id !== targetSessionId));
+      if (targetSessionId === sessionId) {
+        abortRef.current?.abort();
+        localStorage.removeItem(sessionStorageKey);
+        setSessionId(undefined);
+        setMessages([WELCOME_MESSAGE]);
+        setInput("");
+      }
+      setHistoryUnavailable(false);
+    } catch {
+      setHistoryUnavailable(true);
+    }
+  };
+
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const subtitle = useMemo(
@@ -313,7 +337,22 @@ export default function QuizAIChat() {
           </header>
           {historyOpen && (
             <div className="max-h-44 overflow-y-auto border-b border-border bg-background p-2">
-              {historyUnavailable ? <p className="px-2 py-3 text-xs text-amber-600">Backend đang offline; lịch sử chat sẽ tải lại khi kết nối.</p> : history.length ? history.map((item) => <button key={item.session_id} onClick={() => void openHistoryConversation(item.session_id)} className="block w-full rounded-lg px-2.5 py-2 text-left text-xs hover:bg-muted"><span className="block truncate font-medium">{item.title}</span><span className="text-[10px] text-muted-foreground">{new Date(item.updated_at).toLocaleString()}</span></button>) : <p className="px-2 py-3 text-xs text-muted-foreground">{user ? "Chưa có lịch sử chat." : "Đăng nhập để lưu và mở lại lịch sử chat."}</p>}
+              {historyUnavailable ? <p className="px-2 py-3 text-xs text-amber-600">Backend đang offline; lịch sử chat sẽ tải lại khi kết nối.</p> : history.length ? history.map((item) => (
+                <div key={item.session_id} className="group flex items-center gap-1 rounded-lg hover:bg-muted">
+                  <button onClick={() => void openHistoryConversation(item.session_id)} className="min-w-0 flex-1 px-2.5 py-2 text-left text-xs">
+                    <span className="block truncate font-medium">{item.title}</span>
+                    <span className="text-[10px] text-muted-foreground">{new Date(item.updated_at).toLocaleString()}</span>
+                  </button>
+                  <button
+                    onClick={() => void deleteHistoryConversation(item.session_id)}
+                    className="mr-1 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+                    aria-label={`Xóa lịch sử ${item.title}`}
+                    title="Xóa ngay"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )) : <p className="px-2 py-3 text-xs text-muted-foreground">{user ? "Chưa có lịch sử chat." : "Đăng nhập để lưu và mở lại lịch sử chat."}</p>}
             </div>
           )}
 
