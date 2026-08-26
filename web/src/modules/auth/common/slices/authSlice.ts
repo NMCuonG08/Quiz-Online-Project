@@ -124,10 +124,7 @@ export const registerUser = createAsyncThunk(
 
 export const updateUserProfile = createAsyncThunk(
   "auth/updateUserProfile",
-  async (
-    payload: { id: string; data: { username?: string; fullName?: string; avatar?: string; email?: string } },
-    { rejectWithValue }
-  ) => {
+  async (payload: { id: string; data: { username?: string; fullName?: string; avatar?: string; email?: string } }) => {
     // If we had an AuthenticationService.updateProfile, we would use it.
     // Instead relying on the external return of the UserService.
     // This thunk just updates the state with the provided data payload.
@@ -215,6 +212,12 @@ const authSlice = createSlice({
         state.error = null;
         console.log("🚫 No token found, keeping logged out state");
       }
+    },
+    tokenRefreshed: (state, action: PayloadAction<string>) => {
+      state.token = action.payload;
+      state.isAuthenticated = true;
+      state.error = null;
+      TokenStorage.set(action.payload);
     },
   },
   extraReducers: (builder) => {
@@ -387,5 +390,6 @@ export const {
   forceLogout,
   clearAuth,
   restoreAuth,
+  tokenRefreshed,
 } = authSlice.actions;
 export default authSlice.reducer;

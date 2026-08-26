@@ -23,10 +23,11 @@ import { useLocale } from "next-intl";
 import { usePathname } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useAppSelector } from "@/hooks/useRedux";
+import { useAppDispatch, useAppSelector } from "@/hooks/useRedux";
 import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
+import { forceLogout, tokenRefreshed } from "@/modules/auth/common/slices/authSlice";
 import { cn } from "@/lib/utils";
-import { streamAgentChat } from "../services/agent-stream.service";
+import { AgentStreamError, streamAgentChat } from "../services/agent-stream.service";
 import type { AgentStreamEvent, ChatAction, ChatMessage, ChatRole, ChatScope, UIBlock, UISurface } from "../types";
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -218,6 +219,7 @@ export default function QuizAIChat() {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useLocalizedRouter();
+  const dispatch = useAppDispatch();
   const auth = useAppSelector((state) => state.auth);
   const user = auth.user;
   const principalKey = user?.id ? `user:${user.id}` : "unauthenticated";
@@ -418,6 +420,8 @@ export default function QuizAIChat() {
         scope,
         context: { route: pathname || "/" },
         signal: controller.signal,
+        accessToken: auth.token,
+        onTokenRefreshed: (token) => dispatch(tokenRefreshed(token)),
         onEvent: (event) => {
           if (event.type === "done" && event.intent === "approved_write") {
             approvalFinished = true;
@@ -435,11 +439,13 @@ export default function QuizAIChat() {
           : message));
       }
       if (!open) setUnread(true);
-    } catch {
+    } catch (error: unknown) {
+      const streamError = error instanceof AgentStreamError ? error : null;
+      if (streamError?.status === 401) dispatch(forceLogout());
       patchAssistant(assistantId, {
         content: controller.signal.aborted
           ? "Đã dừng phản hồi."
-          : "Không kết nối được AI Agent Server tại cổng 8000.",
+          : streamError?.message || "Không kết nối được AI Agent Server.",
         isStreaming: false,
         status: undefined,
         error: !controller.signal.aborted,

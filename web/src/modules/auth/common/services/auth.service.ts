@@ -69,7 +69,7 @@ export class AuthenticationService {
     }
   }
 
-  static async handleRegister(credentials: RegisterFormData) {
+  static async handleRegister(credentials: Omit<RegisterFormData, "confirmPassword">) {
     try {
       const response = await apiClient.post(apiRoutes.AUTH.REGISTER, credentials);
       return response.data;
@@ -137,7 +137,6 @@ export class AuthenticationService {
     } catch (error) {
       console.error("Token refresh failed:", error);
       // Normalize error shape
-      // @ts-expect-error Axios error dynamic
       const resp = error?.response?.data;
       return (
         resp || {
