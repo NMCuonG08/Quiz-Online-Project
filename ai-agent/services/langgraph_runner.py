@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Literal, Optional
+from typing import Annotated, Any, Awaitable, Callable, Literal, Optional
 from langchain_core._api.deprecation import suppress_langchain_deprecation_warning
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+from .protocol import UIAction, UIBlock
 with suppress_langchain_deprecation_warning():
     from langgraph.graph import END, START, MessagesState, StateGraph
     from langgraph.prebuilt import ToolNode, tools_condition
@@ -18,6 +19,24 @@ ToolDispatcher = Callable[[str, dict[str, Any]], Awaitable[str]]
 DifficultyLevel = Literal["EASY", "MEDIUM", "HARD"]
 QuizType = Literal["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]
 QuestionType = Literal["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]
+InteractionIntent = Literal[
+    "quiz_create", "quiz_discovery", "quiz_delete", "learning_history",
+    "knowledge_import", "auth_required", "no_evidence", "temporal",
+    "account_data", "app_data", "creator_data", "admin_data", "general",
+]
+MissingField = Literal[
+    "title", "category", "category_id", "difficulty", "difficulty_level", "time_limit", "quiz_type",
+]
+KnowledgeVisibility = Literal["PUBLIC", "PRIVATE"]
+KnowledgeReviewStatus = Literal["PUBLISHED", "QUARANTINED"]
+Limit10 = Annotated[int, Field(ge=1, le=10)]
+Limit20 = Annotated[int, Field(ge=1, le=20)]
+Limit50 = Annotated[int, Field(ge=1, le=50)]
+Limit200 = Annotated[int, Field(ge=1, le=200)]
+PositiveNumber = Annotated[float, Field(ge=1)]
+NonNegativeNumber = Annotated[float, Field(ge=0)]
+Percentage = Annotated[float, Field(ge=0, le=100)]
+NonNegativeInteger = Annotated[int, Field(ge=0)]
 
 
 class QuestionOptionInput(BaseModel):
@@ -31,12 +50,17 @@ class QuestionDraftInput(BaseModel):
     question_text: str = Field(min_length=1)
     question_type: QuestionType
     options: list[QuestionOptionInput]
-    points: float = 1
-    time_limit: float = 0
+    points: NonNegativeNumber = 1
+    time_limit: NonNegativeNumber = 0
     explanation: str = ""
     difficulty_level: Optional[DifficultyLevel] = None
-    sort_order: int = 0
+    sort_order: NonNegativeInteger = 0
     is_required: bool = True
+
+
+class QuestionOrderInput(BaseModel):
+    id: str = Field(min_length=1)
+    sort_order: int = Field(ge=0)
 
 
 class LangGraphQuizRunner:
@@ -118,7 +142,7 @@ class LangGraphQuizRunner:
         config: dict[str, Any],
     ) -> dict[str, Any]:
         @tool("plan_interaction")
-        async def plan_interaction(intent: str, missing_fields: list[str] = []) -> str:
+        async def plan_interaction(intent: InteractionIntent, missing_fields: Optional[list[MissingField]] = None) -> str:
             """Classify the interaction as quiz_create, quiz_discovery, quiz_delete,
             learning_history, knowledge_import, auth_required, no_evidence, temporal,
             account_data, app_data, creator_data, admin_data, or general."""
@@ -158,9 +182,9 @@ class LangGraphQuizRunner:
 
         if include("plan_interaction"):
             @tool
-            async def plan_interaction(intent: str, missing_fields: list[str] = []) -> str:
+            async def plan_interaction(intent: InteractionIntent, missing_fields: Optional[list[MissingField]] = None) -> str:
                 """Request a server-owned special interaction template."""
-                return await dispatch("plan_interaction", {"intent": intent, "missing_fields": missing_fields})
+                return await dispatch("plan_interaction", {"intent": intent, "missing_fields": missing_fields or []})
             tools.append(plan_interaction)
 
         if include("get_current_time"):
@@ -186,14 +210,14 @@ class LangGraphQuizRunner:
 
         if include("search_quizzes"):
             @tool
-            async def search_quizzes(query: str, limit: int = 10) -> str:
+            async def search_quizzes(query: str, limit: Limit20 = 10) -> str:
                 """Search real quizzes in the application database."""
                 return await dispatch("search_quizzes", {"query": query, "limit": limit})
             tools.append(search_quizzes)
 
         if include("recommend_quizzes"):
             @tool
-            async def recommend_quizzes(limit: int = 10) -> str:
+            async def recommend_quizzes(limit: Limit20 = 10) -> str:
                 """Recommend popular quizzes from real application data."""
                 return await dispatch("recommend_quizzes", {"limit": limit})
             tools.append(recommend_quizzes)
@@ -207,7 +231,7 @@ class LangGraphQuizRunner:
 
         if include("search_knowledge"):
             @tool
-            async def search_knowledge(query: str, limit: int = 5) -> str:
+            async def search_knowledge(query: str, limit: Limit10 = 5) -> str:
                 """Search published public knowledge before web search."""
                 return await dispatch("search_knowledge", {"query": query, "limit": limit})
             tools.append(search_knowledge)
@@ -256,14 +280,14 @@ class LangGraphQuizRunner:
 
         if include("get_my_quizzes"):
             @tool
-            async def get_my_quizzes(limit: int = 10) -> str:
+            async def get_my_quizzes(limit: Limit20 = 10) -> str:
                 """Get quizzes owned by the signed-in user."""
                 return await dispatch("get_my_quizzes", {"limit": limit})
             tools.append(get_my_quizzes)
 
         if include("get_quiz_history"):
             @tool
-            async def get_quiz_history(limit: int = 10) -> str:
+            async def get_quiz_history(limit: Limit50 = 10) -> str:
                 """Get completed quiz attempts for the signed-in user."""
                 return await dispatch("get_quiz_history", {"limit": limit})
             tools.append(get_quiz_history)
@@ -277,7 +301,7 @@ class LangGraphQuizRunner:
 
         if include("get_all_attempts"):
             @tool
-            async def get_all_attempts(limit: int = 20) -> str:
+            async def get_all_attempts(limit: Limit50 = 20) -> str:
                 """Get all learner attempts and progress."""
                 return await dispatch("get_all_attempts", {"limit": limit})
             tools.append(get_all_attempts)
@@ -305,7 +329,7 @@ class LangGraphQuizRunner:
 
         if include("web_search"):
             @tool
-            async def web_search(query: str, limit: int = 5) -> str:
+            async def web_search(query: str, limit: Limit10 = 5) -> str:
                 """Search web only after internal sources are insufficient."""
                 return await dispatch("web_search", {"query": query, "limit": limit})
             tools.append(web_search)
@@ -327,7 +351,7 @@ class LangGraphQuizRunner:
         if include("list_audit_events"):
             @tool
             async def list_audit_events(
-                limit: int = 50, action: str = "", resource_type: str = "",
+                limit: Limit200 = 50, action: str = "", resource_type: str = "",
             ) -> str:
                 """Admin only: list recent audit events without secrets."""
                 return await dispatch("list_audit_events", {
@@ -339,8 +363,8 @@ class LangGraphQuizRunner:
             @tool
             async def create_quiz(
                 title: str, slug: str, category_id: str, difficulty_level: DifficultyLevel,
-                time_limit: float, quiz_type: QuizType, description: str = "",
-                max_attempts: float = 0, passing_score: float = 0,
+                time_limit: PositiveNumber, quiz_type: QuizType, description: str = "",
+                max_attempts: NonNegativeNumber = 0, passing_score: Percentage = 0,
                 is_active: bool = False, instructions: str = "",
             ) -> str:
                 """Propose creating a quiz; execution still requires Accept."""
@@ -357,9 +381,10 @@ class LangGraphQuizRunner:
             @tool
             async def create_quiz_with_questions(
                 title: str, slug: str, category_id: str, difficulty_level: DifficultyLevel,
-                time_limit: float, quiz_type: QuizType, questions: list[QuestionDraftInput],
-                description: str = "", max_attempts: float = 0,
-                passing_score: float = 0, instructions: str = "",
+                time_limit: PositiveNumber, quiz_type: QuizType,
+                questions: Annotated[list[QuestionDraftInput], Field(min_length=1)],
+                description: str = "", max_attempts: NonNegativeNumber = 0,
+                passing_score: Percentage = 0, instructions: str = "",
             ) -> str:
                 """Propose one inactive quiz draft plus all questions/options; execution requires Accept."""
                 return await dispatch("create_quiz_with_questions", {
@@ -377,9 +402,9 @@ class LangGraphQuizRunner:
             async def update_quiz(
                 quiz_id: str, title: Optional[str] = None, slug: Optional[str] = None,
                 category_id: Optional[str] = None, description: Optional[str] = None,
-                difficulty_level: Optional[str] = None, time_limit: Optional[float] = None,
-                max_attempts: Optional[float] = None, passing_score: Optional[float] = None,
-                is_active: Optional[bool] = None, quiz_type: Optional[str] = None,
+                difficulty_level: Optional[DifficultyLevel] = None, time_limit: Optional[PositiveNumber] = None,
+                max_attempts: Optional[NonNegativeNumber] = None, passing_score: Optional[Percentage] = None,
+                is_active: Optional[bool] = None, quiz_type: Optional[QuizType] = None,
                 instructions: Optional[str] = None,
             ) -> str:
                 """Propose updating an owned quiz; execution still requires Accept."""
@@ -424,10 +449,10 @@ class LangGraphQuizRunner:
             @tool
             async def create_question(
                 quiz_id: str, question_text: str, question_type: QuestionType,
-                options: list[QuestionOptionInput], points: float = 1,
-                time_limit: float = 0, explanation: str = "",
-                difficulty_level: Optional[DifficultyLevel] = None, sort_order: int = 0,
-                is_required: bool = True,
+                options: list[QuestionOptionInput], points: NonNegativeNumber = 1,
+                time_limit: NonNegativeNumber = 0, explanation: str = "",
+                difficulty_level: Optional[DifficultyLevel] = None, sort_order: NonNegativeInteger = 0,
+                is_required: bool = True, slug: str = "",
             ) -> str:
                 """Propose creating a question; execution still requires Accept."""
                 return await dispatch("create_question", {
@@ -436,7 +461,7 @@ class LangGraphQuizRunner:
                     "options": [option.model_dump() for option in options], "points": points,
                     "time_limit": time_limit, "explanation": explanation,
                     "difficulty_level": difficulty_level, "sort_order": sort_order,
-                    "is_required": is_required,
+                    "is_required": is_required, "slug": slug,
                 })
             tools.append(create_question)
 
@@ -444,11 +469,11 @@ class LangGraphQuizRunner:
             @tool
             async def update_question(
                 question_id: str, question_text: Optional[str] = None,
-                question_type: Optional[QuestionType] = None, points: Optional[float] = None,
-                time_limit: Optional[float] = None, explanation: Optional[str] = None,
-                difficulty_level: Optional[DifficultyLevel] = None, sort_order: Optional[int] = None,
+                question_type: Optional[QuestionType] = None, points: Optional[NonNegativeNumber] = None,
+                time_limit: Optional[NonNegativeNumber] = None, explanation: Optional[str] = None,
+                difficulty_level: Optional[DifficultyLevel] = None, sort_order: Optional[NonNegativeInteger] = None,
                 is_required: Optional[bool] = None,
-                options: Optional[list[QuestionOptionInput]] = None,
+                options: Optional[list[QuestionOptionInput]] = None, slug: Optional[str] = None,
             ) -> str:
                 """Propose updating a question; execution still requires Accept."""
                 return await dispatch("update_question", {
@@ -456,7 +481,7 @@ class LangGraphQuizRunner:
                     "question_type": question_type, "points": points,
                     "time_limit": time_limit, "explanation": explanation,
                     "difficulty_level": difficulty_level, "sort_order": sort_order,
-                    "is_required": is_required,
+                    "is_required": is_required, "slug": slug,
                     "options": [option.model_dump() for option in options] if options is not None else None,
                 })
             tools.append(update_question)
@@ -482,18 +507,19 @@ class LangGraphQuizRunner:
         if include("reorder_questions"):
             @tool
             async def reorder_questions(
-                quiz_id: str, question_orders: list[dict[str, Any]],
+                quiz_id: str, question_orders: list[QuestionOrderInput],
             ) -> str:
                 """Propose reordering questions in an owned quiz; execution requires Accept."""
                 return await dispatch("reorder_questions", {
-                    "quiz_id": quiz_id, "question_orders": question_orders,
+                    "quiz_id": quiz_id,
+                    "question_orders": [item.model_dump() for item in question_orders],
                 })
             tools.append(reorder_questions)
 
         if include("import_knowledge_url"):
             @tool
             async def import_knowledge_url(
-                url: str, title: str = "", visibility: str = "PRIVATE",
+                url: str, title: str = "", visibility: KnowledgeVisibility = "PRIVATE",
             ) -> str:
                 """Propose importing a safe URL as a DRAFT knowledge source; execution requires Accept."""
                 return await dispatch("import_knowledge_url", {
@@ -511,7 +537,7 @@ class LangGraphQuizRunner:
         if include("review_knowledge"):
             @tool
             async def review_knowledge(
-                source_id: str, status: str, rejection_reason: str = "",
+                source_id: str, status: KnowledgeReviewStatus, rejection_reason: str = "",
             ) -> str:
                 """Admin only: propose publishing or quarantining a source; execution requires Accept."""
                 return await dispatch("review_knowledge", {
@@ -524,12 +550,13 @@ class LangGraphQuizRunner:
             @tool
             async def render_ui(
                 title: str = "", description: str = "",
-                blocks: list[dict[str, Any]] = [], actions: list[dict[str, Any]] = [],
+                blocks: Optional[list[UIBlock]] = None, actions: Optional[list[UIAction]] = None,
             ) -> str:
                 """Render generic UI only when no server-owned interaction policy applies."""
                 return await dispatch("render_ui", {
                     "title": title, "description": description,
-                    "blocks": blocks, "actions": actions,
+                    "blocks": [block.model_dump(exclude_none=True) for block in (blocks or [])],
+                    "actions": [action.model_dump(exclude_none=True) for action in (actions or [])],
                 })
             tools.append(render_ui)
 

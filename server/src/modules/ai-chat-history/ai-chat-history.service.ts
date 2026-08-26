@@ -18,33 +18,58 @@ const ALLOWED_METADATA_KEYS = new Set([
   'error',
   'approval_expires_at',
   'resolved_approval_token',
+  'approval_succeeded',
 ]);
 
 @Injectable()
 export class AiChatHistoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async append(userId: string, sessionId: string, scope: string, messages: HistoryMessage[]) {
-    const safe = messages.filter((message) =>
-      ['user', 'assistant'].includes(message.role) && typeof message.content === 'string' && message.content.trim(),
-    ).map((message) => ({
-      role: message.role,
-      content: message.content.slice(0, 8000),
-      metadata: this.sanitizeMetadata(message.metadata),
-    }));
+  async append(
+    userId: string,
+    sessionId: string,
+    scope: string,
+    messages: HistoryMessage[],
+  ) {
+    const safe = messages
+      .filter(
+        (message) =>
+          ['user', 'assistant'].includes(message.role) &&
+          typeof message.content === 'string' &&
+          message.content.trim(),
+      )
+      .map((message) => ({
+        role: message.role,
+        content: message.content.slice(0, 8000),
+        metadata: this.sanitizeMetadata(message.metadata),
+      }));
     if (!safe.length) return null;
     const conversation = await this.prisma.aiChatConversation.upsert({
       where: { user_id_session_id: { user_id: userId, session_id: sessionId } },
-      create: { user_id: userId, session_id: sessionId, scope, title: safe.find((item) => item.role === 'user')?.content.slice(0, 160) || 'Cuộc trò chuyện mới' },
+      create: {
+        user_id: userId,
+        session_id: sessionId,
+        scope,
+        title:
+          safe.find((item) => item.role === 'user')?.content.slice(0, 160) ||
+          'Cuộc trò chuyện mới',
+      },
       update: { scope, updated_at: new Date() },
     });
-    await this.prisma.aiChatMessage.createMany({ data: safe.map((message) => ({ ...message, conversation_id: conversation.id })) });
+    await this.prisma.aiChatMessage.createMany({
+      data: safe.map((message) => ({
+        ...message,
+        conversation_id: conversation.id,
+      })),
+    });
     return { id: conversation.id, session_id: sessionId };
   }
 
   async list(userId: string) {
     return this.prisma.aiChatConversation.findMany({
-      where: { user_id: userId }, orderBy: { updated_at: 'desc' }, take: 50,
+      where: { user_id: userId },
+      orderBy: { updated_at: 'desc' },
+      take: 50,
       select: { session_id: true, title: true, scope: true, updated_at: true },
     });
   }
@@ -54,12 +79,15 @@ export class AiChatHistoryService {
       where: { user_id_session_id: { user_id: userId, session_id: sessionId } },
       include: { messages: { orderBy: { created_at: 'asc' } } },
     });
-    if (!conversation) throw new NotFoundException('Chat conversation not found');
+    if (!conversation)
+      throw new NotFoundException('Chat conversation not found');
     return conversation;
   }
 
   async remove(userId: string, sessionId: string) {
-    await this.prisma.aiChatConversation.delete({ where: { user_id_session_id: { user_id: userId, session_id: sessionId } } });
+    await this.prisma.aiChatConversation.delete({
+      where: { user_id_session_id: { user_id: userId, session_id: sessionId } },
+    });
     return { deleted: true };
   }
 
@@ -67,8 +95,8 @@ export class AiChatHistoryService {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     const source = value as Record<string, unknown>;
     const filtered = Object.fromEntries(
-      Object.entries(source).filter(([key, item]) =>
-        ALLOWED_METADATA_KEYS.has(key) && item !== undefined,
+      Object.entries(source).filter(
+        ([key, item]) => ALLOWED_METADATA_KEYS.has(key) && item !== undefined,
       ),
     );
     try {

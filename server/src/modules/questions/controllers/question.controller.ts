@@ -24,6 +24,10 @@ import { CreateQuestionDto } from '../dtos/create-question.dto';
 import { UpdateQuestionDto } from '../dtos/update-question.dto';
 import { QuestionPaginationQueryDto } from '../dtos/question-pagination.dto';
 import { QuestionResponseDto } from '../dtos/question-response.dto';
+import {
+  DuplicateQuestionDto,
+  ReorderQuestionsDto,
+} from '../dtos/question-actions.dto';
 import { PaginatedResponseDto } from '@/common/dtos/responses/base.response';
 import { Permission } from '@/common/enums/permisson';
 import { Auth, Authenticated, AuthGuard } from '@/common/guards/auth.guard';
@@ -158,7 +162,10 @@ export class QuestionController {
     @Auth() auth?: AuthDto,
   ): Promise<QuestionResponseDto> {
     return this.questionService.createQuestion(
-      question, media, auth?.user.id, auth?.user.isAdmin,
+      question,
+      media,
+      auth?.user.id,
+      auth?.user.isAdmin,
     );
   }
 
@@ -218,9 +225,14 @@ export class QuestionController {
     description: 'Question not found',
   })
   async deleteQuestion(
-    @Param('id') id: string, @Auth() auth?: AuthDto,
+    @Param('id') id: string,
+    @Auth() auth?: AuthDto,
   ): Promise<void> {
-    return this.questionService.deleteQuestion(id, auth?.user.id, auth?.user.isAdmin);
+    return this.questionService.deleteQuestion(
+      id,
+      auth?.user.id,
+      auth?.user.isAdmin,
+    );
   }
 
   @Post(':id/duplicate')
@@ -238,11 +250,14 @@ export class QuestionController {
   })
   async duplicateQuestion(
     @Param('id') id: string,
-    @Body() body?: { newQuizId?: string },
+    @Body() body?: DuplicateQuestionDto,
     @Auth() auth?: AuthDto,
   ): Promise<QuestionResponseDto> {
     return this.questionService.duplicateQuestion(
-      id, body?.newQuizId, auth?.user.id, auth?.user.isAdmin,
+      id,
+      body?.newQuizId,
+      auth?.user.id,
+      auth?.user.isAdmin,
     );
   }
 
@@ -260,11 +275,14 @@ export class QuestionController {
   })
   async reorderQuestions(
     @Param('quizId') quizId: string,
-    @Body() body: { questionOrders: { id: string; sort_order: number }[] },
+    @Body() body: ReorderQuestionsDto,
     @Auth() auth?: AuthDto,
   ): Promise<void> {
     return this.questionService.reorderQuestions(
-      quizId, body.questionOrders, auth?.user.id, auth?.user.isAdmin,
+      quizId,
+      body.questionOrders,
+      auth?.user.id,
+      auth?.user.isAdmin,
     );
   }
 }

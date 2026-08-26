@@ -69,13 +69,9 @@ export class QuizService {
           quizId
         );
 
-      const endpoint = isUUID
-        ? apiRoutes.QUIZ_SESSIONS.CREATE_PUBLIC
-        : apiRoutes.QUIZ_SESSIONS.CREATE_PUBLIC_BY_SLUG;
-
       const payload = isUUID ? { quiz_id: quizId } : { quiz_slug: quizId };
 
-      const response = await apiClient.post(endpoint, payload);
+      const response = await apiClient.post(apiRoutes.QUIZ_SESSIONS.CREATE, payload);
       return response.data as QuizSessionResponse;
     } catch (error: unknown) {
       const err = error as { response?: { data?: unknown } };
@@ -97,7 +93,7 @@ export class QuizService {
   ): Promise<{ success: boolean; message: string }> {
     try {
       const response = await apiClient.post(
-        apiRoutes.QUIZ_SESSIONS.SUBMIT_ANSWER_PUBLIC(sessionId),
+        apiRoutes.QUIZ_SESSIONS.SUBMIT_ANSWER(sessionId),
         {
           question_id: questionId,
           ...answer,
@@ -118,7 +114,7 @@ export class QuizService {
   static async completeQuiz(sessionId: string): Promise<QuizResultResponse> {
     try {
       const response = await apiClient.post(
-        apiRoutes.QUIZ_SESSIONS.COMPLETE_PUBLIC(sessionId)
+        apiRoutes.QUIZ_SESSIONS.COMPLETE(sessionId)
       );
       return response.data as QuizResultResponse;
     } catch (error: unknown) {

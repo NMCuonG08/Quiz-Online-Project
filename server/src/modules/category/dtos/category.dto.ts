@@ -89,6 +89,7 @@ export class UpdateCategoryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
+  @IsBoolean()
   is_active?: boolean;
 
   @ApiPropertyOptional({

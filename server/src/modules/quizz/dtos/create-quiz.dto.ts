@@ -8,6 +8,8 @@ import {
   IsEnum,
   IsBoolean,
   IsDateString,
+  Max,
+  Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { DifficultyLevelEnum, QuizTypeEnumEnum } from '@/common/enums';
@@ -48,16 +50,20 @@ export class CreateQuizDto {
 
   @ApiProperty({ example: 600 })
   @IsNumber()
+  @Min(1)
   time_limit: number;
 
   @ApiProperty({ example: 1 })
   @IsOptional()
   @IsNumber()
+  @Min(0)
   max_attempts: number = 0;
 
   @ApiProperty({ example: 0 })
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(100)
   passing_score?: number;
 
   @ApiProperty({ example: true })

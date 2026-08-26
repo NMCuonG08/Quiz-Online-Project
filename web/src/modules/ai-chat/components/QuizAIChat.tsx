@@ -41,6 +41,21 @@ function uid(prefix: string) {
 }
 
 const TOOL_LABELS: Record<string, string> = {
+  plan_interaction: "Hiểu yêu cầu",
+  get_current_time: "Đọc thời gian hệ thống",
+  get_current_user: "Kiểm tra tài khoản",
+  get_my_permissions: "Kiểm tra quyền",
+  search_quizzes: "Tìm quiz",
+  recommend_quizzes: "Gợi ý quiz",
+  get_quiz: "Đọc chi tiết quiz",
+  list_categories: "Đọc danh mục",
+  get_my_quizzes: "Đọc quiz của bạn",
+  get_quiz_history: "Đọc lịch sử làm bài",
+  get_in_progress_quizzes: "Đọc quiz đang làm",
+  get_all_attempts: "Đọc tiến độ học",
+  get_quiz_result: "Đọc kết quả quiz",
+  search_knowledge: "Tìm nguồn kiến thức",
+  web_search: "Tìm kiếm trên web",
   create_quiz: "Tạo quiz",
   create_quiz_with_questions: "Tạo quiz hoàn chỉnh",
   update_quiz: "Cập nhật quiz",
@@ -50,9 +65,21 @@ const TOOL_LABELS: Record<string, string> = {
   create_question: "Tạo câu hỏi",
   update_question: "Cập nhật câu hỏi",
   delete_question: "Xóa câu hỏi",
-  list_categories: "Đọc danh mục",
-  get_my_quizzes: "Đọc quiz của bạn",
-  search_quizzes: "Tìm quiz",
+  list_questions: "Đọc danh sách câu hỏi",
+  get_quiz_build_status: "Kiểm tra quiz",
+  duplicate_question: "Sao chép câu hỏi",
+  reorder_questions: "Sắp xếp câu hỏi",
+  start_quiz: "Bắt đầu quiz",
+  list_knowledge_sources: "Đọc nguồn kiến thức",
+  import_knowledge_url: "Nhập nguồn kiến thức",
+  submit_knowledge_review: "Gửi duyệt nguồn",
+  review_knowledge: "Duyệt nguồn kiến thức",
+  create_category: "Tạo danh mục",
+  update_category: "Cập nhật danh mục",
+  delete_category: "Xóa danh mục",
+  get_admin_dashboard_stats: "Đọc thống kê quản trị",
+  list_audit_events: "Đọc nhật ký hệ thống",
+  render_ui: "Chuẩn bị giao diện",
 };
 
 function toolLabel(tool: string) {
@@ -73,7 +100,52 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function disableApproval(surface: UISurface, resolvedTokens: Set<string>, expiresAt?: string): UISurface {
+function isUISurface(value: unknown): value is UISurface {
+  const surface = asRecord(value);
+  if (!Array.isArray(surface.blocks) || !Array.isArray(surface.actions)) return false;
+  const validBlockTypes = new Set(["notice", "list", "table", "stats", "form"]);
+  const validTones = new Set(["neutral", "info", "success", "warning", "danger"]);
+  const validActionKinds = new Set(["navigate", "prompt", "approve"]);
+  return surface.blocks.every((item) => {
+    const block = asRecord(item);
+    return typeof block.id === "string"
+      && typeof block.type === "string"
+      && validBlockTypes.has(block.type)
+      && typeof block.title === "string"
+      && typeof block.description === "string"
+      && typeof block.tone === "string"
+      && validTones.has(block.tone)
+      && Array.isArray(block.items)
+      && block.items.every((entry) => typeof asRecord(entry).label === "string")
+      && Array.isArray(block.columns)
+      && block.columns.every((entry) => typeof entry === "string")
+      && Array.isArray(block.rows)
+      && block.rows.every((row) => Array.isArray(row) && row.every((cell) => typeof cell === "string"))
+      && Array.isArray(block.stats)
+      && block.stats.every((entry) => {
+        const stat = asRecord(entry);
+        return typeof stat.label === "string" && typeof stat.value === "string";
+      })
+      && Array.isArray(block.fields)
+      && block.fields.every((entry) => {
+        const field = asRecord(entry);
+        return typeof field.name === "string"
+          && typeof field.label === "string"
+          && Array.isArray(field.options)
+          && field.options.every((option) => typeof option === "string");
+      });
+  }) && surface.actions.every((item) => {
+    const action = asRecord(item);
+    return typeof action.id === "string"
+      && typeof action.label === "string"
+      && typeof action.kind === "string"
+      && validActionKinds.has(action.kind)
+      && typeof action.value === "string"
+      && (action.kind !== "navigate" || action.value.startsWith("/"));
+  });
+}
+
+function disableApproval(surface: UISurface, resolvedTokens: Map<string, boolean>, expiresAt?: string): UISurface {
   const expired = Boolean(expiresAt && Date.parse(expiresAt) <= Date.now());
   return {
     ...surface,
@@ -84,23 +156,32 @@ function disableApproval(surface: UISurface, resolvedTokens: Set<string>, expire
       return {
         ...action,
         disabled: true,
-        label: resolved ? "Đã thực hiện" : "Đã hết hạn",
+        label: resolved
+          ? resolvedTokens.get(action.value) ? "Đã thực hiện" : "Đã thất bại"
+          : "Đã hết hạn",
       };
     }),
   };
 }
 
 function hydrateHistoryMessages(items: PersistedMessage[]): ChatMessage[] {
-  const resolvedTokens = new Set(
-    items.map((item) => asRecord(item.metadata).resolved_approval_token)
-      .filter((value): value is string => typeof value === "string"),
-  );
+  const resolvedTokens = new Map<string, boolean>();
+  items.forEach((item) => {
+    const metadata = asRecord(item.metadata);
+    if (typeof metadata.resolved_approval_token === "string") {
+      resolvedTokens.set(
+        metadata.resolved_approval_token,
+        metadata.approval_succeeded === true
+          || (metadata.approval_succeeded === undefined && metadata.error !== true),
+      );
+    }
+  });
   return items.map((item) => {
     const metadata = asRecord(item.metadata);
     const rawSurface = metadata.surface;
-    const surface = rawSurface && typeof rawSurface === "object"
+    const surface = isUISurface(rawSurface)
       ? disableApproval(
-          rawSurface as UISurface,
+          rawSurface,
           resolvedTokens,
           typeof metadata.approval_expires_at === "string" ? metadata.approval_expires_at : undefined,
         )
@@ -326,6 +407,7 @@ export default function QuizAIChat() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let approvalFinished = false;
     let approvalCompleted = false;
     try {
       await streamAgentChat({
@@ -337,15 +419,19 @@ export default function QuizAIChat() {
         context: { route: pathname || "/" },
         signal: controller.signal,
         onEvent: (event) => {
-          if (event.type === "done" && event.intent === "approved_write") approvalCompleted = true;
+          if (event.type === "done" && event.intent === "approved_write") {
+            approvalFinished = true;
+            approvalCompleted = true;
+          }
+          if (event.type === "error") approvalFinished = true;
           onAgentEvent(assistantId, event);
         },
       });
       patchAssistant(assistantId, { isStreaming: false, status: undefined });
-      if (approvalCompleted && hideUserMessage) {
+      if (approvalFinished && hideUserMessage) {
         const resolvedToken = value.slice("__approve__:".length);
         setMessages((current) => current.map((message) => message.surface
-          ? { ...message, surface: disableApproval(message.surface, new Set([resolvedToken])) }
+          ? { ...message, surface: disableApproval(message.surface, new Map([[resolvedToken, approvalCompleted]])) }
           : message));
       }
       if (!open) setUnread(true);

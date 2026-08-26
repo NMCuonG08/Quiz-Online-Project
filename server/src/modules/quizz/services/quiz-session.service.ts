@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AttemptStatus } from '@prisma/client';
 import { BaseService } from '@/common/base/base.service';
 import { CreateQuizSessionDto } from '../dtos/create-quiz-session.dto';
+import { SubmitQuizAnswerDto } from '../dtos/submit-quiz-answer.dto';
 import { QuizRepository } from '../repositories/quiz.repository';
 import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
 import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
@@ -66,23 +72,11 @@ export class QuizSessionService extends BaseService {
   }
 
   async startSession(userId: string | undefined, dto: CreateQuizSessionDto) {
-    let targetUserId = userId;
-    console.log('🚀 startSession called with:', { userId, dto });
-
-    // Fallback: If no userId (public session), use the first user in the DB
-    if (!targetUserId) {
-      const user = await this.prisma.user.findFirst({ select: { id: true } });
-      if (!user) {
-        throw new NotFoundException(
-          'No users found in system to assign session',
-        );
-      }
-      targetUserId = user.id;
-      console.log(
-        '⚠️ No userId provided, falling back to system user:',
-        targetUserId,
+    if (!userId)
+      throw new UnauthorizedException(
+        'Authentication required to start a quiz',
       );
-    }
+    const targetUserId = userId;
 
     let quizId = dto.quiz_id;
 
@@ -184,15 +178,27 @@ export class QuizSessionService extends BaseService {
     };
   }
 
-  async submitAnswer(sessionId: string, answerDto: any) {
-    // Get the question to check correct answer
-    const question = await this.prisma.question.findUnique({
-      where: { id: answerDto.question_id },
+  async submitAnswer(
+    sessionId: string,
+    answerDto: SubmitQuizAnswerDto,
+    userId: string,
+    isAdmin = false,
+  ) {
+    const attempt = await this.prisma.quizAttempt.findUnique({
+      where: { id: sessionId },
+      select: { user_id: true, quiz_id: true, status: true },
+    });
+    if (!attempt || (!isAdmin && attempt.user_id !== userId)) {
+      throw new NotFoundException('Session not found');
+    }
+    if (attempt.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('Quiz session is not in progress');
+    }
+
+    const question = await this.prisma.question.findFirst({
+      where: { id: answerDto.question_id, quiz_id: attempt.quiz_id },
       include: {
-        options: {
-          where: { is_correct: true },
-          select: { id: true },
-        },
+        options: { select: { id: true, is_correct: true } },
       },
     });
 
@@ -201,11 +207,30 @@ export class QuizSessionService extends BaseService {
     }
 
     // Check if the selected option is correct
-    const correctOptionIds = question.options.map((opt) => opt.id);
-    const selectedOptionId = answerDto.selected_option_id;
-    const isCorrect = selectedOptionId
-      ? correctOptionIds.includes(selectedOptionId)
-      : false;
+    const validOptionIds = new Set(question.options.map((option) => option.id));
+    const correctOptionIds = question.options
+      .filter((option) => option.is_correct)
+      .map((option) => option.id);
+    const selectedOptionIds = Array.from(
+      new Set(
+        answerDto.selected_option_ids?.length
+          ? answerDto.selected_option_ids
+          : answerDto.selected_option_id
+            ? [answerDto.selected_option_id]
+            : [],
+      ),
+    );
+    if (selectedOptionIds.some((optionId) => !validOptionIds.has(optionId))) {
+      throw new BadRequestException(
+        'Selected option does not belong to this question',
+      );
+    }
+    const isCorrect =
+      correctOptionIds.length > 0 &&
+      selectedOptionIds.length === correctOptionIds.length &&
+      selectedOptionIds.every((optionId) =>
+        correctOptionIds.includes(optionId),
+      );
 
     // Calculate points earned
     const pointsEarned = isCorrect ? question.points : 0;
@@ -225,7 +250,7 @@ export class QuizSessionService extends BaseService {
       return await this.prisma.questionResponse.update({
         where: { id: existingResponse.id },
         data: {
-          selected_options: selectedOptionId ? [selectedOptionId] : [],
+          selected_options: selectedOptionIds,
           text_answer: answerDto.text_answer,
           is_correct: isCorrect,
           points_earned: pointsEarned,
@@ -240,7 +265,7 @@ export class QuizSessionService extends BaseService {
       data: {
         attempt_id: sessionId,
         question_id: answerDto.question_id,
-        selected_options: selectedOptionId ? [selectedOptionId] : [],
+        selected_options: selectedOptionIds,
         text_answer: answerDto.text_answer,
         is_correct: isCorrect,
         points_earned: pointsEarned,
@@ -249,16 +274,7 @@ export class QuizSessionService extends BaseService {
     });
   }
 
-  async completeSession(sessionId: string) {
-    // Get all responses to calculate total score
-    const responses = await this.prisma.questionResponse.findMany({
-      where: { attempt_id: sessionId },
-    });
-
-    const totalScore = responses.reduce((sum, r) => sum + r.points_earned, 0);
-    const correctCount = responses.filter((r) => r.is_correct).length;
-
-    // Get quiz info for max_score and passing_score
+  async completeSession(sessionId: string, userId: string, isAdmin = false) {
     const attempt = await this.prisma.quizAttempt.findUnique({
       where: { id: sessionId },
       include: {
@@ -270,9 +286,24 @@ export class QuizSessionService extends BaseService {
       },
     });
 
+    if (!attempt || (!isAdmin && attempt.user_id !== userId)) {
+      throw new NotFoundException('Session not found');
+    }
+    if (attempt.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('Quiz session is not in progress');
+    }
+
+    const responses = await this.prisma.questionResponse.findMany({
+      where: { attempt_id: sessionId },
+    });
+    const totalScore = responses.reduce(
+      (sum, response) => sum + response.points_earned,
+      0,
+    );
+
     const maxScore =
-      attempt?.quiz?.questions.reduce((sum, q) => sum + q.points, 0) || 0;
-    const passingScore = attempt?.quiz?.passing_score || 70;
+      attempt.quiz?.questions.reduce((sum, q) => sum + q.points, 0) || 0;
+    const passingScore = attempt.quiz?.passing_score ?? 70;
     const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
     const passed = percentage >= passingScore;
 

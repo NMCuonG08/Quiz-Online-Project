@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsEnum,
   IsBoolean,
+  Min,
 } from 'class-validator';
 import {
   QuestionTypeEnum,
@@ -42,11 +43,13 @@ export class CreateQuestionDto {
   @ApiProperty({ example: 1.0 })
   @IsNumber()
   @IsOptional()
+  @Min(0)
   points: number = 1.0;
 
   @ApiPropertyOptional({ example: 30 })
   @IsNumber()
   @IsOptional()
+  @Min(0)
   time_limit?: number;
 
   @ApiPropertyOptional({
@@ -83,6 +86,7 @@ export class CreateQuestionDto {
   @ApiProperty({ example: 1 })
   @IsNumber()
   @IsOptional()
+  @Min(0)
   sort_order: number = 0;
 
   @ApiProperty({ example: true })

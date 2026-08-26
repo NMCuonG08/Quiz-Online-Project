@@ -16,6 +16,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 from zoneinfo import ZoneInfo
 
 import httpx
+from jsonschema import Draft202012Validator
 from openai import AsyncOpenAI
 from pydantic import ValidationError
 
@@ -141,6 +142,10 @@ APPROVAL_FIELD_LABELS = {
     "name": "Tên danh mục",
     "questions": "Câu hỏi",
     "question_ids": "Câu hỏi",
+    "question_orders": "Thứ tự câu hỏi",
+    "new_quiz_id": "Quiz đích",
+    "quiz_slug": "Quiz",
+    "parent_id": "Danh mục cha",
 }
 
 DIFFICULTY_LABELS = {"EASY": "Dễ", "MEDIUM": "Trung bình", "HARD": "Khó"}
@@ -158,6 +163,7 @@ CREATOR_WRITE_TOOLS = WRITE_TOOLS - {
 }
 GROUNDED_RETRIEVAL_TOOLS = {"search_quizzes", "get_quiz", "search_knowledge"}
 RETRY_GUARDED_TOOLS = GROUNDED_RETRIEVAL_TOOLS | {"web_search"}
+TOOL_PARAMETER_SCHEMAS = {tool["name"]: tool["parameters"] for tool in TOOLS}
 SCOPE_TOOLS = {
     "learner": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "web_search", "render_ui", "start_quiz"},
     "creator": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_my_quizzes", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "list_questions", "get_quiz_build_status", "list_knowledge_sources", "web_search", "render_ui", *CREATOR_WRITE_TOOLS},
@@ -293,6 +299,7 @@ class AIAgentCore:
                 metadata["error"] = True
             if approval_token:
                 metadata["resolved_approval_token"] = approval_token
+                metadata["approval_succeeded"] = not is_error
 
             history_messages: list[dict[str, Any]] = []
             if not is_approval:
@@ -846,6 +853,11 @@ class AIAgentCore:
         scope: str,
         context: Optional[Dict[str, Any]] = None,
     ) -> tuple[Any, Optional[UISurface], list[dict[str, str]]]:
+        args = {key: value for key, value in args.items() if value is not None}
+        if name in WRITE_TOOLS:
+            args = self._normalize_write_args(name, args)
+        self._validate_tool_arguments(name, args)
+        self._validate_tool_semantics(name, args)
         if name == "get_current_time":
             timezone_name = os.getenv("AI_TIMEZONE", "Asia/Ho_Chi_Minh")
             try:
@@ -900,8 +912,6 @@ class AIAgentCore:
             return await self.tools.get_current_user(token), None, []
         if name == "get_my_permissions":
             return await self.tools.get_my_permissions(token), None, []
-        if name in WRITE_TOOLS:
-            args = self._normalize_write_args(name, args)
         if name == "publish_quiz":
             build_status = await self.tools.get_quiz_build_status(args["quiz_id"], token)
             if not build_status.get("ready_to_publish"):
@@ -974,20 +984,12 @@ class AIAgentCore:
             await self.state_store.set_chat_messages(user_id, session_id, history)
             resource_id = str(result.get("id") or "") if isinstance(result, dict) else ""
             resource_title = str(result.get("title") or result.get("name") or name) if isinstance(result, dict) else name
-            yield {"type": "token", "delta": f"Đã thực thi {name}: {resource_title}{f' (ID: {resource_id})' if resource_id else ''}."}
-            if name in {"create_quiz", "create_quiz_with_questions"} and resource_id:
-                questions_route = f"/{'admin' if scope == 'admin' else 'user'}/quizzes/questions/{resource_id}"
-                partial_failure = bool(result.get("partial_failure")) if isinstance(result, dict) else False
-                surface = UISurface(
-                    title="Quiz draft đã tạo một phần" if partial_failure else "Quiz đã được tạo",
-                    description="Một số câu hỏi lỗi; quiz ID đã được giữ để tiếp tục sửa." if partial_failure else "Bạn có thể tiếp tục tạo câu hỏi bằng agent hoặc mở Question Manager.",
-                    blocks=[{"id": "created-quiz", "type": "notice", "title": resource_title, "description": f"Quiz ID: {resource_id}", "tone": "warning" if partial_failure else "success"}],
-                    actions=[
-                        {"id": "continue-questions", "label": "Tạo câu hỏi tiếp", "kind": "prompt", "value": f"Tiếp tục tạo câu hỏi cho quiz ID {resource_id}", "variant": "primary"},
-                        {"id": "open-questions", "label": "Mở Question Manager", "kind": "navigate", "value": questions_route, "variant": "secondary"},
-                    ],
-                )
-                yield {"type": "ui", "surface": surface.model_dump()}
+            operation_label = WRITE_OPERATION_LABELS.get(name, (name, "", ""))[0]
+            yield {"type": "token", "delta": f"{operation_label} thành công."}
+            surface = self._build_write_result_surface(
+                name, args, result, scope, resource_id, resource_title,
+            )
+            yield {"type": "ui", "surface": surface.model_dump()}
             yield {"type": "done", "intent": "approved_write", "agent": self.model, "tool": name, "tools": [name]}
         except Exception as exc:
             self.metrics.record_tool(name, "error")
@@ -1014,7 +1016,11 @@ class AIAgentCore:
         token = self._require_auth(authorization)
         # Approval records may outlive a deployment. Normalize again at the
         # execution boundary so legacy pending payloads cannot bypass aliases.
-        args = self._normalize_write_args(name, args)
+        args = self._normalize_write_args(
+            name, {key: value for key, value in args.items() if value is not None},
+        )
+        self._validate_tool_arguments(name, args)
+        self._validate_tool_semantics(name, args)
         if name in {"create_question", "update_question"}:
             self._validate_question_payload(args)
         if name == "create_quiz_with_questions":
@@ -1183,6 +1189,42 @@ class AIAgentCore:
         words = "".join(character if character.isalnum() else " " for character in ascii_value)
         return "_".join(words.upper().split())
 
+    @staticmethod
+    def _validate_tool_arguments(name: str, args: Dict[str, Any]) -> None:
+        schema = TOOL_PARAMETER_SCHEMAS.get(name)
+        if schema is None:
+            raise ValueError(f"TOOL_NOT_FOUND: {name}")
+        errors = sorted(Draft202012Validator(schema).iter_errors(args), key=lambda item: list(item.path))
+        if not errors:
+            return
+        error = errors[0]
+        path = ".".join(str(part) for part in error.absolute_path) or "arguments"
+        raise ValueError(f"TOOL_ARGUMENT_INVALID: {name}.{path}: {error.message}")
+
+    @staticmethod
+    def _validate_tool_semantics(name: str, args: Dict[str, Any]) -> None:
+        if name == "get_quiz":
+            identifiers = [bool(str(args.get("quiz_id") or "").strip()), bool(str(args.get("slug") or "").strip())]
+            if sum(identifiers) != 1:
+                raise ValueError("QUIZ_IDENTIFIER_INVALID: Cần đúng một quiz_id hoặc slug")
+        if name == "start_quiz":
+            identifiers = [bool(str(args.get("quiz_id") or "").strip()), bool(str(args.get("quiz_slug") or "").strip())]
+            if sum(identifiers) != 1:
+                raise ValueError("QUIZ_IDENTIFIER_INVALID: Cần đúng một quiz_id hoặc quiz_slug")
+        if name == "reorder_questions":
+            orders = args.get("question_orders") or []
+            ids = [str(item.get("id") or "") for item in orders if isinstance(item, dict)]
+            if not ids:
+                raise ValueError("QUESTION_ORDERS_REQUIRED: Cần ít nhất một câu hỏi")
+            if len(set(ids)) != len(ids):
+                raise ValueError("QUESTION_ORDERS_DUPLICATE: Danh sách sắp xếp có question id trùng")
+        if (
+            name == "review_knowledge"
+            and args.get("status") == "QUARANTINED"
+            and not str(args.get("rejection_reason") or "").strip()
+        ):
+            raise ValueError("KNOWLEDGE_REJECTION_REASON_REQUIRED: Cần lý do khi từ chối nguồn")
+
     async def _build_approval_surface(
         self, name: str, args: Dict[str, Any], approval_token: str,
     ) -> UISurface:
@@ -1288,6 +1330,70 @@ class AIAgentCore:
         return str(value)
 
     @staticmethod
+    def _build_write_result_surface(
+        name: str,
+        args: Dict[str, Any],
+        result: Any,
+        scope: str,
+        resource_id: str,
+        resource_title: str,
+    ) -> UISurface:
+        operation_label = WRITE_OPERATION_LABELS.get(name, ("Thao tác", "", ""))[0]
+        result_data = result if isinstance(result, dict) else {}
+        quiz_id = str(result_data.get("quiz_id") or args.get("quiz_id") or "")
+        if name in {"create_quiz", "create_quiz_with_questions"}:
+            quiz_id = resource_id
+        slug = str(result_data.get("slug") or args.get("slug") or "")
+        partial_failure = bool(result_data.get("partial_failure"))
+        title = f"{operation_label} thành công"
+        description = "Thay đổi đã được backend xác nhận và lưu vào hệ thống."
+        tone = "success"
+        if partial_failure:
+            title = "Quiz đã tạo nhưng còn câu hỏi lỗi"
+            description = "Quiz draft được giữ lại; hãy xem danh sách lỗi và tạo lại các câu hỏi chưa thành công."
+            tone = "warning"
+
+        details = []
+        if resource_title and resource_title != name:
+            details.append({"label": "Tài nguyên", "value": resource_title})
+        if resource_id:
+            details.append({"label": "Mã", "value": f"…{resource_id[-8:]}" if len(resource_id) > 8 else resource_id})
+        if result_data.get("questions_created") is not None:
+            details.append({"label": "Câu hỏi đã tạo", "value": str(result_data["questions_created"])})
+        if result_data.get("question_errors"):
+            details.append({"label": "Câu hỏi lỗi", "value": str(len(result_data["question_errors"])), "badge": "Cần xử lý"})
+        if not details:
+            details.append({"label": "Trạng thái", "value": "Đã hoàn tất"})
+
+        manager_root = "/admin/quizzes" if scope == "admin" else "/user/quizzes"
+        actions = []
+        if name in {"create_quiz", "create_quiz_with_questions"} and quiz_id:
+            actions.extend([
+                {"id": "continue-questions", "label": "Tạo câu hỏi tiếp", "kind": "prompt", "value": f"Tiếp tục tạo câu hỏi cho quiz ID {quiz_id}", "variant": "primary"},
+                {"id": "open-questions", "label": "Mở Question Manager", "kind": "navigate", "value": f"{manager_root}/questions/{quiz_id}", "variant": "secondary"},
+            ])
+        elif name in {"create_question", "update_question", "delete_question", "duplicate_question", "reorder_questions"} and quiz_id:
+            actions.append({"id": "open-questions", "label": "Xem danh sách câu hỏi", "kind": "navigate", "value": f"{manager_root}/questions/{quiz_id}", "variant": "primary"})
+        elif name in {"update_quiz", "publish_quiz", "unpublish_quiz"} and slug:
+            actions.append({"id": "open-quiz", "label": "Mở quiz", "kind": "navigate", "value": f"/quiz/{slug}", "variant": "primary"})
+        elif name in {"delete_quiz", "update_quiz", "publish_quiz", "unpublish_quiz"}:
+            actions.append({"id": "open-quizzes", "label": "Về Quiz Manager", "kind": "navigate", "value": manager_root, "variant": "primary"})
+        elif name in {"create_category", "update_category", "delete_category"}:
+            actions.append({"id": "open-categories", "label": "Mở danh mục quiz", "kind": "navigate", "value": "/admin/quiz-categories", "variant": "primary"})
+        elif name == "start_quiz" and str(args.get("quiz_slug") or ""):
+            actions.append({"id": "open-attempt", "label": "Tiếp tục làm quiz", "kind": "navigate", "value": f"/quiz/{args['quiz_slug']}/do-quiz", "variant": "primary"})
+
+        return UISurface(
+            title=title,
+            description=description,
+            blocks=[{
+                "id": "write-result", "type": "list", "title": "Kết quả",
+                "tone": tone, "items": details,
+            }],
+            actions=actions,
+        )
+
+    @staticmethod
     def _require_auth(authorization: Optional[str]) -> str:
         if not authorization:
             raise PermissionError("AUTH_REQUIRED: Người dùng cần đăng nhập")
@@ -1359,8 +1465,19 @@ class AIAgentCore:
     def _safe_tool_error(exc: Exception) -> str:
         if isinstance(exc, httpx.HTTPStatusError):
             status = exc.response.status_code
-            detail = exc.response.text[:800]
-            return f"BACKEND_HTTP_{status}: {detail}"
+            try:
+                payload = exc.response.json()
+                error = payload.get("error", payload) if isinstance(payload, dict) else {}
+                message = str(error.get("message") or f"Backend trả về lỗi {status}")
+                details = error.get("details") or []
+                detail_text = "; ".join(
+                    f"{item.get('field')}: {item.get('message')}"
+                    for item in details if isinstance(item, dict)
+                )
+                separator = " " if message.rstrip().endswith((".", "!", "?")) else ": "
+                return f"{message}{separator + detail_text if detail_text else ''}"[:1000]
+            except Exception:
+                return f"Backend trả về lỗi {status}."
         if isinstance(exc, httpx.RequestError):
             return "BACKEND_UNAVAILABLE: Không kết nối được NestJS Backend API"
         return str(exc)[:1000]

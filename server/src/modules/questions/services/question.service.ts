@@ -16,7 +16,17 @@ import {
   MediaTypeEnum,
 } from '@/common/enums';
 
-export function parseQuestionOptions(value: unknown): Record<string, any>[] | undefined {
+type NormalizedQuestionOption = {
+  option_text: string;
+  is_correct: boolean;
+  sort_order: number;
+  explanation?: string;
+  media_url?: string;
+};
+
+export function parseQuestionOptions(
+  value: unknown,
+): NormalizedQuestionOption[] | undefined {
   if (value === undefined || value === null || value === '') return undefined;
   let parsed: unknown = value;
   if (typeof value === 'string') {
@@ -33,13 +43,82 @@ export function parseQuestionOptions(value: unknown): Record<string, any>[] | un
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       throw new BadRequestException(`Đáp án ${index + 1} không hợp lệ`);
     }
-    const option = item as Record<string, any>;
-    const optionText = option.option_text ?? option.text ?? option.content ?? option.label ?? option.value;
+    const option = item as Record<string, unknown>;
+    const optionText =
+      option.option_text ??
+      option.text ??
+      option.content ??
+      option.label ??
+      option.value;
     if (typeof optionText !== 'string' || !optionText.trim()) {
-      throw new BadRequestException(`Đáp án ${index + 1} thiếu nội dung option_text`);
+      throw new BadRequestException(
+        `Đáp án ${index + 1} thiếu nội dung option_text`,
+      );
     }
-    return { ...option, option_text: optionText.trim() };
+    const rawCorrect = option.is_correct;
+    if (
+      rawCorrect !== true &&
+      rawCorrect !== false &&
+      rawCorrect !== 'true' &&
+      rawCorrect !== 'false'
+    ) {
+      throw new BadRequestException(
+        `Đáp án ${index + 1} thiếu trạng thái is_correct hợp lệ`,
+      );
+    }
+    const rawOrder = option.sort_order ?? index + 1;
+    const sortOrder = Number(rawOrder);
+    if (!Number.isInteger(sortOrder) || sortOrder < 0) {
+      throw new BadRequestException(
+        `Đáp án ${index + 1} có sort_order không hợp lệ`,
+      );
+    }
+    return {
+      option_text: optionText.trim(),
+      is_correct: rawCorrect === true || rawCorrect === 'true',
+      sort_order: sortOrder,
+      ...(typeof option.explanation === 'string' && option.explanation
+        ? { explanation: option.explanation }
+        : {}),
+      ...(typeof option.media_url === 'string' && option.media_url
+        ? { media_url: option.media_url }
+        : {}),
+    };
   });
+}
+
+export function validateQuestionOptions(
+  questionType: QuestionTypeEnum | string,
+  options: NormalizedQuestionOption[] | undefined,
+): void {
+  const normalizedType = String(questionType);
+  const choiceTypes = new Set<string>([
+    String(QuestionTypeEnum.SINGLE_CHOICE),
+    String(QuestionTypeEnum.MULTIPLE_CHOICE),
+    String(QuestionTypeEnum.TRUE_FALSE),
+  ]);
+  if (!choiceTypes.has(normalizedType)) return;
+  if (!options || options.length < 2) {
+    throw new BadRequestException('Câu hỏi lựa chọn cần ít nhất 2 đáp án');
+  }
+  const correctCount = options.filter((option) => option.is_correct).length;
+  if (
+    [
+      String(QuestionTypeEnum.SINGLE_CHOICE),
+      String(QuestionTypeEnum.TRUE_FALSE),
+    ].includes(normalizedType) &&
+    correctCount !== 1
+  ) {
+    throw new BadRequestException('Câu hỏi một đáp án cần đúng 1 đáp án đúng');
+  }
+  if (
+    normalizedType === String(QuestionTypeEnum.MULTIPLE_CHOICE) &&
+    correctCount < 1
+  ) {
+    throw new BadRequestException(
+      'Câu hỏi nhiều đáp án cần ít nhất 1 đáp án đúng',
+    );
+  }
 }
 
 @Injectable()
@@ -151,9 +230,11 @@ export class QuestionService extends BaseService {
 
     // Parse options if provided
     const optionsData = parseQuestionOptions(question.options);
+    validateQuestionOptions(question.question_type, optionsData);
 
     // Prepare question data without options
-    const { options, ...restOfQuestion } = question;
+    const restOfQuestion = { ...question };
+    delete restOfQuestion.options;
     const questionData: Record<string, any> = {
       ...restOfQuestion,
       media_id: mediaId || null,
@@ -166,7 +247,7 @@ export class QuestionService extends BaseService {
     await this.eventRepository.emit('QuestionCreated', {
       id: created.id,
       quizId: created.quiz_id,
-    } as any);
+    });
     return created;
   }
 
@@ -209,6 +290,12 @@ export class QuestionService extends BaseService {
 
     // Parse options if provided
     const optionsData = parseQuestionOptions(updateData.options);
+    if (optionsData !== undefined) {
+      validateQuestionOptions(
+        updateData.question_type || existingQuestion.question_type,
+        optionsData,
+      );
+    }
 
     // Handle option media files if provided
     if (optionsData && optionMediaFiles && optionMediaFiles.length > 0) {
@@ -231,7 +318,8 @@ export class QuestionService extends BaseService {
     }
 
     // Prepare update data without options - only include valid question fields
-    const { options, ...restOfUpdateData } = updateData;
+    const restOfUpdateData = { ...updateData };
+    delete restOfUpdateData.options;
 
     // Clean and convert the update data
     const dataToUpdate: Record<string, any> = {};
@@ -302,11 +390,15 @@ export class QuestionService extends BaseService {
     await this.eventRepository.emit('QuestionUpdated', {
       id,
       quizId: updated.quiz_id,
-    } as any);
+    });
     return updated;
   }
 
-  async deleteQuestion(id: string, userId?: string, isAdmin = false): Promise<void> {
+  async deleteQuestion(
+    id: string,
+    userId?: string,
+    isAdmin = false,
+  ): Promise<void> {
     const existingQuestion = await this.questionRepository.findByIdRaw(id);
     if (!existingQuestion) {
       throw new NotFoundException('Question not found');
@@ -317,15 +409,21 @@ export class QuestionService extends BaseService {
     await this.eventRepository.emit('QuestionDeleted', {
       id,
       quizId: '',
-    } as any);
+    });
   }
 
-  private async assertQuizOwner(quizId: string, userId?: string, isAdmin = false): Promise<void> {
+  private async assertQuizOwner(
+    quizId: string,
+    userId?: string,
+    isAdmin = false,
+  ): Promise<void> {
     if (isAdmin) return;
     if (!userId) throw new ForbiddenException('User not authenticated');
     const quiz = await this.quizRepository.findByIdRaw(quizId);
     if (!quiz || quiz.creator_id !== userId) {
-      throw new ForbiddenException('You are not authorized to modify this quiz questions');
+      throw new ForbiddenException(
+        'You are not authorized to modify this quiz questions',
+      );
     }
   }
 
@@ -363,7 +461,9 @@ export class QuestionService extends BaseService {
       where: { id: { in: questionIds }, quiz_id: quizId },
     });
     if (matchingQuestions !== questionIds.length) {
-      throw new BadRequestException('All reordered questions must belong to this quiz');
+      throw new BadRequestException(
+        'All reordered questions must belong to this quiz',
+      );
     }
 
     // Update sort orders in a transaction
@@ -412,8 +512,7 @@ export class QuestionService extends BaseService {
       explanation: sourceQuestion.explanation,
       media_id: sourceQuestion.media_id,
       media_type: sourceQuestion.media_type as MediaTypeEnum,
-      difficulty_level:
-        sourceQuestion.difficulty_level as DifficultyLevelEnum,
+      difficulty_level: sourceQuestion.difficulty_level as DifficultyLevelEnum,
       sort_order: sourceQuestion.sort_order + 1,
       is_required: sourceQuestion.is_required,
       settings: sourceQuestion.settings,

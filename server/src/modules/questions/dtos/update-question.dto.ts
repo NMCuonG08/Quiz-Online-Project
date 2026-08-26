@@ -2,12 +2,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsOptional,
-  IsUUID,
   IsNumber,
   IsEnum,
   IsBoolean,
+  Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import {
   QuestionTypeEnum,
   DifficultyLevelEnum,
@@ -37,11 +36,13 @@ export class UpdateQuestionDto {
   @ApiPropertyOptional({ example: 2.0 })
   @IsNumber()
   @IsOptional()
+  @Min(0)
   points?: number;
 
   @ApiPropertyOptional({ example: 45 })
   @IsNumber()
   @IsOptional()
+  @Min(0)
   time_limit?: number;
 
   @ApiPropertyOptional({ example: 'Updated explanation text' })
@@ -74,6 +75,7 @@ export class UpdateQuestionDto {
   @ApiPropertyOptional({ example: 2 })
   @IsNumber()
   @IsOptional()
+  @Min(0)
   sort_order?: number;
 
   @ApiPropertyOptional({ example: false })

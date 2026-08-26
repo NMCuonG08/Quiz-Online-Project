@@ -1,5 +1,6 @@
 import asyncio
 import unittest
+import httpx
 from datetime import datetime
 from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
@@ -9,6 +10,7 @@ from services.agent_core import (
     GROUNDED_RETRIEVAL_TOOLS,
     RETRY_GUARDED_TOOLS,
     SCOPE_TOOLS,
+    WRITE_TOOLS,
     runtime_system_prompt,
 )
 from services.web_search import WebSearchProvider
@@ -19,6 +21,7 @@ from services.observability import AgentMetrics
 from services.protocol import ChatRequest
 from services.ui_policy import UiPolicyResolver
 from services.langgraph_runner import LangGraphQuizRunner
+from services.tool_catalog import TOOLS
 
 
 class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
@@ -91,9 +94,13 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         events = [event async for event in self.core._approve(
             surface.actions[0].value, "Bearer token", "user-1", "creator", "session-1",
         )]
-        self.assertIn("quiz-1", next(event["delta"] for event in events if event["type"] == "token"))
+        self.assertEqual(
+            next(event["delta"] for event in events if event["type"] == "token"),
+            "Tạo quiz thành công.",
+        )
         result_surface = next(event["surface"] for event in events if event["type"] == "ui")
         self.assertEqual(result_surface["actions"][0]["kind"], "prompt")
+        self.assertIn("quiz-1", str(result_surface))
         memory = await self.core.state_store.get_chat_messages("user-1", "session-1")
         self.assertIn("quiz-1", memory[-1]["content"])
         payload = self.core.tools.create_quiz.await_args.args[0]
@@ -142,7 +149,40 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0]["role"], "assistant")
         self.assertEqual(messages[0]["metadata"]["resolved_approval_token"], "approval-token")
+        self.assertTrue(messages[0]["metadata"]["approval_succeeded"])
         self.assertNotIn("__approve__", str(messages))
+
+    def test_every_write_tool_has_a_valid_result_surface(self):
+        for name in WRITE_TOOLS:
+            surface = self.core._build_write_result_surface(
+                name,
+                {"quiz_id": "quiz-1", "slug": "python", "title": "Python"},
+                {"id": "resource-1", "quiz_id": "quiz-1", "slug": "python", "title": "Python"},
+                "creator",
+                "resource-1",
+                "Python",
+            )
+            self.assertTrue(surface.title, name)
+            self.assertTrue(surface.blocks, name)
+            for action in surface.actions:
+                if action.kind == "navigate":
+                    self.assertTrue(action.value.startswith("/"), name)
+
+    def test_backend_validation_errors_are_human_readable(self):
+        request = httpx.Request("POST", "http://backend.test/api/questions")
+        response = httpx.Response(400, request=request, json={
+            "error": {
+                "message": "Dữ liệu gửi lên không hợp lệ.",
+                "details": [{"field": "option_text", "message": "Giá trị không hợp lệ"}],
+            },
+        })
+        error = httpx.HTTPStatusError("bad request", request=request, response=response)
+        message = self.core._safe_tool_error(error)
+        self.assertEqual(
+            message,
+            "Dữ liệu gửi lên không hợp lệ. option_text: Giá trị không hợp lệ",
+        )
+        self.assertNotIn("BACKEND_HTTP", message)
 
     async def test_legacy_pending_approval_is_normalized_before_execution(self):
         await self.core.state_store.create_approval("legacy-token", {
@@ -199,7 +239,7 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(options_block.rows[0][2], "Đúng")
 
     async def test_question_without_option_text_is_rejected_before_approval(self):
-        with self.assertRaisesRegex(ValueError, "QUESTION_OPTION_TEXT_REQUIRED"):
+        with self.assertRaisesRegex(ValueError, "TOOL_ARGUMENT_INVALID"):
             await self.core._execute_tool("create_question", {
                 "quiz_id": "quiz-1", "question_text": "AI là gì?",
                 "question_type": "SINGLE_CHOICE",
@@ -210,7 +250,7 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
             }, "Bearer token", "user-1", "creator")
 
         self.core.tools.create_question = AsyncMock(return_value={"id": "should-not-run"})
-        with self.assertRaisesRegex(ValueError, "QUESTION_OPTION_TEXT_REQUIRED"):
+        with self.assertRaisesRegex(ValueError, "TOOL_ARGUMENT_INVALID"):
             await self.core._execute_write("create_question", {
                 "quiz_id": "quiz-1", "question_text": "AI là gì?",
                 "question_type": "SINGLE_CHOICE",
@@ -365,6 +405,72 @@ class LangGraphContractTests(unittest.TestCase):
         self.assertIn("option_text", option_schema["required"])
         self.assertEqual(option_schema["properties"]["option_text"]["minLength"], 1)
 
+    def test_catalog_and_langgraph_tool_constraints_match(self):
+        async def dispatch(_name, _args):
+            return "{}"
+
+        def resolve(schema, root):
+            if "$ref" in schema:
+                node = root
+                for part in schema["$ref"].split("/")[1:]:
+                    node = node[part]
+                return node
+            if "anyOf" in schema:
+                return next((item for item in schema["anyOf"] if item.get("type") != "null"), schema)
+            return schema
+
+        def constraints(schema, root=None, path=""):
+            root = root or schema
+            schema = resolve(schema, root)
+            result = {}
+            if "enum" in schema:
+                result[f"{path}#enum"] = tuple(schema["enum"])
+            for key in ("minimum", "maximum", "minItems", "minLength"):
+                if key in schema:
+                    result[f"{path}#{key}"] = schema[key]
+            required = set(schema.get("required", []))
+            for name, child in schema.get("properties", {}).items():
+                child_path = f"{path}.{name}" if path else name
+                result[f"{child_path}#required"] = name in required
+                result.update(constraints(child, root, child_path))
+            if schema.get("type") == "array" and "items" in schema:
+                result.update(constraints(schema["items"], root, f"{path}[]"))
+            return result
+
+        catalog = {item["name"]: item["parameters"] for item in TOOLS}
+        runner = LangGraphQuizRunner("test-model", "test-key", "https://example.test/v1")
+        graph = {
+            item.name: item.args_schema.model_json_schema()
+            for item in runner._build_tools(SCOPE_TOOLS["admin"], dispatch)
+        }
+        self.assertEqual(set(catalog), set(graph))
+        for name in catalog:
+            self.assertEqual(constraints(catalog[name]), constraints(graph[name]), name)
+
+    def test_common_semantic_contracts_reject_ambiguous_or_unsafe_args(self):
+        core = AIAgentCore({})
+        with self.assertRaisesRegex(ValueError, "QUIZ_IDENTIFIER_INVALID"):
+            core._validate_tool_semantics("get_quiz", {})
+        with self.assertRaisesRegex(ValueError, "QUIZ_IDENTIFIER_INVALID"):
+            core._validate_tool_semantics("start_quiz", {"quiz_id": "id", "quiz_slug": "slug"})
+        with self.assertRaisesRegex(ValueError, "QUESTION_ORDERS_DUPLICATE"):
+            core._validate_tool_semantics("reorder_questions", {
+                "question_orders": [{"id": "q-1"}, {"id": "q-1"}],
+            })
+        with self.assertRaisesRegex(ValueError, "KNOWLEDGE_REJECTION_REASON_REQUIRED"):
+            core._validate_tool_semantics("review_knowledge", {"status": "QUARANTINED"})
+
+    def test_catalog_validation_rejects_out_of_range_values(self):
+        core = AIAgentCore({})
+        with self.assertRaisesRegex(ValueError, "TOOL_ARGUMENT_INVALID"):
+            core._validate_tool_arguments("search_quizzes", {"query": "AI", "limit": 21})
+        with self.assertRaisesRegex(ValueError, "TOOL_ARGUMENT_INVALID"):
+            core._validate_tool_arguments("create_quiz", {
+                "title": "AI", "slug": "ai", "category_id": "category-1",
+                "difficulty_level": "EASY", "time_limit": 0,
+                "quiz_type": "MULTIPLE_CHOICE",
+            })
+
     def test_graph_step_limit_defaults_to_twelve(self):
         core = AIAgentCore({})
         self.assertEqual(core.max_graph_steps, 12)
@@ -399,6 +505,67 @@ class TemporalToolContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(citations, [])
         self.assertIn("current_date", result)
         self.assertEqual(result["timezone"], "Asia/Ho_Chi_Minh")
+
+
+class ToolBackendRouteContractTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.tools = MCPToolWrapper({"backend_url": "http://backend.test"})
+        self.tools.call_backend_api = AsyncMock(return_value={"data": {"id": "result-1"}})
+        self.tools._ensure_owned_quiz = AsyncMock(return_value=None)
+        self.tools._ensure_owned_question = AsyncMock(return_value=None)
+
+    async def test_question_writes_preserve_backend_field_contracts(self):
+        payload = {
+            "quiz_id": "quiz-1", "question_text": "AI là gì?", "question_type": "SINGLE_CHOICE",
+            "options": [{"option_text": "A", "is_correct": True, "sort_order": 1}],
+        }
+        await self.tools.create_question(payload, "Bearer token")
+        self.tools.call_backend_api.assert_awaited_with(
+            "POST", "/api/questions", body=payload, authorization="Bearer token",
+        )
+
+    async def test_reorder_and_duplicate_translate_only_backend_casing(self):
+        orders = [{"id": "question-1", "sort_order": 0}]
+        await self.tools.reorder_questions("quiz-1", orders, "Bearer token")
+        self.tools.call_backend_api.assert_awaited_with(
+            "PATCH", "/api/questions/quiz/quiz-1/reorder",
+            body={"questionOrders": orders}, authorization="Bearer token",
+        )
+        self.tools.call_backend_api.reset_mock()
+        await self.tools.duplicate_question("question-1", "quiz-2", "Bearer token")
+        self.tools.call_backend_api.assert_awaited_with(
+            "POST", "/api/questions/question-1/duplicate",
+            body={"newQuizId": "quiz-2"}, authorization="Bearer token",
+        )
+
+    async def test_start_and_knowledge_routes_match_backend_dtos(self):
+        await self.tools.start_quiz("quiz-1", "", "Bearer token")
+        self.tools.call_backend_api.assert_awaited_with(
+            "POST", "/api/quiz-sessions", body={"quiz_id": "quiz-1"}, authorization="Bearer token",
+        )
+        self.tools.call_backend_api.reset_mock()
+        await self.tools.review_knowledge("source-1", "QUARANTINED", "Thiếu nguồn", "Bearer token")
+        self.tools.call_backend_api.assert_awaited_with(
+            "POST", "/api/knowledge/sources/source-1/review",
+            body={"status": "QUARANTINED", "rejection_reason": "Thiếu nguồn"},
+            authorization="Bearer token",
+        )
+
+    async def test_publish_readiness_rejects_invalid_question_options(self):
+        self.tools.get_quiz = AsyncMock(return_value={"id": "quiz-1", "title": "AI"})
+        self.tools.list_questions = AsyncMock(return_value=[{
+            "id": "question-1", "question_text": "AI là gì?",
+            "question_type": "SINGLE_CHOICE",
+            "options": [
+                {"option_text": "A", "is_correct": False},
+                {"option_text": "B", "is_correct": False},
+            ],
+        }])
+
+        status = await self.tools.get_quiz_build_status("quiz-1", "Bearer token")
+
+        self.assertFalse(status["ready_to_publish"])
+        self.assertIn("Câu hỏi 1 cần đúng 1 đáp án đúng", status["issues"])
 
 
 class RetrievalCitationContractTests(unittest.TestCase):

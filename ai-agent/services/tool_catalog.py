@@ -21,6 +21,11 @@ STRING = {"type": "string"}
 INTEGER = {"type": "integer"}
 NUMBER = {"type": "number"}
 BOOLEAN = {"type": "boolean"}
+NON_EMPTY_STRING = {"type": "string", "minLength": 1}
+NON_NEGATIVE_INTEGER = {"type": "integer", "minimum": 0}
+POSITIVE_NUMBER = {"type": "number", "minimum": 1}
+NON_NEGATIVE_NUMBER = {"type": "number", "minimum": 0}
+PERCENTAGE = {"type": "number", "minimum": 0, "maximum": 100}
 
 
 UI_ACTION = {
@@ -33,7 +38,7 @@ UI_ACTION = {
         "variant": {"type": "string", "enum": ["primary", "secondary", "danger"]},
         "icon": STRING,
     },
-    "required": ["id", "label", "kind", "value", "variant", "icon"],
+    "required": ["id", "label", "kind", "value"],
     "additionalProperties": False,
 }
 
@@ -50,7 +55,7 @@ UI_BLOCK = {
             "items": {
                 "type": "object",
                 "properties": {"label": STRING, "value": STRING, "description": STRING, "badge": STRING},
-                "required": ["label", "value", "description", "badge"],
+                "required": ["label"],
                 "additionalProperties": False,
             },
         },
@@ -61,7 +66,7 @@ UI_BLOCK = {
             "items": {
                 "type": "object",
                 "properties": {"label": STRING, "value": STRING, "trend": STRING},
-                "required": ["label", "value", "trend"],
+                "required": ["label", "value"],
                 "additionalProperties": False,
             },
         },
@@ -77,17 +82,14 @@ UI_BLOCK = {
                     "placeholder": STRING,
                     "options": {"type": "array", "items": STRING},
                 },
-                "required": ["name", "label", "input_type", "required", "placeholder", "options"],
+                "required": ["name", "label"],
                 "additionalProperties": False,
             },
         },
         "submit_label": STRING,
         "submit_prompt": STRING,
     },
-    "required": [
-        "id", "type", "title", "description", "tone", "items", "columns", "rows",
-        "stats", "fields", "submit_label", "submit_prompt",
-    ],
+    "required": ["id", "type"],
     "additionalProperties": False,
 }
 
@@ -201,9 +203,9 @@ TOOLS = [
             "category_id": STRING,
             "description": STRING,
             "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
-            "time_limit": NUMBER,
-            "max_attempts": NUMBER,
-            "passing_score": NUMBER,
+            "time_limit": POSITIVE_NUMBER,
+            "max_attempts": NON_NEGATIVE_NUMBER,
+            "passing_score": PERCENTAGE,
             "is_active": BOOLEAN,
             "quiz_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]},
             "instructions": STRING,
@@ -217,7 +219,7 @@ TOOLS = [
             "title": STRING, "slug": STRING, "category_id": STRING,
             "description": STRING,
             "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
-            "time_limit": NUMBER, "max_attempts": NUMBER, "passing_score": NUMBER,
+            "time_limit": POSITIVE_NUMBER, "max_attempts": NON_NEGATIVE_NUMBER, "passing_score": PERCENTAGE,
             "quiz_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]},
             "instructions": STRING,
             "questions": {
@@ -225,15 +227,15 @@ TOOLS = [
                 "items": {
                     "type": "object",
                     "properties": {
-                        "question_text": STRING,
+                        "question_text": NON_EMPTY_STRING,
                         "question_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]},
-                        "points": NUMBER, "time_limit": NUMBER, "explanation": STRING,
+                        "points": NON_NEGATIVE_NUMBER, "time_limit": NON_NEGATIVE_NUMBER, "explanation": STRING,
                         "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
-                        "sort_order": INTEGER, "is_required": BOOLEAN,
+                        "sort_order": NON_NEGATIVE_INTEGER, "is_required": BOOLEAN,
                         "options": {
                             "type": "array", "items": {
                                 "type": "object",
-                                "properties": {"option_text": STRING, "is_correct": BOOLEAN, "sort_order": INTEGER, "explanation": STRING},
+                                "properties": {"option_text": NON_EMPTY_STRING, "is_correct": BOOLEAN, "sort_order": NON_NEGATIVE_INTEGER, "explanation": STRING},
                                 "required": ["option_text", "is_correct", "sort_order"], "additionalProperties": False,
                             },
                         },
@@ -255,9 +257,9 @@ TOOLS = [
             "category_id": STRING,
             "description": STRING,
             "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
-            "time_limit": NUMBER,
-            "max_attempts": NUMBER,
-            "passing_score": NUMBER,
+            "time_limit": POSITIVE_NUMBER,
+            "max_attempts": NON_NEGATIVE_NUMBER,
+            "passing_score": PERCENTAGE,
             "is_active": BOOLEAN,
             "quiz_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]},
             "instructions": STRING,
@@ -307,20 +309,20 @@ TOOLS = [
             "question_text": STRING,
             "slug": STRING,
             "question_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]},
-            "points": NUMBER,
-            "time_limit": NUMBER,
+            "points": NON_NEGATIVE_NUMBER,
+            "time_limit": NON_NEGATIVE_NUMBER,
             "explanation": STRING,
             "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
-            "sort_order": INTEGER,
+            "sort_order": NON_NEGATIVE_INTEGER,
             "is_required": BOOLEAN,
             "options": {
                 "type": "array",
                 "items": {
                     "type": "object",
                     "properties": {
-                        "option_text": STRING,
+                        "option_text": NON_EMPTY_STRING,
                         "is_correct": BOOLEAN,
-                        "sort_order": INTEGER,
+                        "sort_order": NON_NEGATIVE_INTEGER,
                         "explanation": STRING,
                     },
                     "required": ["option_text", "is_correct", "sort_order"],
@@ -337,14 +339,27 @@ TOOLS = [
             "question_id": STRING,
             "question_text": STRING,
             "slug": STRING,
-            "question_type": STRING,
-            "points": NUMBER,
-            "time_limit": NUMBER,
+            "question_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]},
+            "points": NON_NEGATIVE_NUMBER,
+            "time_limit": NON_NEGATIVE_NUMBER,
             "explanation": STRING,
-            "difficulty_level": STRING,
-            "sort_order": INTEGER,
+            "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
+            "sort_order": NON_NEGATIVE_INTEGER,
             "is_required": BOOLEAN,
-            "options": {"type": "array", "items": {"type": "object"}},
+            "options": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "option_text": NON_EMPTY_STRING,
+                        "is_correct": BOOLEAN,
+                        "sort_order": NON_NEGATIVE_INTEGER,
+                        "explanation": STRING,
+                    },
+                    "required": ["option_text", "is_correct", "sort_order"],
+                    "additionalProperties": False,
+                },
+            },
         },
         ["question_id"],
     ),
@@ -369,7 +384,7 @@ TOOLS = [
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "properties": {"id": STRING, "sort_order": INTEGER},
+                    "properties": {"id": NON_EMPTY_STRING, "sort_order": NON_NEGATIVE_INTEGER},
                     "required": ["id", "sort_order"],
                     "additionalProperties": False,
                 },
@@ -442,6 +457,6 @@ TOOLS = [
             "blocks": {"type": "array", "items": UI_BLOCK},
             "actions": {"type": "array", "items": UI_ACTION},
         },
-        ["title", "description", "blocks", "actions"],
+        [],
     ),
 ]

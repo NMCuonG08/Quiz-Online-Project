@@ -187,6 +187,7 @@ class MCPToolWrapper:
         )
 
     async def list_questions(self, quiz_id: str, authorization: str) -> Any:
+        await self._ensure_owned_quiz(quiz_id, authorization)
         response = await self.call_backend_api(
             "GET", f"/api/questions/quiz/{quiz_id}/all", authorization=authorization
         )
@@ -201,12 +202,35 @@ class MCPToolWrapper:
             questions = questions_payload
         questions = questions if isinstance(questions, list) else []
         total_points = sum(float(item.get("points") or 0) for item in questions if isinstance(item, dict))
+        issues: list[str] = []
+        if not questions:
+            issues.append("Quiz chưa có câu hỏi")
+        for index, question in enumerate(questions, start=1):
+            if not isinstance(question, dict):
+                issues.append(f"Câu hỏi {index} có dữ liệu không hợp lệ")
+                continue
+            if not str(question.get("question_text") or "").strip():
+                issues.append(f"Câu hỏi {index} thiếu nội dung")
+            question_type = str(question.get("question_type") or "")
+            if question_type in {"SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE"}:
+                options = question.get("options") or []
+                if not isinstance(options, list) or len(options) < 2:
+                    issues.append(f"Câu hỏi {index} cần ít nhất 2 đáp án")
+                    continue
+                correct_count = sum(
+                    1 for option in options
+                    if isinstance(option, dict) and option.get("is_correct") is True
+                )
+                if question_type in {"SINGLE_CHOICE", "TRUE_FALSE"} and correct_count != 1:
+                    issues.append(f"Câu hỏi {index} cần đúng 1 đáp án đúng")
+                if question_type == "MULTIPLE_CHOICE" and correct_count < 1:
+                    issues.append(f"Câu hỏi {index} cần ít nhất 1 đáp án đúng")
         return {
             "quiz": quiz,
             "question_count": len(questions),
             "total_points": total_points,
-            "ready_to_publish": len(questions) > 0,
-            "issues": [] if questions else ["Quiz chưa có câu hỏi"],
+            "ready_to_publish": not issues,
+            "issues": issues,
         }
 
     async def create_question(self, payload: Dict[str, Any], authorization: str) -> Any:
@@ -232,6 +256,9 @@ class MCPToolWrapper:
     async def duplicate_question(
         self, question_id: str, new_quiz_id: str, authorization: str
     ) -> Any:
+        await self._ensure_owned_question(question_id, authorization)
+        if new_quiz_id:
+            await self._ensure_owned_quiz(new_quiz_id, authorization)
         return self.data(await self.call_backend_api(
             "POST", f"/api/questions/{question_id}/duplicate",
             body={"newQuizId": new_quiz_id} if new_quiz_id else {},
@@ -241,6 +268,7 @@ class MCPToolWrapper:
     async def reorder_questions(
         self, quiz_id: str, question_orders: list[dict[str, Any]], authorization: str
     ) -> Any:
+        await self._ensure_owned_quiz(quiz_id, authorization)
         return self.data(await self.call_backend_api(
             "PATCH", f"/api/questions/quiz/{quiz_id}/reorder",
             body={"questionOrders": question_orders}, authorization=authorization,
