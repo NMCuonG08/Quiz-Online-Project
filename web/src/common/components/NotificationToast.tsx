@@ -14,6 +14,14 @@ export function NotificationToast({
   onRemove,
   onMarkRead,
 }: Props) {
+  const parsedTimestamp = Date.parse(notification.timestamp);
+  const displayTime = Number.isNaN(parsedTimestamp)
+    ? ""
+    : new Date(parsedTimestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
   useEffect(() => {
     if (notification.autoRemove && notification.duration) {
       const timer = setTimeout(() => {
@@ -54,9 +62,9 @@ export function NotificationToast({
         <div>
           <h4 className="font-bold">{notification.title}</h4>
           <p className="text-sm opacity-90">{notification.message}</p>
-          <span className="text-xs opacity-70">
-            {new Date(notification.timestamp).toLocaleTimeString()}
-          </span>
+          {displayTime && (
+            <span className="text-xs opacity-70">{displayTime}</span>
+          )}
         </div>
         <div className="flex items-center ml-4">
           {!notification.read && (

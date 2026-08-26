@@ -1,4 +1,3 @@
-import { Notification } from '@prisma/client';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -44,7 +43,15 @@ type EventMap = {
   ];
   UserLogin: [{ userId: string }];
   ConfigValidate: [{ newConfig: SystemConfig; oldConfig: SystemConfig }];
-  Notification: [{ userId: string; message: string }];
+  Notification: [
+    {
+      userId: string;
+      message: string;
+      title?: string;
+      type?: 'success' | 'error' | 'warning' | 'info';
+      actionUrl?: string;
+    },
+  ];
   JobStart: [QueueName, JobItem];
   JobFailed: [{ job: JobItem; error: Error | any }];
   WebsocketConnect: [{ userId: string }];
@@ -101,10 +108,21 @@ export type ArgOf<T extends EmitEvent> = EventMap[T][0];
 export type ArgsOf<T extends EmitEvent> = EventMap[T];
 export type AuthFn = (client: Socket) => Promise<AuthDto>;
 
+export interface RealtimeNotification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  userId: string;
+  timestamp: string;
+  read: boolean;
+  actionUrl?: string;
+}
+
 export interface ClientEventMap {
   on_user_delete: [string];
   on_asset_delete: [string];
-  notification: [string];
+  notification: [RealtimeNotification];
   participants_list: [
     {
       roomId: string;

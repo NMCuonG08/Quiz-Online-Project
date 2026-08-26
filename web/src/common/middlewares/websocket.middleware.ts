@@ -104,13 +104,38 @@ function setupWebSocketListeners(dispatch: Dispatch<AnyAction>) {
     dispatch(connectionError(error.message || "Connection failed"));
   });
 
-  wsManager.on("notification", (data: NotificationData) => {
+  wsManager.on("notification", (data: NotificationData | string) => {
     console.log("📢 Notification received from WebSocket:", data);
+
+    const now = new Date().toISOString();
+    const normalized: NotificationData = typeof data === "string"
+      ? {
+          id: `legacy-${Date.now()}`,
+          type: "info",
+          title: "Thông báo",
+          message: data,
+          userId: "current-user",
+          timestamp: now,
+          read: false,
+        }
+      : {
+          ...data,
+          id: data.id || `realtime-${Date.now()}`,
+          type: data.type || "info",
+          title: data.title || "Thông báo",
+          message: data.message || "Bạn có thông báo mới.",
+          userId: data.userId || "current-user",
+          timestamp: Number.isNaN(Date.parse(data.timestamp))
+            ? now
+            : data.timestamp,
+          read: Boolean(data.read),
+        };
 
     // Convert to NotificationItem và dispatch
     const notification = {
-      ...data,
-      autoRemove: data.type === "success" || data.type === "info",
+      ...normalized,
+      autoRemove:
+        normalized.type === "success" || normalized.type === "info",
       duration: 5,
     };
 

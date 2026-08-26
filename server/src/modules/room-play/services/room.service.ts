@@ -41,11 +41,13 @@ export class RoomService extends BaseService {
     await this.eventRepository.emit('RoomCreated', {
       id: created.id,
       ownerId: userId,
-    } as any);
+    });
 
     // Notify owner about created room, client can join socket room by code or id
     await this.eventRepository.emit('Notification', {
       userId,
+      title: 'Tạo phòng thành công',
+      type: 'success',
       message: `Room created: ${created.room_code}`,
     });
 
@@ -196,7 +198,7 @@ export class RoomService extends BaseService {
     await this.eventRepository.emit('RoomUpdated', {
       id,
       ownerId: userId,
-    } as any);
+    });
     return updated;
   }
 
@@ -209,7 +211,7 @@ export class RoomService extends BaseService {
     await this.eventRepository.emit('RoomDeleted', {
       id,
       ownerId: userId,
-    } as any);
+    });
     return 'Room deleted successfully';
   }
 
@@ -250,6 +252,8 @@ export class RoomService extends BaseService {
     await this.eventRepository.joinUserToRoom(userId, socketRoom);
     await this.eventRepository.emit('Notification', {
       userId,
+      title: 'Đã vào phòng',
+      type: 'info',
       message: `Joined room ${room.room_code}. Socket room: ${socketRoom}`,
     });
 
@@ -322,6 +326,8 @@ export class RoomService extends BaseService {
     await this.eventRepository.joinUserToRoom(userId, socketRoom);
     await this.eventRepository.emit('Notification', {
       userId,
+      title: 'Đã vào phòng',
+      type: 'info',
       message: `Joined room ${room.room_code}. Socket room: ${socketRoom}`,
     });
 
@@ -347,27 +353,36 @@ export class RoomService extends BaseService {
     const room = await this.roomRepository.findUnique({ id: roomId });
     if (!room) throw new NotFoundException('Room not found');
 
-    await this.prisma.$transaction(async (tx) => {
-      const participant = await tx.roomParticipant.findUnique({
-        where: { room_id_user_id: { room_id: roomId, user_id: userId } },
-      });
-      if (!participant || !['JOINED', 'ACTIVE'].includes(participant.status)) {
-        return;
-      }
-      await tx.roomParticipant.update({
-        where: { id: participant.id },
-        data: { status: 'DISCONNECTED', left_at: new Date() },
-      });
-      const activeCount = await tx.roomParticipant.count({
-        where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE'] } },
-      });
-      await tx.quizRoom.update({
-        where: { id: roomId }, data: { current_participants: activeCount },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    await this.prisma.$transaction(
+      async (tx) => {
+        const participant = await tx.roomParticipant.findUnique({
+          where: { room_id_user_id: { room_id: roomId, user_id: userId } },
+        });
+        if (
+          !participant ||
+          !['JOINED', 'ACTIVE'].includes(participant.status)
+        ) {
+          return;
+        }
+        await tx.roomParticipant.update({
+          where: { id: participant.id },
+          data: { status: 'DISCONNECTED', left_at: new Date() },
+        });
+        const activeCount = await tx.roomParticipant.count({
+          where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE'] } },
+        });
+        await tx.quizRoom.update({
+          where: { id: roomId },
+          data: { current_participants: activeCount },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     await this.eventRepository.emit('Notification', {
       userId,
+      title: 'Đã rời phòng',
+      type: 'info',
       message: `Left room ${room.room_code}`,
     });
 
@@ -380,35 +395,46 @@ export class RoomService extends BaseService {
     return uuidRegex.test(uuid);
   }
 
-  private async activateParticipant(userId: string, roomId: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const room = await tx.quizRoom.findUnique({ where: { id: roomId } });
-      if (!room) throw new NotFoundException('Room not found');
-      const participant = await tx.roomParticipant.findUnique({
-        where: { room_id_user_id: { room_id: roomId, user_id: userId } },
-      });
-      if (participant && ['JOINED', 'ACTIVE'].includes(participant.status)) {
+  private async activateParticipant(
+    userId: string,
+    roomId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(
+      async (tx) => {
+        const room = await tx.quizRoom.findUnique({ where: { id: roomId } });
+        if (!room) throw new NotFoundException('Room not found');
+        const participant = await tx.roomParticipant.findUnique({
+          where: { room_id_user_id: { room_id: roomId, user_id: userId } },
+        });
+        if (participant && ['JOINED', 'ACTIVE'].includes(participant.status)) {
+          const activeCount = await tx.roomParticipant.count({
+            where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE'] } },
+          });
+          if (room.current_participants !== activeCount) {
+            await tx.quizRoom.update({
+              where: { id: roomId },
+              data: { current_participants: activeCount },
+            });
+          }
+          return;
+        }
         const activeCount = await tx.roomParticipant.count({
           where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE'] } },
         });
-        if (room.current_participants !== activeCount) {
-          await tx.quizRoom.update({ where: { id: roomId }, data: { current_participants: activeCount } });
-        }
-        return;
-      }
-      const activeCount = await tx.roomParticipant.count({
-        where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE'] } },
-      });
-      if (activeCount >= room.max_participants) throw new ForbiddenException('Room full');
-      await tx.roomParticipant.upsert({
-        where: { room_id_user_id: { room_id: roomId, user_id: userId } },
-        create: { room_id: roomId, user_id: userId, status: 'JOINED' },
-        update: { status: 'JOINED', left_at: null },
-      });
-      await tx.quizRoom.update({
-        where: { id: roomId }, data: { current_participants: activeCount + 1 },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (activeCount >= room.max_participants)
+          throw new ForbiddenException('Room full');
+        await tx.roomParticipant.upsert({
+          where: { room_id_user_id: { room_id: roomId, user_id: userId } },
+          create: { room_id: roomId, user_id: userId, status: 'JOINED' },
+          update: { status: 'JOINED', left_at: null },
+        });
+        await tx.quizRoom.update({
+          where: { id: roomId },
+          data: { current_participants: activeCount + 1 },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   // ============= GAME PLAY METHODS =============
@@ -424,7 +450,8 @@ export class RoomService extends BaseService {
     }
     await this.prisma.$transaction([
       this.prisma.quizRoom.update({
-        where: { id: roomId }, data: { status: 'IN_GAME' },
+        where: { id: roomId },
+        data: { status: 'IN_GAME' },
       }),
       this.prisma.roomParticipant.updateMany({
         where: { room_id: roomId, status: 'JOINED' },
@@ -487,7 +514,9 @@ export class RoomService extends BaseService {
       throw new ForbiddenException('Not an active participant');
     }
 
-    const room = await this.prisma.quizRoom.findUnique({ where: { id: roomId } });
+    const room = await this.prisma.quizRoom.findUnique({
+      where: { id: roomId },
+    });
     if (!room) throw new NotFoundException('Room not found');
 
     const question = await this.prisma.question.findUnique({
@@ -499,14 +528,21 @@ export class RoomService extends BaseService {
       throw new ForbiddenException('Question does not belong to this room');
     }
 
-    const selected = new Set((Array.isArray(answer) ? answer : [answer]).filter(Boolean));
-    const correctOptions = question.options.filter((option) => option.is_correct);
+    const selected = new Set(
+      (Array.isArray(answer) ? answer : [answer]).filter(Boolean),
+    );
+    const correctOptions = question.options.filter(
+      (option) => option.is_correct,
+    );
     const correctIds = new Set(correctOptions.map((option) => option.id));
-    const isCorrect = selected.size === correctIds.size &&
+    const isCorrect =
+      selected.size === correctIds.size &&
       Array.from(selected).every((id) => correctIds.has(id));
     return {
       isCorrect,
-      correctAnswer: correctOptions.map((option) => option.option_text).join(', '),
+      correctAnswer: correctOptions
+        .map((option) => option.option_text)
+        .join(', '),
       points: isCorrect ? question.points : 0,
     };
   }
@@ -537,12 +573,20 @@ export class RoomService extends BaseService {
     });
   }
 
-  async persistFinalLeaderboard(roomId: string, leaderboard: unknown[]): Promise<void> {
-    const room = await this.prisma.quizRoom.findUnique({ where: { id: roomId } });
+  async persistFinalLeaderboard(
+    roomId: string,
+    leaderboard: unknown[],
+  ): Promise<void> {
+    const room = await this.prisma.quizRoom.findUnique({
+      where: { id: roomId },
+    });
     if (!room) throw new NotFoundException('Room not found');
-    const settings = room.settings && typeof room.settings === 'object' && !Array.isArray(room.settings)
-      ? room.settings as Record<string, unknown>
-      : {};
+    const settings =
+      room.settings &&
+      typeof room.settings === 'object' &&
+      !Array.isArray(room.settings)
+        ? (room.settings as Record<string, unknown>)
+        : {};
     await this.prisma.quizRoom.update({
       where: { id: roomId },
       data: {
@@ -555,15 +599,28 @@ export class RoomService extends BaseService {
     });
   }
 
-  async persistGameSnapshot(roomId: string, snapshot: Record<string, unknown>): Promise<void> {
-    const room = await this.prisma.quizRoom.findUnique({ where: { id: roomId } });
+  async persistGameSnapshot(
+    roomId: string,
+    snapshot: Record<string, unknown>,
+  ): Promise<void> {
+    const room = await this.prisma.quizRoom.findUnique({
+      where: { id: roomId },
+    });
     if (!room) throw new NotFoundException('Room not found');
-    const settings = room.settings && typeof room.settings === 'object' && !Array.isArray(room.settings)
-      ? room.settings as Record<string, unknown>
-      : {};
+    const settings =
+      room.settings &&
+      typeof room.settings === 'object' &&
+      !Array.isArray(room.settings)
+        ? (room.settings as Record<string, unknown>)
+        : {};
     await this.prisma.quizRoom.update({
       where: { id: roomId },
-      data: { settings: { ...settings, gameSnapshot: snapshot } as Prisma.InputJsonValue },
+      data: {
+        settings: {
+          ...settings,
+          gameSnapshot: snapshot,
+        } as Prisma.InputJsonValue,
+      },
     });
   }
 }

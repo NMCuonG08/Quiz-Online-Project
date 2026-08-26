@@ -8,6 +8,7 @@ import {
 } from '../dtos/notification.dto';
 import { OnEvent } from '@/common/decorators';
 import { ArgOf } from '@/common/repositories/event.repository';
+import { randomUUID } from 'node:crypto';
 
 @Injectable()
 export class NotificationService extends BaseService {
@@ -297,8 +298,22 @@ export class NotificationService extends BaseService {
   }
 
   @OnEvent({ name: 'Notification' })
-  notificationForUser({ userId, message }: ArgOf<'Notification'>) {
-    const messageForUser = message + ' for user ' + userId;
-    this.eventRepository.clientSend('notification', userId, messageForUser);
+  notificationForUser({
+    userId,
+    message,
+    title = 'Thông báo',
+    type = 'info',
+    actionUrl,
+  }: ArgOf<'Notification'>) {
+    this.eventRepository.clientSend('notification', userId, {
+      id: randomUUID(),
+      type,
+      title,
+      message,
+      userId,
+      timestamp: new Date().toISOString(),
+      read: false,
+      ...(actionUrl ? { actionUrl } : {}),
+    });
   }
 }

@@ -51,7 +51,9 @@ export function ChatSection({
   };
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString([], {
+    const timestamp = Date.parse(dateString);
+    if (Number.isNaN(timestamp)) return "";
+    return new Date(timestamp).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
