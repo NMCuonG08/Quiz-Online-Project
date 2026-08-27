@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { useRoomQuiz } from "@/modules/client/room-quiz/hooks/useRoomQuiz";
@@ -10,10 +16,12 @@ import { RoomError } from "@/modules/client/room-quiz/components/RoomError";
 import { ChatSection } from "@/modules/client/room-quiz/components/ChatSection";
 import { ParticipantsSection } from "@/modules/client/room-quiz/components/ParticipantsSection";
 import { useWebSocketState } from "@/common/hooks/useWebSocket";
-import { Button } from "@/common/components/ui/button";
 import GameQuizPage from "@/modules/client/game-quiz/pages/GameQuizPage";
 import { QuizService } from "@/modules/client/do-quiz/services/quiz.service";
 import { Question } from "@/modules/client/do-quiz/types/quiz.types";
+import { useAppSelector } from "@/hooks/useRedux";
+import { wsManager } from "@/lib/websocket";
+import type { RoomGameStatePayload } from "@/common/types/websocket-event.type";
 
 const RoomQuizPage = () => {
   const params = useParams();
@@ -22,6 +30,26 @@ const RoomQuizPage = () => {
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [gameQuestions, setGameQuestions] = useState<Question[]>([]);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const [gameError, setGameError] = useState<string | null>(null);
+  const gameVersionRef = useRef(0);
+  const questionsLoadingRef = useRef(false);
+  const authUserId = useAppSelector((state) => state.auth.user?.id);
+  const currentUserId = useMemo(() => {
+    if (authUserId) return authUserId;
+    if (!isConnected) return undefined;
+    try {
+      const token = wsManager.getCurrentToken();
+      const encoded = token?.split(".")[1];
+      if (!encoded) return undefined;
+      const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+      const payload = JSON.parse(
+        atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")),
+      ) as { sub?: string; userId?: string; id?: string };
+      return payload.sub || payload.userId || payload.id;
+    } catch {
+      return undefined;
+    }
+  }, [authUserId, isConnected]);
 
   const {
     roomData,
@@ -98,34 +126,83 @@ const RoomQuizPage = () => {
     }
   };
 
-  const handleStartGame = async () => {
-    if (!roomData?.quiz_id) {
-      console.error("No quiz ID found in room data");
-      return;
-    }
-
+  const ensureGameQuestions = useCallback(async () => {
+    if (gameQuestions.length > 0) return true;
+    if (!roomData?.quiz_id || questionsLoadingRef.current) return false;
+    questionsLoadingRef.current = true;
     setIsLoadingQuestions(true);
     try {
       const response = await QuizService.getQuizQuestions(roomData.quiz_id);
-      if (response.success && response.data) {
-        setGameQuestions(response.data);
-        setIsGameStarted(true);
-      } else {
-        console.error("Failed to fetch questions:", response.message);
-        alert("Không thể tải câu hỏi. Vui lòng thử lại!");
+      if (!response.success || !response.data?.length) {
+        setGameError(response.message || "Không thể tải câu hỏi của phòng.");
+        return false;
       }
+      setGameQuestions(response.data);
+      setGameError(null);
+      return true;
     } catch (error) {
-      console.error("Error fetching questions:", error);
-      alert("Đã xảy ra lỗi khi tải câu hỏi!");
+      console.error("Error fetching room questions:", error);
+      setGameError("Không thể tải câu hỏi. Vui lòng thử lại.");
+      return false;
     } finally {
+      questionsLoadingRef.current = false;
       setIsLoadingQuestions(false);
     }
+  }, [gameQuestions.length, roomData?.quiz_id]);
+
+  useEffect(() => {
+    if (!isConnected || !roomId) return;
+    let active = true;
+
+    const handleGameState = async (snapshot: RoomGameStatePayload) => {
+      if (
+        snapshot.roomId !== roomId
+        || snapshot.version < gameVersionRef.current
+      ) return;
+      gameVersionRef.current = snapshot.version;
+      if (snapshot.status === "QUESTION" || snapshot.status === "FINISHED") {
+        const ready = await ensureGameQuestions();
+        if (active && ready) setIsGameStarted(true);
+      } else if (active) {
+        setIsGameStarted(false);
+      }
+    };
+    const handleGameError = (payload: { error: string }) => {
+      if (!active) return;
+      setIsLoadingQuestions(false);
+      setGameError(payload.error || "Không thể đồng bộ trạng thái trò chơi.");
+    };
+
+    wsManager.on("game_state", handleGameState);
+    wsManager.on("game_error", handleGameError);
+    wsManager.joinRoom(roomId);
+    wsManager.send("get_game_state", { roomId });
+
+    return () => {
+      active = false;
+      wsManager.off("game_state", handleGameState);
+      wsManager.off("game_error", handleGameError);
+    };
+  }, [ensureGameQuestions, isConnected, roomId]);
+
+  const handleStartGame = () => {
+    if (!roomId || !isConnected) {
+      setGameError("WebSocket chưa kết nối. Vui lòng chờ và thử lại.");
+      return;
+    }
+    setGameError(null);
+    setIsLoadingQuestions(true);
+    wsManager.send("start_game", { roomId });
   };
 
   const handleExitGame = () => {
     setIsGameStarted(false);
     setGameQuestions([]);
   };
+
+  const isRoomOwner = Boolean(
+    currentUserId && roomData?.owner_id === currentUserId,
+  );
 
   if (loading) {
     return <RoomLoading message="Loading room information..." />;
@@ -158,13 +235,24 @@ const RoomQuizPage = () => {
             <h1 className="text-3xl font-bold text-foreground text-center sm:text-left">
               Room Information
             </h1>
-            <button
-              onClick={handleStartGame}
-              disabled={isLoadingQuestions || !roomData.quiz_id}
-              className="inline-flex items-center gap-2 rounded-md border border-primary bg-primary text-primary-foreground px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoadingQuestions ? "Đang tải..." : "🎮 Chơi ngay"}
-            </button>
+            <div className="flex flex-col items-center gap-1 sm:items-end">
+              {isRoomOwner ? (
+                <button
+                  onClick={handleStartGame}
+                  disabled={isLoadingQuestions || !roomData.quiz_id || !isConnected}
+                  className="inline-flex items-center gap-2 rounded-md border border-primary bg-primary text-primary-foreground px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoadingQuestions ? "Đang đồng bộ..." : "🎮 Bắt đầu cho cả phòng"}
+                </button>
+              ) : (
+                <span className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  Đang chờ chủ phòng bắt đầu…
+                </span>
+              )}
+              {gameError && (
+                <span className="max-w-sm text-xs text-destructive">{gameError}</span>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">

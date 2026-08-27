@@ -49,7 +49,7 @@ export interface RoomData {
   quiz_id: string;
   owner_id: string;
   room_code: string;
-  status: "OPEN" | "CLOSED" | "ONGOING";
+  status: "OPEN" | "IN_GAME" | "CLOSED";
   is_private: boolean;
   max_participants: number;
   current_participants: number;
@@ -66,6 +66,9 @@ export interface RoomGameStatePayload {
   deadline?: number;
   version: number;
   serverTime: number;
+  playerScore?: number;
+  playerCorrectAnswers?: number;
+  answeredQuestionId?: string;
 }
 
 export interface ClientEventMap {

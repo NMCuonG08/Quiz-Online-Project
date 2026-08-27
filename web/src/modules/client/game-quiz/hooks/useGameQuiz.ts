@@ -16,6 +16,9 @@ interface AuthoritativeGameState {
   status: "WAITING" | "QUESTION" | "FINISHED";
   questionIndex: number;
   deadline?: number;
+  answeredQuestionId?: string;
+  playerScore?: number;
+  playerCorrectAnswers?: number;
 }
 
 export const useGameQuiz = ({
@@ -53,12 +56,27 @@ export const useGameQuiz = ({
       currentQuestionIndex: Math.max(0, Math.min(snapshot.questionIndex, Math.max(0, questions.length - 1))),
       isGameStarted: snapshot.status === "QUESTION",
       isGameEnded: snapshot.status === "FINISHED",
-      isAnswered: snapshot.questionIndex !== prev.currentQuestionIndex ? false : prev.isAnswered,
+      isAnswered: snapshot.answeredQuestionId
+        ? snapshot.answeredQuestionId === questions[snapshot.questionIndex]?.id
+        : snapshot.questionIndex !== prev.currentQuestionIndex
+          ? false
+          : prev.isAnswered,
+      score: snapshot.playerScore ?? prev.score,
+      correctAnswersCount:
+        snapshot.playerCorrectAnswers ?? prev.correctAnswersCount,
       timeRemaining: snapshot.deadline
         ? Math.max(0, Math.ceil((snapshot.deadline - Date.now()) / 1000))
         : 0,
     }));
-  }, [questions.length]);
+  }, [questions]);
+
+  const syncScore = useCallback((score: number, correctAnswers: number) => {
+    setState((prev) => ({
+      ...prev,
+      score: Math.max(0, Number(score || 0)),
+      correctAnswersCount: Math.max(0, Number(correctAnswers || 0)),
+    }));
+  }, []);
 
   // Start timer for current question
   const startTimerForCurrentQuestion = useCallback(() => {
@@ -138,8 +156,6 @@ export const useGameQuiz = ({
       selectedOptionIds: Array.isArray(selectedAnswer) ? selectedAnswer : undefined,
       textAnswer: typeof selectedAnswer === "string" && 
         (currentQuestion.question_type === "fill_blank" || 
-         currentQuestion.question_type === "fill_in_blank" ||
-         currentQuestion.question_type === "short_answer" ||
          currentQuestion.question_type === "essay" ||
          currentQuestion.question_type === "matching") 
         ? selectedAnswer : undefined,
@@ -217,6 +233,7 @@ export const useGameQuiz = ({
     isLastQuestion: state.currentQuestionIndex >= questions.length - 1,
     selectedAnswers: state.selectedAnswers,
     syncGameState,
+    syncScore,
     // Actions
     selectAnswer,
     submitAnswer,

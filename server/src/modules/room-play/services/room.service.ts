@@ -418,6 +418,9 @@ export class RoomService extends BaseService {
           }
           return;
         }
+        if (!participant && room.status !== 'OPEN') {
+          throw new ForbiddenException('Game already started');
+        }
         const activeCount = await tx.roomParticipant.count({
           where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE'] } },
         });
@@ -426,7 +429,10 @@ export class RoomService extends BaseService {
         await tx.roomParticipant.upsert({
           where: { room_id_user_id: { room_id: roomId, user_id: userId } },
           create: { room_id: roomId, user_id: userId, status: 'JOINED' },
-          update: { status: 'JOINED', left_at: null },
+          update: {
+            status: room.status === 'IN_GAME' ? 'ACTIVE' : 'JOINED',
+            left_at: null,
+          },
         });
         await tx.quizRoom.update({
           where: { id: roomId },

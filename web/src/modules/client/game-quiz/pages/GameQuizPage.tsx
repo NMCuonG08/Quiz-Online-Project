@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { Question, UserAnswer, QuizResult } from "../../do-quiz/types/quiz.types";
@@ -43,6 +43,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
 
   const [leaderboard, setLeaderboard] = useState<Map<string, LeaderboardScore>>(new Map());
   const [gameVersion, setGameVersion] = useState(0);
+  const gameVersionRef = useRef(0);
   const { isConnected } = useWebSocketState();
   const user = useSelector((state: RootState) => state.auth.user);
   const roomData = useSelector((state: RootState) => state.roomQuiz.data);
@@ -67,6 +68,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     submitAnswer,
     applyAnswerResult,
     syncGameState,
+    syncScore,
   } = useGameQuiz({
     roomId: roomId || "",
     quizId,
@@ -103,6 +105,9 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
         next.set(data.userId, data);
         return next;
       });
+      if (data.userId === currentUserId) {
+        syncScore(data.score, data.correctAnswers);
+      }
     };
 
     const handleLeaderboardUpdate = (list: LeaderboardScore[]) => {
@@ -112,6 +117,8 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
         list.forEach((entry) => next.set(entry.userId, entry));
         return next;
       });
+      const me = list.find((entry) => entry.userId === currentUserId);
+      if (me) syncScore(me.score, me.correctAnswers);
     };
 
     const handleAnswerResult = (result: {
@@ -130,8 +137,8 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     wsManager.on("leaderboard_update", handleLeaderboardUpdate);
     wsManager.on("answer_result", handleAnswerResult);
 
-    // Initial fetch if game already ended
-    if (isGameEnded && roomId) {
+    // Always restore authoritative scores after mount/reconnect.
+    if (roomId) {
       wsManager.send("get_leaderboard", { roomId });
     }
 
@@ -140,23 +147,24 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
       wsManager.off("leaderboard_update", handleLeaderboardUpdate);
       wsManager.off("answer_result", handleAnswerResult);
     };
-  }, [applyAnswerResult, isConnected, isGameEnded, roomId]);
+  }, [applyAnswerResult, currentUserId, isConnected, roomId, syncScore]);
 
   useEffect(() => {
     if (!isConnected || !roomId) return;
     const handleGameState = (snapshot: RoomGameStatePayload) => {
-      if (snapshot.roomId !== roomId || snapshot.version < gameVersion) return;
+      if (
+        snapshot.roomId !== roomId
+        || snapshot.version < gameVersionRef.current
+      ) return;
+      gameVersionRef.current = snapshot.version;
       setGameVersion(snapshot.version);
       syncGameState(snapshot);
     };
     wsManager.on("game_state", handleGameState);
     wsManager.joinRoom(roomId);
     wsManager.send("get_game_state", { roomId });
-    if (roomData?.owner_id === currentUserId) {
-      wsManager.send("start_game", { roomId });
-    }
     return () => wsManager.off("game_state", handleGameState);
-  }, [currentUserId, gameVersion, isConnected, roomData?.owner_id, roomId, syncGameState]);
+  }, [isConnected, roomId, syncGameState]);
 
   // Calculate results for QuizResults component
   const quizResultData = useMemo((): QuizResult | null => {

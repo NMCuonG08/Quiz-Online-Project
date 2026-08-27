@@ -38,6 +38,14 @@ interface RoomGameState {
   serverTime: number;
 }
 
+interface StoredRoomAnswer {
+  questionId: string;
+  commandId: string;
+  isCorrect: boolean;
+  correctAnswer: string;
+  points: number;
+}
+
 @Injectable()
 @WebSocketGateway({
   cors: true,
@@ -67,14 +75,8 @@ export class RoomWebSocketGateway
     }>
   > = new Map();
   // In-memory score storage per room (ephemeral)
-  private roomScores: Map<
-    string,
-    Map<
-      string,
-      RoomScoreEntry
-    >
-  > = new Map();
-  private readonly disconnectGraceMs = 5000;
+  private roomScores: Map<string, Map<string, RoomScoreEntry>> = new Map();
+  private readonly disconnectGraceMs = 30000;
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
   private readonly gameTimers = new Map<string, NodeJS.Timeout>();
 
@@ -87,15 +89,20 @@ export class RoomWebSocketGateway
 
   afterInit(server: Server) {
     server.use((socket: AuthenticatedSocket, next) => {
-      void this.authenticateClient(socket).then(() => next()).catch((error) => {
-        this.logger.warn(`Room socket authentication rejected: ${error instanceof Error ? error.message : String(error)}`);
-        next(new Error('Unauthorized'));
-      });
+      void this.authenticateClient(socket)
+        .then(() => next())
+        .catch((error) => {
+          this.logger.warn(
+            `Room socket authentication rejected: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          next(new Error('Unauthorized'));
+        });
     });
   }
 
   private async authenticateClient(client: AuthenticatedSocket): Promise<void> {
-    const token = client.handshake.auth?.token ||
+    const token =
+      client.handshake.auth?.token ||
       client.handshake.headers?.authorization?.replace('Bearer ', '');
     if (!token) throw new Error('No token provided');
     const authDto = await this.authService.authenticate({
@@ -228,7 +235,9 @@ export class RoomWebSocketGateway
     const timer = setTimeout(() => {
       void this.finalizeDisconnect(userId, roomId)
         .catch((error) => {
-          this.logger.warn(`Disconnect cleanup skipped for room ${roomId}: ${error instanceof Error ? error.message : String(error)}`);
+          this.logger.warn(
+            `Disconnect cleanup skipped for room ${roomId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         })
         .finally(() => {
           this.disconnectTimers.delete(key);
@@ -237,14 +246,21 @@ export class RoomWebSocketGateway
     this.disconnectTimers.set(key, timer);
   }
 
-  private async finalizeDisconnect(userId: string, roomId: string): Promise<void> {
+  private async finalizeDisconnect(
+    userId: string,
+    roomId: string,
+  ): Promise<void> {
     const socketRoom = `room:${roomId}`;
     const sockets = await this.server.in(socketRoom).fetchSockets();
-    if (sockets.some((socket) => String(socket.data?.userId || '') === userId)) {
+    if (
+      sockets.some((socket) => String(socket.data?.userId || '') === userId)
+    ) {
       return;
     }
     await this.roomService.leaveRoomViaWebSocket(userId, roomId);
-    this.server.to(socketRoom).emit('user_left', { userId, roomId, message: 'User left the room' });
+    this.server
+      .to(socketRoom)
+      .emit('user_left', { userId, roomId, message: 'User left the room' });
     await this.broadcastParticipants(roomId);
   }
 
@@ -260,7 +276,10 @@ export class RoomWebSocketGateway
 
   private async nextRoomRevision(roomId: string): Promise<number> {
     try {
-      return await this.redisService.incrementWithTtl(`room:${roomId}:revision`, 86400);
+      return await this.redisService.incrementWithTtl(
+        `room:${roomId}:revision`,
+        86400,
+      );
     } catch {
       return Date.now();
     }
@@ -268,7 +287,11 @@ export class RoomWebSocketGateway
 
   private async currentRoomRevision(roomId: string): Promise<number> {
     try {
-      return Number(await this.redisService.get<number>(`room:${roomId}:revision`)) || 0;
+      return (
+        Number(
+          await this.redisService.get<number>(`room:${roomId}:revision`),
+        ) || 0
+      );
     } catch {
       return Date.now();
     }
@@ -280,61 +303,120 @@ export class RoomWebSocketGateway
 
   private async setGameState(state: RoomGameState): Promise<void> {
     await this.redisService.set(`room:${state.roomId}:game`, state, 21600);
-    await this.roomService.persistGameSnapshot(state.roomId, state as unknown as Record<string, unknown>);
+    await this.roomService.persistGameSnapshot(
+      state.roomId,
+      state as unknown as Record<string, unknown>,
+    );
   }
 
   private async nextGameRevision(roomId: string): Promise<number> {
-    return this.redisService.incrementWithTtl(`room:${roomId}:game:revision`, 21600);
+    return this.redisService.incrementWithTtl(
+      `room:${roomId}:game:revision`,
+      21600,
+    );
   }
 
-  private emitGameState(state: RoomGameState, client?: AuthenticatedSocket): void {
+  private emitGameState(
+    state: RoomGameState,
+    client?: AuthenticatedSocket,
+  ): void {
     const payload = { ...state, serverTime: Date.now() };
     if (client) client.emit('game_state', payload);
     else this.server.to(`room:${state.roomId}`).emit('game_state', payload);
+  }
+
+  private async emitPersonalizedGameState(
+    state: RoomGameState,
+    client: AuthenticatedSocket,
+  ): Promise<void> {
+    const userId = this.extractUserIdFromToken(client);
+    const answer = state.questionId
+      ? await this.redisService.get<StoredRoomAnswer>(
+          `room:${state.roomId}:answered:${userId}:${state.questionId}`,
+        )
+      : null;
+    const leaderboard = await this.redisService.hashValuesJson<RoomScoreEntry>(
+      `room:${state.roomId}:scores`,
+    );
+    const player = leaderboard.find((entry) => entry.userId === userId);
+    client.emit('game_state', {
+      ...state,
+      serverTime: Date.now(),
+      playerScore: Number(player?.score || 0),
+      playerCorrectAnswers: Number(player?.correctAnswers || 0),
+      answeredQuestionId: answer?.questionId,
+    });
   }
 
   private scheduleGameAdvance(state: RoomGameState): void {
     const current = this.gameTimers.get(state.roomId);
     if (current) clearTimeout(current);
     if (state.status !== 'QUESTION' || !state.deadline) return;
-    const timer = setTimeout(() => {
-      void this.advanceGameState(state.roomId, state.version).catch((error) => {
-        this.logger.error(`Scheduled game advance failed for room ${state.roomId}: ${error instanceof Error ? error.message : String(error)}`);
-      });
-    }, Math.max(0, state.deadline - Date.now()) + 25);
+    const timer = setTimeout(
+      () => {
+        void this.advanceGameState(state.roomId, state.version).catch(
+          (error) => {
+            this.logger.error(
+              `Scheduled game advance failed for room ${state.roomId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          },
+        );
+      },
+      Math.max(0, state.deadline - Date.now()) + 25,
+    );
     this.gameTimers.set(state.roomId, timer);
   }
 
-  private async advanceGameState(roomId: string, expectedVersion: number): Promise<RoomGameState | null> {
+  private async advanceGameState(
+    roomId: string,
+    expectedVersion: number,
+  ): Promise<RoomGameState | null> {
     const state = await this.getGameState(roomId);
-    if (!state || state.status !== 'QUESTION' || state.version !== expectedVersion) return state;
+    if (
+      !state ||
+      state.status !== 'QUESTION' ||
+      state.version !== expectedVersion
+    )
+      return state;
     const lock = await this.redisService.setIfAbsent(
-      `room:${roomId}:game:advance:${expectedVersion}`, '1', 300,
+      `room:${roomId}:game:advance:${expectedVersion}`,
+      '1',
+      300,
     );
     if (!lock) return this.getGameState(roomId);
     const nextIndex = state.questionIndex + 1;
     const question = await this.roomService.getNextQuestion(roomId, nextIndex);
-    const version = await this.nextGameRevision(roomId);
+    const version = Math.max(
+      await this.nextGameRevision(roomId),
+      state.version + 1,
+    );
     if (!question) {
       const room = await this.roomService.getRoom(roomId);
-      const finalLeaderboard = await this.redisService.hashValuesJson<RoomScoreEntry>(
-        `room:${roomId}:scores`,
-      );
+      const finalLeaderboard =
+        await this.redisService.hashValuesJson<RoomScoreEntry>(
+          `room:${roomId}:scores`,
+        );
       await this.roomService.persistFinalLeaderboard(roomId, finalLeaderboard);
       await this.roomService.endGame(roomId, room.owner_id);
       const finished: RoomGameState = {
-        roomId, status: 'FINISHED', questionIndex: state.questionIndex,
-        version, serverTime: Date.now(),
+        roomId,
+        status: 'FINISHED',
+        questionIndex: state.questionIndex,
+        version,
+        serverTime: Date.now(),
       };
       await this.setGameState(finished);
       this.emitGameState(finished);
       return finished;
     }
     const nextState: RoomGameState = {
-      roomId, status: 'QUESTION', questionIndex: nextIndex,
+      roomId,
+      status: 'QUESTION',
+      questionIndex: nextIndex,
       questionId: question.questionId,
       deadline: Date.now() + Number(question.timeLimit || 30) * 1000,
-      version, serverTime: Date.now(),
+      version,
+      serverTime: Date.now(),
     };
     await this.setGameState(nextState);
     this.emitGameState(nextState);
@@ -430,7 +512,7 @@ export class RoomWebSocketGateway
       await this.broadcastParticipants(result.room_id);
       const gameState = await this.getGameState(result.room_id);
       if (gameState) {
-        this.emitGameState(gameState, client);
+        await this.emitPersonalizedGameState(gameState, client);
         this.scheduleGameAdvance(gameState);
       }
     } catch (error) {
@@ -490,7 +572,11 @@ export class RoomWebSocketGateway
       });
 
       const remainingSockets = await this.server.in(socketRoom).fetchSockets();
-      if (remainingSockets.some((socket) => String(socket.data?.userId || '') === userId)) {
+      if (
+        remainingSockets.some(
+          (socket) => String(socket.data?.userId || '') === userId,
+        )
+      ) {
         return;
       }
 
@@ -621,10 +707,14 @@ export class RoomWebSocketGateway
       const socketRoom = `room:${data.roomId}`;
       try {
         await this.redisService.listPushJson(
-          `room:${data.roomId}:messages`, messageData, 200, 86400,
+          `room:${data.roomId}:messages`,
+          messageData,
+          200,
+          86400,
         );
       } catch {
-        if (!this.roomMessages.has(data.roomId)) this.roomMessages.set(data.roomId, []);
+        if (!this.roomMessages.has(data.roomId))
+          this.roomMessages.set(data.roomId, []);
         const fallback = this.roomMessages.get(data.roomId)!;
         fallback.push(messageData);
         if (fallback.length > 200) fallback.splice(0, fallback.length - 200);
@@ -656,7 +746,9 @@ export class RoomWebSocketGateway
       let messages;
       try {
         messages = await this.redisService.listRangeJson(
-          `room:${data.roomId}:messages`, 0, -1,
+          `room:${data.roomId}:messages`,
+          0,
+          -1,
         );
       } catch {
         messages = this.roomMessages.get(data.roomId) || [];
@@ -760,10 +852,11 @@ export class RoomWebSocketGateway
     try {
       const userId = this.extractUserIdFromToken(client);
       const room = await this.roomService.getRoom(data.roomId);
-      if (room.owner_id !== userId) throw new Error('Only room owner can start the game');
+      if (room.owner_id !== userId)
+        throw new Error('Only room owner can start the game');
       const existing = await this.getGameState(data.roomId);
       if (existing?.status === 'QUESTION' || existing?.status === 'FINISHED') {
-        this.emitGameState(existing, client);
+        await this.emitPersonalizedGameState(existing, client);
         return;
       }
       await this.roomService.startGame(data.roomId, userId);
@@ -780,9 +873,12 @@ export class RoomWebSocketGateway
       };
       await this.setGameState(state);
       this.emitGameState(state);
+      await this.emitPersonalizedGameState(state, client);
       this.scheduleGameAdvance(state);
     } catch (error) {
-      client.emit('game_error', { error: error instanceof Error ? error.message : 'Failed to start game' });
+      client.emit('game_error', {
+        error: error instanceof Error ? error.message : 'Failed to start game',
+      });
     }
   }
 
@@ -793,24 +889,65 @@ export class RoomWebSocketGateway
   ) {
     try {
       let state = await this.getGameState(data.roomId);
-      if (state?.status === 'QUESTION' && state.deadline && state.deadline <= Date.now()) {
-        state = await this.advanceGameState(data.roomId, state.version);
-      }
       if (!state) {
         const room = await this.roomService.getRoom(data.roomId);
-        const settings = room.settings && typeof room.settings === 'object' && !Array.isArray(room.settings)
-          ? room.settings as Record<string, unknown>
-          : {};
+        const settings =
+          room.settings &&
+          typeof room.settings === 'object' &&
+          !Array.isArray(room.settings)
+            ? (room.settings as Record<string, unknown>)
+            : {};
         const persisted = settings.gameSnapshot as RoomGameState | undefined;
-        state = persisted || {
-          roomId: data.roomId,
-          status: room.status === 'CLOSED' ? 'FINISHED' : 'WAITING',
-          questionIndex: 0, version: 0, serverTime: Date.now(),
-        };
+        if (persisted) {
+          state = persisted;
+        } else if (room.status === 'IN_GAME') {
+          const question = await this.roomService.getNextQuestion(
+            data.roomId,
+            0,
+          );
+          state = question
+            ? {
+                roomId: data.roomId,
+                status: 'QUESTION',
+                questionIndex: 0,
+                questionId: question.questionId,
+                deadline: Date.now() + Number(question.timeLimit || 30) * 1000,
+                version: await this.nextGameRevision(data.roomId),
+                serverTime: Date.now(),
+              }
+            : {
+                roomId: data.roomId,
+                status: 'FINISHED',
+                questionIndex: 0,
+                version: await this.nextGameRevision(data.roomId),
+                serverTime: Date.now(),
+              };
+          await this.setGameState(state);
+        } else {
+          state = {
+            roomId: data.roomId,
+            status: room.status === 'CLOSED' ? 'FINISHED' : 'WAITING',
+            questionIndex: 0,
+            version: 0,
+            serverTime: Date.now(),
+          };
+        }
       }
-      this.emitGameState(state, client);
+      if (
+        state.status === 'QUESTION' &&
+        state.deadline &&
+        state.deadline <= Date.now()
+      ) {
+        state = await this.advanceGameState(data.roomId, state.version);
+      }
+      if (!state) throw new Error('Game state is unavailable');
+      this.scheduleGameAdvance(state);
+      await this.emitPersonalizedGameState(state, client);
     } catch (error) {
-      client.emit('game_error', { error: error instanceof Error ? error.message : 'Failed to load game state' });
+      client.emit('game_error', {
+        error:
+          error instanceof Error ? error.message : 'Failed to load game state',
+      });
     }
   }
 
@@ -822,16 +959,21 @@ export class RoomWebSocketGateway
     try {
       const userId = this.extractUserIdFromToken(client);
       const room = await this.roomService.getRoom(data.roomId);
-      if (room.owner_id !== userId) throw new Error('Only room owner can advance questions');
+      if (room.owner_id !== userId)
+        throw new Error('Only room owner can advance questions');
       await this.advanceGameState(data.roomId, Number(data.expectedVersion));
     } catch (error) {
-      client.emit('game_error', { error: error instanceof Error ? error.message : 'Failed to advance question' });
+      client.emit('game_error', {
+        error:
+          error instanceof Error ? error.message : 'Failed to advance question',
+      });
     }
   }
 
   @SubscribeMessage('submit_answer')
   async handleSubmitAnswer(
-    @MessageBody() data: {
+    @MessageBody()
+    data: {
       roomId: string;
       questionId: string;
       selectedOptionId?: string;
@@ -841,52 +983,93 @@ export class RoomWebSocketGateway
     },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
+    let answerKey = '';
+    let answerLockAcquired = false;
     try {
       if (!data.roomId || !data.questionId || !data.commandId) {
-        client.emit('answer_error', { error: 'roomId, questionId and commandId are required' });
+        client.emit('answer_error', {
+          error: 'roomId, questionId and commandId are required',
+        });
         return;
       }
       const userId = this.extractUserIdFromToken(client);
-      const firstExecution = await this.redisService.setIfAbsent(
-        `room:${data.roomId}:answer:${userId}:${data.commandId}`, '1', 21600,
+      answerKey = `room:${data.roomId}:answered:${userId}:${data.questionId}`;
+      answerLockAcquired = await this.redisService.setIfAbsent(
+        answerKey,
+        { status: 'processing' },
+        30,
       );
-      if (!firstExecution) {
-        client.emit('answer_result', { commandId: data.commandId, questionId: data.questionId, duplicate: true });
+      if (!answerLockAcquired) {
+        const previousAnswer =
+          await this.redisService.get<StoredRoomAnswer>(answerKey);
+        client.emit('answer_result', {
+          commandId: data.commandId,
+          questionId: data.questionId,
+          ...(previousAnswer?.questionId ? previousAnswer : {}),
+          duplicate: true,
+        });
         return;
       }
       const answer = data.selectedOptionIds?.length
         ? data.selectedOptionIds
         : data.selectedOptionId || '';
       const result = await this.roomService.submitAnswer(
-        userId, data.roomId, data.questionId, answer, data.timeSpent || 0,
+        userId,
+        data.roomId,
+        data.questionId,
+        answer,
+        data.timeSpent || 0,
+      );
+      await this.redisService.set(
+        answerKey,
+        {
+          questionId: data.questionId,
+          commandId: data.commandId,
+          ...result,
+        } satisfies StoredRoomAnswer,
+        21600,
       );
       const username = this.extractUsernameFromToken(client) || 'Unknown';
       const scoreKey = `room:${data.roomId}:scores`;
-      const leaderboard = await this.redisService.hashValuesJson<RoomScoreEntry>(scoreKey);
+      const leaderboard =
+        await this.redisService.hashValuesJson<RoomScoreEntry>(scoreKey);
       const previous = leaderboard.find((entry) => entry.userId === userId);
       const updateData = {
         userId,
         username,
         score: Number(previous?.score || 0) + result.points,
-        correctAnswers: Number(previous?.correctAnswers || 0) + (result.isCorrect ? 1 : 0),
+        correctAnswers:
+          Number(previous?.correctAnswers || 0) + (result.isCorrect ? 1 : 0),
         timestamp: new Date().toISOString(),
       };
       await this.redisService.hashSetJson(scoreKey, userId, updateData, 21600);
-      const updatedLeaderboard = await this.redisService.hashValuesJson(scoreKey);
-      client.emit('answer_result', { commandId: data.commandId, questionId: data.questionId, ...result });
+      const updatedLeaderboard =
+        await this.redisService.hashValuesJson(scoreKey);
+      client.emit('answer_result', {
+        commandId: data.commandId,
+        questionId: data.questionId,
+        ...result,
+      });
       this.server.to(`room:${data.roomId}`).emit('score_updated', updateData);
-      this.server.to(`room:${data.roomId}`).emit('leaderboard_update', updatedLeaderboard);
+      this.server
+        .to(`room:${data.roomId}`)
+        .emit('leaderboard_update', updatedLeaderboard);
     } catch (error) {
+      if (answerLockAcquired && answerKey) {
+        await this.redisService.del(answerKey);
+      }
       client.emit('answer_error', {
         commandId: data.commandId,
-        error: error instanceof Error ? error.message : 'Failed to submit answer',
+        error:
+          error instanceof Error ? error.message : 'Failed to submit answer',
       });
     }
   }
 
   @SubscribeMessage('update_score')
   async handleUpdateScore(
-    @MessageBody() data: { roomId: string; score: number; correctAnswers: number },
+    @MessageBody()
+    data: { roomId: string; score: number; correctAnswers: number },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     void data;
@@ -904,7 +1087,7 @@ export class RoomWebSocketGateway
 
     try {
       if (!data.roomId) return;
-      
+
       let leaderboard;
       try {
         leaderboard = await this.redisService.hashValuesJson(
@@ -915,7 +1098,7 @@ export class RoomWebSocketGateway
           ? Array.from(this.roomScores.get(data.roomId)!.values())
           : [];
       }
-        
+
       client.emit('leaderboard_update', leaderboard);
     } catch (error) {
       this.logger.error(

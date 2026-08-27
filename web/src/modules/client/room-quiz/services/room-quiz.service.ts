@@ -7,7 +7,7 @@ export interface RoomQuizData {
   quiz_id: string;
   owner_id: string;
   room_code: string;
-  status: "OPEN" | "CLOSED" | "ONGOING";
+  status: "OPEN" | "IN_GAME" | "CLOSED";
   is_private: boolean;
   password_hash: string | null;
   max_participants: number;
