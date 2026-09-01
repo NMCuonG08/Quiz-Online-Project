@@ -102,7 +102,7 @@ export function WebSocketDebugger() {
   };
 
   const forceSetupListeners = () => {
-    wsManager.forceSetupListeners(dispatch);
+    wsManager.forceSetupListeners();
     addLog("Force setup WebSocket listeners");
   };
 

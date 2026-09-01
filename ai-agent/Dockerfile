@@ -11,6 +11,8 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY services ./services
+COPY mcp ./mcp
+COPY scripts ./scripts
 
 USER app
 

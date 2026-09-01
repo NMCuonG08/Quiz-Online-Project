@@ -6,6 +6,8 @@ interface User {
   id: string;
   username: string;
   email: string;
+  full_name?: string | null;
+  role?: string;
   avatarUrl?: string;
   isPremium?: boolean;
   isAdmin?: boolean;

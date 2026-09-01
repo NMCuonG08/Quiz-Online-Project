@@ -109,6 +109,38 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  ai-agent-worker:
+    build:
+      context: ../ai-agent
+      dockerfile: Dockerfile
+    container_name: ${AI_AGENT_WORKER_CONTAINER_NAME:-quiz-ai-agent-worker}
+    restart: unless-stopped
+    env_file:
+      - path: ../ai-agent/config/.env
+        required: false
+    environment:
+      BACKEND_URL: http://app:5000
+      REDIS_URL: ${AI_REDIS_URL:-redis://redis-cache:6379/0}
+      AI_REQUIRE_REDIS: "true"
+      AGENT_CHECKPOINTER: ${AGENT_CHECKPOINTER:-disabled}
+      AI_CHECKPOINT_DATABASE_URL: ${AI_CHECKPOINT_DATABASE_URL:-${DATABASE_URL}}
+      AGENT_QUEUE_KEY_PREFIX: ${AGENT_QUEUE_KEY_PREFIX:-quiz-ai:queue:}
+      AGENT_QUEUE_LEASE_TTL_SECONDS: ${AGENT_QUEUE_LEASE_TTL_SECONDS:-300}
+      AGENT_WORKER_POLL_TIMEOUT_SECONDS: ${AGENT_WORKER_POLL_TIMEOUT_SECONDS:-2}
+    command: ["python", "scripts/run_worker.py"]
+    depends_on:
+      app:
+        condition: service_started
+      redis-cache:
+        condition: service_healthy
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # PostgreSQL Database
   db:
     image: postgres:${POSTGRES_VERSION:-15}

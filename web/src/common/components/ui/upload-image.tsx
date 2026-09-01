@@ -88,7 +88,7 @@ export const UploadImage: React.FC<UploadImageProps> = ({
     fileInputRef.current?.click();
   };
 
-  const onDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -110,13 +110,13 @@ export const UploadImage: React.FC<UploadImageProps> = ({
     }
   };
 
-  const onDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
   };
 
-  const onDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
+  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);

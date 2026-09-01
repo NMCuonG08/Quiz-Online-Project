@@ -4,6 +4,7 @@ import React, { useCallback, useRef, useState } from "react";
 import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/common/components/ui/button";
 import InputGroup from "@/modules/admin/common/components/InputGroup";
 import { TextAreaGroup } from "@/modules/admin/common/components/InputGroup/text-area";
@@ -33,7 +34,7 @@ const AddCategories = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { categories, getCategories, createCategory } = useAdminCategory();
 
-  const form = useForm<CategoryFormData>({
+  const form = useForm<z.input<typeof categorySchema>, unknown, CategoryFormData>({
     resolver: zodResolver(categorySchema),
     defaultValues: {
       name: "",

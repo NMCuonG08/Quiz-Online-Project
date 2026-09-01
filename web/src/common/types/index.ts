@@ -1,5 +1,6 @@
 export * from "./notification.type";
 export * from "./websocket-event.type";
+import type { ServerNotification } from "./websocket-event.type";
 
 // Re-export commonly used types
 export type { NotificationItem, NotificationState } from "./notification.type";

@@ -116,7 +116,7 @@ const QuestionCard: React.FC<Props> = ({ question, onRefresh }) => {
           <div className="flex-1 flex items-center justify-center">
             <div className="w-full h-20 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden relative">
               <Image
-                src={question.media_url}
+                src={typeof question.media_url === "string" ? question.media_url : ""}
                 alt="Question"
                 fill
                 className="object-contain"

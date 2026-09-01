@@ -4,6 +4,7 @@ import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ResourceNotFoundException } from '@/common/middlewares';
+import { EventRepository } from '@/common/repositories/event.repository';
 // import { createTestUser } from '../../../test/setup';
 
 // Mock createTestUser function
@@ -43,6 +44,10 @@ describe('UsersService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: EventRepository,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();
@@ -180,6 +185,7 @@ describe('UsersService', () => {
 
       expect(result).toEqual(mockUsers);
       expect(prismaService.user.findMany).toHaveBeenCalledWith({
+        include: { userRoles: { include: { role: true } } },
         orderBy: { created_at: 'desc' },
       });
     });
@@ -191,6 +197,7 @@ describe('UsersService', () => {
 
       expect(result).toEqual([]);
       expect(prismaService.user.findMany).toHaveBeenCalledWith({
+        include: { userRoles: { include: { role: true } } },
         orderBy: { created_at: 'desc' },
       });
     });
@@ -201,6 +208,7 @@ describe('UsersService', () => {
 
       await expect(service.findAll()).rejects.toThrow(error);
       expect(prismaService.user.findMany).toHaveBeenCalledWith({
+        include: { userRoles: { include: { role: true } } },
         orderBy: { created_at: 'desc' },
       });
     });

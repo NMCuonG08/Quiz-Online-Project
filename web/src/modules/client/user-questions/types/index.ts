@@ -6,11 +6,11 @@ export type QuestionItem = {
     points: number;
     time_limit: number;
     difficulty_level: string;
-    media_url: string | null;
+    media_url: string | File | null;
     options_count?: number;
     options?: QuestionOption[];
-    created_at: string;
-    updated_at: string;
+    created_at?: string;
+    updated_at?: string;
 };
 
 export type QuestionOption = {
@@ -20,9 +20,9 @@ export type QuestionOption = {
     is_correct: boolean;
     sort_order: number;
     explanation: string | null;
-    media_url: string | null;
-    created_at: string;
-    updated_at: string;
+    media_url: string | File | null;
+    created_at?: string;
+    updated_at?: string;
     question_text?: string;
     question_type?: string;
 };

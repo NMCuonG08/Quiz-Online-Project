@@ -59,6 +59,25 @@ class UiPolicyResolver:
                     [{"id": "creator-required", "type": "notice", "title": "Cần quyền creator", "description": "Bạn vẫn có thể xem các quiz công khai.", "tone": "info"}],
                     ["open_login", "browse_quizzes"],
                 )
+            entities = plan.get("entities") if isinstance(plan.get("entities"), dict) else {}
+            required_fields = ("title", "category", "difficulty_level", "time_limit", "quiz_type")
+            computed_missing = [
+                field for field in required_fields
+                if entities.get(field) in (None, "")
+            ]
+            missing_fields = list(dict.fromkeys([*missing_fields, *computed_missing]))
+            if not missing_fields:
+                return self._surface(
+                    "Đã đủ thông tin tạo quiz",
+                    "Agent sẽ kiểm tra category thật và tạo đề xuất xác nhận tiếp theo.",
+                    [{
+                        "id": "quiz-create-ready", "type": "notice",
+                        "title": "Thông tin đã sẵn sàng",
+                        "description": "Không cần nhập lại các trường vừa cung cấp.",
+                        "tone": "success",
+                    }],
+                    [],
+                )
             fields = self._quiz_create_fields(missing_fields)
             action = "open_quiz_create_admin" if scope == "admin" else "open_quiz_create_creator"
             return self._surface(
@@ -74,7 +93,7 @@ class UiPolicyResolver:
                 [action],
             )
 
-        if intent == "quiz_discovery":
+        if intent in {"quiz_search", "quiz_recommend", "quiz_detail"}:
             return self._surface(
                 "Khám phá quiz",
                 "Agent sẽ tìm theo chủ đề từ database. Bạn có thể mở danh sách để lọc thêm.",
@@ -82,12 +101,35 @@ class UiPolicyResolver:
                 ["browse_quizzes"],
             )
 
-        if intent == "learning_history":
+        if intent in {"quiz_history", "quiz_result", "quiz_resume"}:
             return self._surface(
                 "Lịch sử học",
                 "Agent có thể đọc các lần làm bài đã hoàn thành để phân tích.",
                 [{"id": "learning-history", "type": "notice", "title": "Dữ liệu cá nhân", "description": "Chỉ hiển thị dữ liệu của tài khoản hiện tại.", "tone": "info"}],
                 ["open_learning_history"],
+            )
+
+        if intent in {"quiz_attempts", "quiz_in_progress"}:
+            return self._surface(
+                "Tiến độ học tập",
+                "Agent sẽ đọc dữ liệu attempts của chính tài khoản hiện tại.",
+                [{"id": "learning-progress", "type": "notice", "title": "Dữ liệu cá nhân", "description": "Kết quả được lấy trực tiếp từ backend.", "tone": "info"}],
+                [],
+            )
+
+        if intent == "quiz_owned":
+            if scope not in {"creator", "admin"}:
+                return self._surface(
+                    "Quiz của bạn",
+                    "Tài khoản hiện tại chưa có quyền quản lý quiz đã tạo.",
+                    [{"id": "owned-quiz-permission", "type": "notice", "title": "Cần quyền creator", "description": "Hãy mở Quiz Manager hoặc dùng tài khoản có quyền tạo quiz.", "tone": "warning"}],
+                    ["open_quiz_manager"] if (context or {}).get("is_authenticated") else ["open_login"],
+                )
+            return self._surface(
+                "Quiz tôi đã tạo",
+                "Agent sẽ lấy danh sách quiz sở hữu trực tiếp từ backend.",
+                [{"id": "owned-quizzes", "type": "notice", "title": "Dữ liệu sở hữu", "description": "Chỉ hiển thị quiz thuộc tài khoản hiện tại.", "tone": "info"}],
+                [],
             )
 
         if intent == "knowledge_import" and scope in {"creator", "admin"}:
@@ -98,12 +140,32 @@ class UiPolicyResolver:
                 [],
             )
 
-        if intent == "quiz_delete":
+        if intent in {"quiz_delete", "question_delete", "category_delete"}:
+            needs_confirmation = bool(plan.get("needs_clarification")) or "confirmation" in missing_fields
+            resource_label = {
+                "quiz_delete": "quiz",
+                "question_delete": "câu hỏi",
+                "category_delete": "category",
+            }[intent]
+            entities = plan.get("entities") if isinstance(plan.get("entities"), dict) else {}
+            resource_name = str(
+                entities.get("title")
+                or entities.get("question_id")
+                or entities.get("category_id")
+                or resource_label
+            ).strip()
             return self._surface(
                 "Xóa dữ liệu cần xác nhận",
                 "Agent chỉ đề xuất xóa sau khi bạn nói rõ xác nhận. Accept token chỉ dùng một lần.",
                 [{"id": "delete-guard", "type": "notice", "title": "Thao tác phá hủy", "description": "Backend vẫn kiểm tra quyền sở hữu và RBAC khi Accept.", "tone": "warning"}],
                 [],
+                extra_actions=[{
+                    "id": f"confirm-{intent}",
+                    "label": "Xác nhận xóa",
+                    "kind": "prompt",
+                    "value": f"Xác nhận xóa {resource_label} {resource_name}",
+                    "variant": "danger",
+                }] if needs_confirmation else [],
             )
 
         if intent == "no_evidence":
@@ -117,7 +179,12 @@ class UiPolicyResolver:
         return None
 
     def _surface(
-        self, title: str, description: str, blocks: list[dict[str, Any]], action_ids: list[str]
+        self,
+        title: str,
+        description: str,
+        blocks: list[dict[str, Any]],
+        action_ids: list[str],
+        extra_actions: Optional[list[dict[str, Any]]] = None,
     ) -> UISurface:
         actions = []
         for action_id in action_ids:
@@ -127,7 +194,7 @@ class UiPolicyResolver:
             "title": title,
             "description": description,
             "blocks": [self._complete_block(block) for block in blocks],
-            "actions": actions,
+            "actions": [*actions, *(extra_actions or [])],
         })
 
     @staticmethod

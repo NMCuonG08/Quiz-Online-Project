@@ -31,9 +31,10 @@ type DropdownProps = {
   children: React.ReactNode;
   isOpen: boolean;
   setIsOpen: SetStateActionType<boolean>;
+  className?: string;
 };
 
-export function Dropdown({ children, isOpen, setIsOpen }: DropdownProps) {
+export function Dropdown({ children, isOpen, setIsOpen, className }: DropdownProps) {
   const triggerRef = useRef<HTMLElement>(null);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -66,7 +67,7 @@ export function Dropdown({ children, isOpen, setIsOpen }: DropdownProps) {
 
   return (
     <DropdownContext.Provider value={{ isOpen, handleOpen, handleClose }}>
-      <div className="relative" onKeyDown={handleKeyDown}>
+      <div className={cn("relative", className)} onKeyDown={handleKeyDown}>
         {children}
       </div>
     </DropdownContext.Provider>

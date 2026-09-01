@@ -305,6 +305,23 @@ export class AuthController {
     return auth.user;
   }
 
+  @Post('agent-token')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Issue a short-lived delegated Quiz AI token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Short-lived agent token',
+    schema: { type: 'object', properties: { accessToken: { type: 'string' } } },
+  })
+  issueAgentToken(@Auth() auth: AuthDto) {
+    return this.authService.generateAgentAccessToken(auth.user.id).then((accessToken) => ({
+      accessToken,
+    }));
+  }
+
   @Get('me/roles')
   @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.ActivityRead })

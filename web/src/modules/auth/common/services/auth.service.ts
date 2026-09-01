@@ -3,6 +3,18 @@ import { apiRoutes } from "@/lib/apiRoutes";
 import { LoginFormData, RegisterFormData } from "../schema/auth";
 
 export class AuthenticationService {
+  static async forgotPassword(email: string) {
+    try {
+      const response = await apiClient.post(apiRoutes.AUTH.FORGOT_PASSWORD, { email });
+      return response.data;
+    } catch (error: any) {
+      return error?.response?.data || {
+        success: false,
+        error: { message: "Không thể gửi yêu cầu đặt lại mật khẩu.", code: "FORGOT_PASSWORD_ERROR" },
+      };
+    }
+  }
+
   // Handle user login
   static async handleLogin(credentials: LoginFormData) {
     try {

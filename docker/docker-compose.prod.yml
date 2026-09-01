@@ -78,6 +78,31 @@ services:
       BACKEND_URL: http://app:5000
       REDIS_URL: ${AI_REDIS_URL:-redis://redis-cache:6379/0}
       AI_REQUIRE_REDIS: "true"
+      AI_EXECUTOR_MODEL: ${AI_EXECUTOR_MODEL:-}
+      AI_EXECUTOR_API_KEY: ${AI_EXECUTOR_API_KEY:-}
+      AI_EXECUTOR_BASE_URL: ${AI_EXECUTOR_BASE_URL:-}
+      AI_EXECUTOR_REASONING_EFFORT: ${AI_EXECUTOR_REASONING_EFFORT:-}
+      AI_EXECUTOR_TIMEOUT_SECONDS: ${AI_EXECUTOR_TIMEOUT_SECONDS:-60}
+      AI_PLANNER_FAST_MODEL: ${AI_PLANNER_FAST_MODEL:-}
+      AI_PLANNER_FAST_API_KEY: ${AI_PLANNER_FAST_API_KEY:-}
+      AI_PLANNER_FAST_BASE_URL: ${AI_PLANNER_FAST_BASE_URL:-}
+      AI_PLANNER_FAST_REASONING_EFFORT: ${AI_PLANNER_FAST_REASONING_EFFORT:-}
+      AI_PLANNER_FAST_TIMEOUT_SECONDS: ${AI_PLANNER_FAST_TIMEOUT_SECONDS:-8}
+      AI_PLANNER_STRONG_MODEL: ${AI_PLANNER_STRONG_MODEL:-}
+      AI_PLANNER_STRONG_API_KEY: ${AI_PLANNER_STRONG_API_KEY:-}
+      AI_PLANNER_STRONG_BASE_URL: ${AI_PLANNER_STRONG_BASE_URL:-}
+      AI_PLANNER_STRONG_REASONING_EFFORT: ${AI_PLANNER_STRONG_REASONING_EFFORT:-}
+      AI_PLANNER_STRONG_TIMEOUT_SECONDS: ${AI_PLANNER_STRONG_TIMEOUT_SECONDS:-25}
+      AI_PLANNER_CONFIDENCE_THRESHOLD: ${AI_PLANNER_CONFIDENCE_THRESHOLD:-0.82}
+      AI_PLANNER_ESCALATE_WRITES: ${AI_PLANNER_ESCALATE_WRITES:-true}
+      AI_MODEL_MAX_RETRIES: ${AI_MODEL_MAX_RETRIES:-1}
+      AI_LANGGRAPH_USE_RESPONSES_API: ${AI_LANGGRAPH_USE_RESPONSES_API:-false}
+      AGENT_CHECKPOINTER: ${AGENT_CHECKPOINTER:-postgres}
+      AI_CHECKPOINT_DATABASE_URL: ${AI_CHECKPOINT_DATABASE_URL:-${DATABASE_URL}}
+      KNOWLEDGE_EMBEDDING_ENABLED: ${KNOWLEDGE_EMBEDDING_ENABLED:-false}
+      KNOWLEDGE_EMBEDDING_MODEL: ${KNOWLEDGE_EMBEDDING_MODEL:-text-embedding-3-small}
+      KNOWLEDGE_EMBEDDING_API_KEY: ${KNOWLEDGE_EMBEDDING_API_KEY:-}
+      KNOWLEDGE_EMBEDDING_BASE_URL: ${KNOWLEDGE_EMBEDDING_BASE_URL:-https://api.openai.com/v1}
       CORS_ORIGINS: ${AI_AGENT_CORS_ORIGINS:-https://localhost}
       PORT: 8000
     expose:
@@ -88,6 +113,36 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    depends_on:
+      app:
+        condition: service_started
+      redis-cache:
+        condition: service_healthy
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ai-agent-worker:
+    image: ${AI_AGENT_IMAGE:-${ACR_REGISTRY}/quiz-ai-agent:${IMAGE_TAG:-latest}}
+    container_name: ${AI_AGENT_WORKER_CONTAINER_NAME:-quiz-ai-agent-worker}
+    restart: unless-stopped
+    env_file:
+      - path: ../ai-agent/config/.env
+        required: false
+    environment:
+      BACKEND_URL: http://app:5000
+      REDIS_URL: ${AI_REDIS_URL:-redis://redis-cache:6379/0}
+      AI_REQUIRE_REDIS: "true"
+      AGENT_CHECKPOINTER: ${AGENT_CHECKPOINTER:-postgres}
+      AI_CHECKPOINT_DATABASE_URL: ${AI_CHECKPOINT_DATABASE_URL:-${DATABASE_URL}}
+      AGENT_QUEUE_KEY_PREFIX: ${AGENT_QUEUE_KEY_PREFIX:-quiz-ai:queue:}
+      AGENT_QUEUE_LEASE_TTL_SECONDS: ${AGENT_QUEUE_LEASE_TTL_SECONDS:-300}
+      AGENT_WORKER_POLL_TIMEOUT_SECONDS: ${AGENT_WORKER_POLL_TIMEOUT_SECONDS:-2}
+    command: ["python", "scripts/run_worker.py"]
     depends_on:
       app:
         condition: service_started

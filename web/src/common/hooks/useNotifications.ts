@@ -8,6 +8,7 @@ import {
 } from "@/common/slices/notification.slice";
 import { wsManager } from "@/lib/websocket";
 import type { NotificationItem } from "@/common/types";
+import type { ServerEventMap } from "@/common/types/websocket-event.type";
 
 export function useNotifications() {
   const dispatch = useAppDispatch();
@@ -17,7 +18,7 @@ export function useNotifications() {
   const unreadCount = useAppSelector(
     (state) => state.notifications.unreadCount
   );
-  const { isConnected, isConnecting, error } = useAppSelector(
+  const { isConnected, isConnecting, error: webSocketError } = useAppSelector(
     (state) => state.websocket
   );
 
@@ -82,7 +83,10 @@ export function useNotifications() {
   const sendMessage = useCallback(
     (event: string, ...args: unknown[]) => {
       if (isConnected) {
-        wsManager.send(event as keyof typeof wsManager, ...args);
+      wsManager.send(
+        event as keyof ServerEventMap,
+        ...(args as never)
+      );
       }
     },
     [isConnected]
@@ -94,7 +98,7 @@ export function useNotifications() {
     unreadCount,
     isConnected,
     isConnecting,
-    error,
+    webSocketError,
 
     // Actions
     createNotification,

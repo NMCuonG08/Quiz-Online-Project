@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Delete,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { QuizSessionService } from '../services/quiz-session.service';
@@ -14,9 +15,11 @@ import { CreateQuizSessionDto } from '../dtos/create-quiz-session.dto';
 import { SubmitQuizAnswerDto } from '../dtos/submit-quiz-answer.dto';
 import { AuthGuard, Auth, Authenticated } from '@/common/guards/auth.guard';
 import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
+import { AiIdempotencyInterceptor } from '@/common/interceptors/ai-idempotency.interceptor';
 
 @ApiTags('quiz-sessions')
 @Controller('/api/quiz-sessions')
+@UseInterceptors(AiIdempotencyInterceptor)
 export class QuizSessionController {
   constructor(private readonly quizSessionService: QuizSessionService) {}
 

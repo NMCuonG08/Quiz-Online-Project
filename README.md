@@ -18,6 +18,13 @@ Welcome to the **Quiz Online** repository! This is a modern, real-time web appli
 - **Background Processing:** BullMQ integration for handling heavy background jobs and scheduled tasks.
 - **Modern UI/UX:** Responsive, accessible, and beautifully designed interfaces using TailwindCSS, Shadcn UI, and Framer Motion.
 - **Internationalization:** Multi-language support out-of-the-box leveraging `next-intl`.
+
+Đánh giá production và taxonomy keyword AI-agent được duy trì tại
+[`docs/ai-agent-production-readiness.md`](docs/ai-agent-production-readiness.md)
+và [`docs/ai-agent-keywords.vi.md`](docs/ai-agent-keywords.vi.md). Skill map
+theo job market nằm tại [`docs/ai-agent-job-skill-map.vi.md`](docs/ai-agent-job-skill-map.vi.md).
+Deployment runbook: [`docs/ai-agent-deployment-runbook.md`](docs/ai-agent-deployment-runbook.md).
+Semantic intent architecture: [`docs/ai-agent-intent-architecture.md`](docs/ai-agent-intent-architecture.md).
 - **Comprehensive Monitoring:** Support for OpenTelemetry (OTEL) on the backend for in-depth metrics and tracing.
 
 ---

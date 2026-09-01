@@ -51,7 +51,7 @@ export default function EditCourse() {
         setValue,
         reset,
         formState: { errors },
-    } = useForm<CourseFormData>({
+    } = useForm<z.input<typeof courseSchema>, unknown, CourseFormData>({
         resolver: zodResolver(courseSchema),
         defaultValues: {
             title: "",

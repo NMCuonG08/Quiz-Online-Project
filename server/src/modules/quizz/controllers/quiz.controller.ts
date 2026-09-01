@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Body,
@@ -23,8 +24,11 @@ import { Authenticated, AuthGuard, Auth } from '@/common/guards/auth.guard';
 import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
 import { QuizResponseDto } from '../dtos/quiz-response.dto';
 import { UpdateQuizDto } from '../dtos/update-quiz.dto';
+import { CreateQuizWithQuestionsDto } from '../dtos/create-quiz-with-questions.dto';
+import { AiIdempotencyInterceptor } from '@/common/interceptors/ai-idempotency.interceptor';
 
 @Controller('/api/quizzes')
+@UseInterceptors(AiIdempotencyInterceptor)
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
@@ -229,6 +233,22 @@ export class QuizController {
     const creatorId = auth?.user?.id;
     console.log(creatorId);
     return await this.quizService.createQuiz(quiz, thumbnail, creatorId);
+  }
+
+  @Post('with-questions')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.QuizCreate })
+  @ApiOperation({ summary: 'Create a quiz draft and questions atomically' })
+  async createQuizWithQuestions(
+    @Body() quiz: CreateQuizWithQuestionsDto,
+    @Auth() auth: AuthDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.quizService.createQuizWithQuestions(
+      quiz,
+      auth.user.id,
+      idempotencyKey,
+    );
   }
 
   @Delete(':id')

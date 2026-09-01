@@ -20,7 +20,7 @@ export interface QuizCardProps {
   average_rating: number;
   total_ratings: number;
   creator_name: string;
-  difficulty?: "EASY" | "HARD" | "AI GENERATED";
+  difficulty?: "EASY" | "MEDIUM" | "HARD" | "AI GENERATED";
   difficulty_level?: string;
   category_name?: string;
   quiz_type?: string;

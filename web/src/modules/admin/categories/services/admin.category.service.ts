@@ -14,16 +14,26 @@ export interface Category {
 }
 
 export interface CategoryResponse {
-  data?: Category[];
+  data?: Category;
   error?: {
     message: string;
     code: string;
   };
 }
 
+export interface CategoryListResponse {
+  data?: Category[];
+  error?: CategoryResponse["error"];
+}
+
+export interface CategoryDeleteResponse {
+  data?: boolean;
+  error?: CategoryResponse["error"];
+}
+
 export class CategoryService {
   // Lấy danh sách tất cả categories
-  static async getCategories(): Promise<CategoryResponse> {
+  static async getCategories(): Promise<CategoryListResponse> {
     try {
       console.log("Fetching categories...");
       const response = await apiClient.get(apiRoutes.CATEGORIES.GET_ALL);
@@ -203,7 +213,7 @@ export class CategoryService {
   // Xoá category theo ID
   static async deleteCategoryById(
     id: string | number
-  ): Promise<CategoryResponse> {
+  ): Promise<CategoryDeleteResponse> {
     try {
       console.log("Deleting category id=", id);
       const response = await apiClient.delete(

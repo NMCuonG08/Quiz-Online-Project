@@ -182,7 +182,7 @@ const DoQuizPage: React.FC<DoQuizPageProps> = ({ slug }) => {
 
   // Handle view answers
   const handleViewAnswers = () => {
-    router.push(`${APP_ROUTES.QUIZZES.LIST}/${slug}/review`);
+    router.push(`${APP_ROUTES.QUIZ.LIST}/${slug}/review`);
   };
 
   // Handle go back

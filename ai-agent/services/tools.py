@@ -11,6 +11,15 @@ class MCPToolWrapper:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
         self.backend_url = (self.config.get("backend_url") or "http://localhost:3333").rstrip("/")
+        self._http_client: Optional[httpx.AsyncClient] = None
+
+    async def _client(self) -> httpx.AsyncClient:
+        if self._http_client is None or self._http_client.is_closed:
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(30.0, connect=5.0, write=10.0, pool=5.0),
+                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            )
+        return self._http_client
 
     async def call_backend_api(
         self,
@@ -19,20 +28,32 @@ class MCPToolWrapper:
         body: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
         authorization: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         headers: Dict[str, str] = {"Accept": "application/json"}
         if authorization:
             headers["Authorization"] = authorization
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.request(
-                method=method,
-                url=f"{self.backend_url}{endpoint}",
-                json=body if method.upper() not in {"GET", "HEAD"} else None,
-                params=params,
-                headers=headers,
-            )
-            response.raise_for_status()
-            return response.json()
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        client = await self._client()
+        response = await client.request(
+            method=method,
+            url=f"{self.backend_url}{endpoint}",
+            json=body if method.upper() not in {"GET", "HEAD"} else None,
+            params=params,
+            headers=headers,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def close(self) -> None:
+        if self._http_client is not None:
+            await self._http_client.aclose()
+            self._http_client = None
+
+    @staticmethod
+    def _idempotency_kwargs(key: Optional[str]) -> Dict[str, str]:
+        return {"idempotency_key": key} if key else {}
 
     @staticmethod
     def data(response: Dict[str, Any]) -> Any:
@@ -80,11 +101,25 @@ class MCPToolWrapper:
         )
         return self.compact(response, limit)
 
-    async def recommend_quizzes(self, limit: int = 10) -> Any:
+    async def recommend_quizzes(self, limit: int = 10, query: str = "") -> Any:
+        if query.strip():
+            topic_result = await self.search_quizzes(query, limit)
+            topic_items = topic_result.get("items", []) if isinstance(topic_result, dict) else []
+            if topic_items:
+                return {"mode": "topic_match", "requested_topic": query, **topic_result}
         response = await self.call_backend_api(
             "GET", "/api/quizzes/popular", params={"page": 1, "limit": limit},
         )
-        return self.compact(response, limit)
+        result = self.compact(response, limit)
+        if query.strip() and isinstance(result, dict):
+            return {"mode": "general_fallback", "requested_topic": query, **result}
+        return result
+
+    async def recommend_quizzes_with_citations(
+        self, limit: int = 10, query: str = ""
+    ) -> tuple[Any, list[dict[str, str]]]:
+        result = await self.recommend_quizzes(limit, query)
+        return result, self.quiz_citations(result, limit)
 
     async def search_quizzes_with_citations(
         self, query: str, limit: int = 10
@@ -144,6 +179,12 @@ class MCPToolWrapper:
             "GET", "/api/auth/me/permissions", authorization=authorization,
         ))
 
+    async def issue_agent_token(self, authorization: str) -> Any:
+        """Exchange a user access token for a short-lived delegated agent token."""
+        return self.data(await self.call_backend_api(
+            "POST", "/api/auth/agent-token", authorization=authorization,
+        ))
+
     async def append_chat_history(
         self, session_id: str, scope: str, messages: list[dict[str, Any]], authorization: str
     ) -> Any:
@@ -152,38 +193,52 @@ class MCPToolWrapper:
             body={"scope": scope, "messages": messages}, authorization=authorization,
         ))
 
-    async def create_category(self, payload: Dict[str, Any], authorization: str) -> Any:
+    async def create_category(self, payload: Dict[str, Any], authorization: str, idempotency_key: Optional[str] = None) -> Any:
         return self.data(await self.call_backend_api(
-            "POST", "/api/categories", body=payload, authorization=authorization,
+            "POST", "/api/categories", body=payload, authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
     async def update_category(
-        self, category_id: str, changes: Dict[str, Any], authorization: str
+        self, category_id: str, changes: Dict[str, Any], authorization: str, idempotency_key: Optional[str] = None
     ) -> Any:
         return self.data(await self.call_backend_api(
-            "PATCH", f"/api/categories/{category_id}", body=changes, authorization=authorization,
+            "PATCH", f"/api/categories/{category_id}", body=changes, authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
-    async def delete_category(self, category_id: str, authorization: str) -> Any:
+    async def delete_category(self, category_id: str, authorization: str, idempotency_key: Optional[str] = None) -> Any:
         return self.data(await self.call_backend_api(
-            "DELETE", f"/api/categories/{category_id}", authorization=authorization,
+            "DELETE", f"/api/categories/{category_id}", authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
-    async def create_quiz(self, payload: Dict[str, Any], authorization: str) -> Any:
-        return self.data(await self.call_backend_api("POST", "/api/quizzes", body=payload, authorization=authorization))
+    async def create_quiz(self, payload: Dict[str, Any], authorization: str, idempotency_key: Optional[str] = None) -> Any:
+        return self.data(await self.call_backend_api("POST", "/api/quizzes", body=payload, authorization=authorization, **self._idempotency_kwargs(idempotency_key)))
 
-    async def update_quiz(self, quiz_id: str, changes: Dict[str, Any], authorization: str) -> Any:
+    async def create_quiz_with_questions(
+        self,
+        payload: Dict[str, Any],
+        authorization: str,
+        idempotency_key: str,
+    ) -> Any:
+        return self.data(await self.call_backend_api(
+            "POST",
+            "/api/quizzes/with-questions",
+            body=payload,
+            authorization=authorization,
+            **self._idempotency_kwargs(idempotency_key),
+        ))
+
+    async def update_quiz(self, quiz_id: str, changes: Dict[str, Any], authorization: str, idempotency_key: Optional[str] = None) -> Any:
         return self.data(
-            await self.call_backend_api("PATCH", f"/api/quizzes/{quiz_id}", body=changes, authorization=authorization)
+            await self.call_backend_api("PATCH", f"/api/quizzes/{quiz_id}", body=changes, authorization=authorization, **self._idempotency_kwargs(idempotency_key))
         )
 
-    async def delete_quiz(self, quiz_id: str, authorization: str) -> Any:
-        return self.data(await self.call_backend_api("DELETE", f"/api/quizzes/{quiz_id}", authorization=authorization))
+    async def delete_quiz(self, quiz_id: str, authorization: str, idempotency_key: Optional[str] = None) -> Any:
+        return self.data(await self.call_backend_api("DELETE", f"/api/quizzes/{quiz_id}", authorization=authorization, **self._idempotency_kwargs(idempotency_key)))
 
-    async def start_quiz(self, quiz_id: str, quiz_slug: str, authorization: str) -> Any:
+    async def start_quiz(self, quiz_id: str, quiz_slug: str, authorization: str, idempotency_key: Optional[str] = None) -> Any:
         payload = {"quiz_id": quiz_id} if quiz_id else {"quiz_slug": quiz_slug}
         return self.data(
-            await self.call_backend_api("POST", "/api/quiz-sessions", body=payload, authorization=authorization)
+            await self.call_backend_api("POST", "/api/quiz-sessions", body=payload, authorization=authorization, **self._idempotency_kwargs(idempotency_key))
         )
 
     async def list_questions(self, quiz_id: str, authorization: str) -> Any:
@@ -233,28 +288,28 @@ class MCPToolWrapper:
             "issues": issues,
         }
 
-    async def create_question(self, payload: Dict[str, Any], authorization: str) -> Any:
+    async def create_question(self, payload: Dict[str, Any], authorization: str, idempotency_key: Optional[str] = None) -> Any:
         await self._ensure_owned_quiz(payload["quiz_id"], authorization)
         return self.data(
-            await self.call_backend_api("POST", "/api/questions", body=payload, authorization=authorization)
+            await self.call_backend_api("POST", "/api/questions", body=payload, authorization=authorization, **self._idempotency_kwargs(idempotency_key))
         )
 
-    async def update_question(self, question_id: str, changes: Dict[str, Any], authorization: str) -> Any:
+    async def update_question(self, question_id: str, changes: Dict[str, Any], authorization: str, idempotency_key: Optional[str] = None) -> Any:
         await self._ensure_owned_question(question_id, authorization)
         return self.data(
             await self.call_backend_api(
-                "PATCH", f"/api/questions/{question_id}", body=changes, authorization=authorization
+                "PATCH", f"/api/questions/{question_id}", body=changes, authorization=authorization, **self._idempotency_kwargs(idempotency_key)
             )
         )
 
-    async def delete_question(self, question_id: str, authorization: str) -> Any:
+    async def delete_question(self, question_id: str, authorization: str, idempotency_key: Optional[str] = None) -> Any:
         await self._ensure_owned_question(question_id, authorization)
         return self.data(
-            await self.call_backend_api("DELETE", f"/api/questions/{question_id}", authorization=authorization)
+            await self.call_backend_api("DELETE", f"/api/questions/{question_id}", authorization=authorization, **self._idempotency_kwargs(idempotency_key))
         )
 
     async def duplicate_question(
-        self, question_id: str, new_quiz_id: str, authorization: str
+        self, question_id: str, new_quiz_id: str, authorization: str, idempotency_key: Optional[str] = None
     ) -> Any:
         await self._ensure_owned_question(question_id, authorization)
         if new_quiz_id:
@@ -262,16 +317,16 @@ class MCPToolWrapper:
         return self.data(await self.call_backend_api(
             "POST", f"/api/questions/{question_id}/duplicate",
             body={"newQuizId": new_quiz_id} if new_quiz_id else {},
-            authorization=authorization,
+            authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
     async def reorder_questions(
-        self, quiz_id: str, question_orders: list[dict[str, Any]], authorization: str
+        self, quiz_id: str, question_orders: list[dict[str, Any]], authorization: str, idempotency_key: Optional[str] = None
     ) -> Any:
         await self._ensure_owned_quiz(quiz_id, authorization)
         return self.data(await self.call_backend_api(
             "PATCH", f"/api/questions/quiz/{quiz_id}/reorder",
-            body={"questionOrders": question_orders}, authorization=authorization,
+            body={"questionOrders": question_orders}, authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
     async def get_quiz_history(self, authorization: str, limit: int = 10) -> Any:
@@ -306,29 +361,29 @@ class MCPToolWrapper:
         ))
 
     async def import_knowledge_url(
-        self, url: str, title: str, visibility: str, authorization: str
+        self, url: str, title: str, visibility: str, authorization: str, idempotency_key: Optional[str] = None
     ) -> Any:
         payload = {"url": url, "visibility": visibility}
         if title:
             payload["title"] = title
         return self.data(await self.call_backend_api(
-            "POST", "/api/knowledge/sources/import-url", body=payload, authorization=authorization,
+            "POST", "/api/knowledge/sources/import-url", body=payload, authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
-    async def submit_knowledge_review(self, source_id: str, authorization: str) -> Any:
+    async def submit_knowledge_review(self, source_id: str, authorization: str, idempotency_key: Optional[str] = None) -> Any:
         return self.data(await self.call_backend_api(
-            "POST", f"/api/knowledge/sources/{source_id}/submit", authorization=authorization,
+            "POST", f"/api/knowledge/sources/{source_id}/submit", authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
     async def review_knowledge(
-        self, source_id: str, status: str, rejection_reason: str, authorization: str
+        self, source_id: str, status: str, rejection_reason: str, authorization: str, idempotency_key: Optional[str] = None
     ) -> Any:
         payload = {"status": status}
         if rejection_reason:
             payload["rejection_reason"] = rejection_reason
         return self.data(await self.call_backend_api(
             "POST", f"/api/knowledge/sources/{source_id}/review",
-            body=payload, authorization=authorization,
+            body=payload, authorization=authorization, **self._idempotency_kwargs(idempotency_key),
         ))
 
     async def get_admin_dashboard_stats(self, authorization: str) -> Any:

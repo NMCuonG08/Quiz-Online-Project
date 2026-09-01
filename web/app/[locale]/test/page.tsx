@@ -313,7 +313,7 @@ function ServiceItem({
     );
 }
 
-export function StaffGroup({
+function StaffGroup({
     staffId,
     staffName,
     services = [],

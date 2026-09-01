@@ -27,7 +27,7 @@ const initialState: QuizState = {
 
 export const fetchQuizzes = createAsyncThunk(
   "userQuiz/fetchQuizzes",
-  async (params?: QuizQueryParams, { rejectWithValue }) => {
+  async (params: QuizQueryParams | undefined, { rejectWithValue }) => {
     const response = await QuizService.getQuizzes(params);
     if (!response.success) {
       return rejectWithValue(response.message || "Failed to fetch quizzes");

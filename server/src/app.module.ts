@@ -29,6 +29,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { AiChatHistoryModule } from './modules/ai-chat-history/ai-chat-history.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AiIdempotencyInterceptor } from './common/interceptors/ai-idempotency.interceptor';
 
 @Module({
   imports: [
@@ -201,6 +202,7 @@ import { APP_GUARD } from '@nestjs/core';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    AiIdempotencyInterceptor,
   ],
 })
 export class AppModule {}

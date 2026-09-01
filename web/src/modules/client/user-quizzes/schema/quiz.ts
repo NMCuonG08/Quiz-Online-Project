@@ -22,9 +22,7 @@ export const quizSchema = z.object({
     .min(1, "Instructions are required")
     .max(2000, "Instructions must be less than 2000 characters"),
   category_id: z.string().min(1, "Category is required"),
-  difficulty_level: z.enum(["EASY", "MEDIUM", "HARD"], {
-    required_error: "Difficulty level is required",
-  }),
+  difficulty_level: z.enum(["EASY", "MEDIUM", "HARD"]),
   time_limit: z
     .number()
     .min(1, "Time limit must be at least 1 minute")
@@ -38,12 +36,8 @@ export const quizSchema = z.object({
     .min(0, "Passing score must be at least 0")
     .max(100, "Passing score cannot exceed 100"),
   is_active: z.boolean().default(true),
-  quiz_type: z.enum(
-    ["MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"],
-    {
-      required_error: "Quiz type is required",
-    }
-  ),
+  is_public: z.boolean().default(true),
+  quiz_type: z.enum(["MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]),
   tags: z.array(z.string()).optional().default([]),
   thumbnailFile: z.instanceof(File).optional().nullable(),
   thumbnailPreview: z.string().optional().nullable(),

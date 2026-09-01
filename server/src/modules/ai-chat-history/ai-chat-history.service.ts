@@ -44,6 +44,7 @@ export class AiChatHistoryService {
         metadata: this.sanitizeMetadata(message.metadata),
       }));
     if (!safe.length) return null;
+    const batchStartedAt = Date.now();
     const conversation = await this.prisma.aiChatConversation.upsert({
       where: { user_id_session_id: { user_id: userId, session_id: sessionId } },
       create: {
@@ -57,9 +58,12 @@ export class AiChatHistoryService {
       update: { scope, updated_at: new Date() },
     });
     await this.prisma.aiChatMessage.createMany({
-      data: safe.map((message) => ({
+      data: safe.map((message, index) => ({
         ...message,
         conversation_id: conversation.id,
+        // Keep user → assistant order deterministic even when both messages
+        // are persisted within the same database timestamp tick.
+        created_at: new Date(batchStartedAt + index),
       })),
     });
     return { id: conversation.id, session_id: sessionId };
@@ -81,6 +85,14 @@ export class AiChatHistoryService {
     });
     if (!conversation)
       throw new NotFoundException('Chat conversation not found');
+    // Legacy rows may share the same timestamp. Keep their display order
+    // stable and prefer the natural user → assistant pair order on ties.
+    conversation.messages.sort((left, right) => {
+      const timeDiff = left.created_at.getTime() - right.created_at.getTime();
+      if (timeDiff !== 0) return timeDiff;
+      if (left.role !== right.role) return left.role === 'user' ? -1 : 1;
+      return left.id.localeCompare(right.id);
+    });
     return conversation;
   }
 

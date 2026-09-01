@@ -71,6 +71,38 @@ OPENAI_MODEL=gpt-4.1-mini
 LLM_API_MODE=responses
 ```
 
+Intent planner dùng semantic structured output, không dùng keyword/regex routing.
+Cấu hình nhiều model/API độc lập:
+
+```env
+AI_EXECUTOR_MODEL=gpt-5.6-terra
+AI_EXECUTOR_API_KEY=...
+AI_EXECUTOR_BASE_URL=https://api.openai.com/v1
+AI_EXECUTOR_REASONING_EFFORT=medium
+
+AI_PLANNER_FAST_MODEL=gpt-5.6-luna
+AI_PLANNER_FAST_API_KEY=...
+AI_PLANNER_FAST_BASE_URL=https://api.openai.com/v1
+AI_PLANNER_FAST_REASONING_EFFORT=none
+
+AI_PLANNER_STRONG_MODEL=gpt-5.6-sol
+AI_PLANNER_STRONG_API_KEY=...
+AI_PLANNER_STRONG_BASE_URL=https://api.openai.com/v1
+AI_PLANNER_STRONG_REASONING_EFFORT=medium
+
+AI_PLANNER_CONFIDENCE_THRESHOLD=0.82
+AI_PLANNER_ESCALATE_WRITES=true
+```
+
+Fast planner xử lý read intent rõ ràng. Request ambiguous, multi-intent,
+confidence thấp, write/destructive/admin luôn được strong planner kiểm tra lại.
+Mỗi tier có thể dùng OpenAI-compatible base URL/key riêng; nếu không đặt thì
+fallback về `OPENAI_MODEL`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` hiện có.
+
+Dependencies của agent được pin để giữ compatibility giữa LangGraph và
+Postgres checkpointer. Khi nâng package, chạy lại toàn bộ agent tests và
+`python -m pip check` trước khi build image.
+
 `responses` keeps multi-instance memory through `previous_response_id`. A provider
 that lacks Responses API support but supports Chat Completions + function calling
 can use `LLM_API_MODE=chat_completions`; Redis persists short-term history,
@@ -117,6 +149,16 @@ LangGraph là orchestrator mặc định: planner → assistant → ToolNode →
 Đặt `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` để Langfuse
 trace planner, graph node, LLM call và tool call; event `done` trả `trace_id`
 để tìm đúng trace.
+
+Khi `AGENT_CHECKPOINTER=postgres`, graph dùng Postgres checkpointer durable với
+`AI_CHECKPOINT_DATABASE_URL` để có thể phục hồi state qua restart/redeploy.
+Nên cấp một database user riêng chỉ có quyền trên các bảng checkpoint; không
+dùng credential có quyền ghi dữ liệu quiz cho agent.
+
+Flow `create_quiz_with_questions` dùng endpoint transaction
+`POST /api/quizzes/with-questions` của NestJS. Agent tạo một `Idempotency-Key`
+trong approval payload; backend lưu kết quả theo `(user_id, key)` để retry cùng
+request trả lại kết quả cũ thay vì tạo quiz/câu hỏi lần hai.
 - `POST /chat`: phản hồi JSON, hữu ích cho test.
 - `POST /chat/stream`: phản hồi `text/event-stream` cho UI.
 
@@ -171,3 +213,97 @@ Danh mục sẵn có gồm `quiz.search`, `quiz.get`, `quiz.create`, `quiz.updat
 - Chỉ thêm embedding + vector retrieval khi metric không đạt.
 - Thêm ingestion có version, review và citation metadata cho nguồn tài liệu.
 - Thêm OpenTelemetry/Prometheus trước khi scale nhiều agent.
+
+## Harness kernel
+
+Runtime hiện có một kernel framework-neutral tại `services/harness/`, gồm:
+
+- typed run/context/usage contracts;
+- atomic per-run budgets cho graph step, model call, tool call, token, cost và thời gian;
+- typed safe errors cho budget, approval, validation, dependency và cancellation;
+- explicit run lifecycle với transition validation;
+- ordered event envelope có `run_id`, `event_id`, `sequence` và timestamp.
+
+LangGraph vẫn là orchestrator duy nhất. Đường LangGraph tạo `RunContext`, chặn
+model/tool call trước khi chạy, ghi usage vào event `done` và giữ nguyên các
+field SSE cũ để frontend tương thích. Budget mặc định có thể điều chỉnh bằng:
+
+```env
+AGENT_MAX_MODEL_CALLS=24
+AGENT_MAX_TOOL_CALLS=32
+AGENT_MAX_SUBAGENT_CALLS=8
+AGENT_MAX_TOTAL_TOKENS=100000
+AGENT_MAX_COST_USD=5
+AGENT_VERSION=quiz-agent-dev
+```
+
+Blueprint và thứ tự triển khai nằm ở:
+
+- `docs/quiz-agent-harness-blueprint.md`;
+- `docs/quiz-agent-harness-implementation-plan.md`.
+
+Phase 2 đã migrate qua deterministic `ToolRuntime` cho `search_quizzes` và
+`create_quiz_with_questions`. Runtime kiểm tra ToolSpec, scope, capability,
+input/output schema, approval, idempotency, timeout và giới hạn kích thước
+result trước khi trả dữ liệu cho agent. Các tool còn lại vẫn đi qua compatibility
+path và sẽ được migrate từng tool trong các phase sau.
+
+Phase 3 đã tách domain thành các capability services tại `services/capabilities/`:
+
+- `DiscoveryCapability`: search, recommend, detail, categories;
+- `LearningCapability`: start, resume, history, attempts, result;
+- `AuthoringCapability`: quiz/question CRUD, publish và build status;
+- `KnowledgeCapability`: search, import và review nguồn;
+- `AccountCapability`: identity và permissions;
+- `QuestionQualityCapability`: deterministic question validation.
+
+Mỗi capability có descriptor riêng gồm intent, scope, tool manifest và access
+mode. `agent_core.py` vẫn là compatibility facade; việc tách module không thay
+đổi API hoặc backend route.
+
+Phase 4 đã bổ sung:
+
+- `QuestionQualityCapability.inspect_question()` và `inspect_quiz()` trả quality report theo từng path;
+- duplicate question/option checks và answer-cardinality checks trước proposal/write;
+- `ContextBuilder` với history/section/total limits, compaction/truncation và trust markers;
+- `MemoryStore` namespace theo user/tenant, TTL, giới hạn bucket, search và credential rejection;
+- LangGraph dùng context builder và đọc memory namespace hiện tại trước execution.
+
+Memory Phase 4 hiện là process-local boundary; durable memory/run persistence sẽ
+được đưa vào phase durable execution sau khi contract ổn định.
+
+Phase 6 đã bổ sung durable run kernel tại `services/harness/durable.py`:
+
+- lưu và đọc lại `RunContext` theo owner/tenant;
+- replay event theo `sequence`;
+- cancellation request có owner isolation;
+- artifact store có ownership và run binding;
+- Redis backend khi cấu hình, in-memory fallback cho local development;
+- API `GET /runs/{run_id}`, `POST /runs/{run_id}/cancel` và
+  `GET /runs/{run_id}/events`.
+
+Queue/worker background, resume sau process crash và checkpoint reconciliation
+vẫn là phần tiếp theo của Phase 6.
+
+Phase 7 đã mở rộng observability/evaluation:
+
+- metrics cho run outcome, planner, verification, memory và budget blocks;
+- evaluator kiểm tra optional tool sequence, approval và run status;
+- scenario corpus validation chống thiếu field và duplicate ID;
+- configurable minimum pass rate cho release gate.
+
+Phase 8 đã thêm production hardening:
+
+- `services/hardening.py` kiểm tra production config mà không in secrets;
+- `/ready` trả hardening report và fail 503 khi production config không đạt;
+- `scripts/check_production_hardening.py` để chạy gate trước deploy;
+- [ai-agent-production-hardening.md](../docs/ai-agent-production-hardening.md)
+  ghi rõ secret, network, database, recovery, load và rollback checklist.
+
+Các extension sau roadmap đã có tại `services/capabilities/question_pipeline.py`,
+`services/memory/store.py`, `services/harness/durable.py` và
+`services/harness/queue.py`: full ToolSpec coverage, persistent namespaced
+memory, deterministic/optional semantic question review, durable human-review
+records, draft-only question pipeline và queue/worker contract. Worker entrypoint
+để chạy agent thật trong background cùng checkpoint reconciliation vẫn cần
+wiring ở deployment slice tiếp theo.

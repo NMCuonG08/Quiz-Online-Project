@@ -146,7 +146,7 @@ export class ClientQuizService {
   ): PaginatedQuizResponse {
     const err = error as { response?: { data?: unknown } };
     return (
-      err.response?.data || {
+      (err.response?.data as PaginatedQuizResponse) || {
         success: false,
         statusCode: 500,
         message,

@@ -24,9 +24,11 @@ import {
   UpdateKnowledgeSourceDto,
 } from '../dtos/knowledge.dto';
 import { KnowledgeService } from '../services/knowledge.service';
+import { AiIdempotencyInterceptor } from '@/common/interceptors/ai-idempotency.interceptor';
 
 @ApiTags('Knowledge')
 @Controller('/api/knowledge')
+@UseInterceptors(AiIdempotencyInterceptor)
 export class KnowledgeController {
   constructor(private readonly knowledgeService: KnowledgeService) {}
 

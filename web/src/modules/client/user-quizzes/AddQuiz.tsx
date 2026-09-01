@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/common/components/ui/button";
 import InputGroup from "@/modules/admin/common/components/InputGroup";
 import { TextAreaGroup } from "@/modules/admin/common/components/InputGroup/text-area";
@@ -42,7 +43,7 @@ const AddQuiz = () => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const form = useForm<QuizFormData>({
+  const form = useForm<z.input<typeof quizSchema>, unknown, QuizFormData>({
     resolver: zodResolver(quizSchema),
     mode: "onChange",
     reValidateMode: "onChange",
@@ -171,6 +172,7 @@ const AddQuiz = () => {
         time_limit: data.time_limit,
         max_attempts: data.max_attempts,
         passing_score: data.passing_score,
+        is_public: data.is_public,
         is_active: data.is_active,
         quiz_type: data.quiz_type,
         tags: data.tags || [],
@@ -188,7 +190,7 @@ const AddQuiz = () => {
         router.push("/user/quizzes");
       } else {
         // Try to extract server validation errors
-        const err = res.error as
+        const err = ("error" in res ? res.error : undefined) as
           | {
             message?: string;
             code?: string;
@@ -209,7 +211,6 @@ const AddQuiz = () => {
             const field = (d.field || "").trim();
             const message = d.message || "Invalid value";
             if (field && field in errors) {
-              // @ts-expect-error dynamic key is safe here due to schema alignment
               form.setError(field as keyof QuizFormData, {
                 type: "server",
                 message,

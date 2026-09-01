@@ -12,10 +12,9 @@ type PropsType = {
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   error?: string;
-} & (
-    | { placeholder?: string; defaultValue: string }
-    | { placeholder: string; defaultValue?: string }
-  );
+  placeholder?: string;
+  defaultValue?: string;
+};
 
 export function Select({
   items,

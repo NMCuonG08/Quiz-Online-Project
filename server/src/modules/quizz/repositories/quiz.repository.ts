@@ -317,10 +317,17 @@ export class QuizRepository extends BaseRepository<Quiz> {
   }
 
   async getPopularQuizzes(paginationDto: QuizPaginationQueryDto) {
-    return this.paginateWithRelations({
-      ...paginationDto,
-      sortBy: QuizSortCriteria.POPULAR,
-    });
+    return this.paginateWithRelations(
+      {
+        ...paginationDto,
+        sortBy: QuizSortCriteria.POPULAR,
+      },
+      {
+        is_active: true,
+        is_public: true,
+        questions: { some: {} },
+      },
+    );
   }
 
   async getEasyQuizzes(paginationDto: QuizPaginationQueryDto) {
@@ -340,6 +347,10 @@ export class QuizRepository extends BaseRepository<Quiz> {
   }
 
   async searchQuizzes(paginationDto: QuizPaginationQueryDto) {
-    return this.paginateWithRelations(paginationDto);
+    return this.paginateWithRelations(paginationDto, {
+      is_active: true,
+      is_public: true,
+      questions: { some: {} },
+    });
   }
 }

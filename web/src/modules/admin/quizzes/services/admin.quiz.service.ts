@@ -26,7 +26,7 @@ export class QuizService {
     } catch (error: unknown) {
       const err = error as { response?: { data?: unknown } };
       return (
-        err.response?.data || {
+        (err.response?.data as PaginatedQuizResponse) || {
           success: false,
           statusCode: 500,
           message: "Failed to fetch quizzes",
@@ -73,7 +73,7 @@ export class QuizService {
           payload.thumbnailFile
         );
         const form = new FormData();
-        Object.entries(payload as Record<string, unknown>).forEach(
+        Object.entries(payload as unknown as Record<string, unknown>).forEach(
           ([key, value]) => {
             if (key === "thumbnailFile") return;
             if (key === "tags") {
@@ -99,7 +99,7 @@ export class QuizService {
       } else {
         console.log("Creating JSON body without thumbnail");
         const jsonBody: Record<string, unknown> = {
-          ...(payload as Record<string, unknown>),
+          ...(payload as unknown as Record<string, unknown>),
         };
         if (
           "tags" in jsonBody &&
@@ -133,7 +133,7 @@ export class QuizService {
       let body: FormData | Record<string, unknown>;
       if (payload.thumbnailFile) {
         const form = new FormData();
-        Object.entries(payload as Record<string, unknown>).forEach(
+        Object.entries(payload as unknown as Record<string, unknown>).forEach(
           ([key, value]) => {
             if (key === "thumbnailFile") return;
             if (key === "tags") {
@@ -152,7 +152,7 @@ export class QuizService {
         body = form;
       } else {
         const jsonBody: Record<string, unknown> = {
-          ...(payload as Record<string, unknown>),
+          ...(payload as unknown as Record<string, unknown>),
         };
         if (
           "tags" in jsonBody &&

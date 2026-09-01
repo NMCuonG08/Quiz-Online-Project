@@ -2,7 +2,8 @@ import asyncio
 import unittest
 import httpx
 from datetime import datetime
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
+from langchain_core.messages import AIMessage
 from zoneinfo import ZoneInfo
 
 from services.agent_core import (
@@ -10,6 +11,7 @@ from services.agent_core import (
     GROUNDED_RETRIEVAL_TOOLS,
     RETRY_GUARDED_TOOLS,
     SCOPE_TOOLS,
+    INTENT_ALLOWED_TOOLS,
     WRITE_TOOLS,
     runtime_system_prompt,
 )
@@ -21,6 +23,7 @@ from services.observability import AgentMetrics
 from services.protocol import ChatRequest
 from services.ui_policy import UiPolicyResolver
 from services.langgraph_runner import LangGraphQuizRunner
+from services.intent_schema import ALL_INTENTS, INTENT_DOMAINS, INTENT_METADATA, InteractionPlan
 from services.tool_catalog import TOOLS
 
 
@@ -42,7 +45,9 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
             surface.actions[0].value, "Bearer token", "user-1", "creator",
         )]
         self.assertEqual(events[-1]["intent"], "approved_write")
-        self.core.tools.delete_quiz.assert_awaited_once_with("quiz-1", "Bearer token")
+        self.core.tools.delete_quiz.assert_awaited_once_with(
+            "quiz-1", "Bearer token", idempotency_key=ANY,
+        )
         replay = [event async for event in self.core._approve(
             surface.actions[0].value, "Bearer token", "user-1", "creator",
         )]
@@ -262,8 +267,10 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.core.tools.create_question.assert_not_awaited()
 
     async def test_complete_quiz_tool_creates_draft_then_questions(self):
-        self.core.tools.create_quiz = AsyncMock(return_value={"id": "quiz-1", "title": "Python"})
-        self.core.tools.create_question = AsyncMock(side_effect=[{"id": "q-1"}, {"id": "q-2"}])
+        self.core.tools.create_quiz_with_questions = AsyncMock(return_value={
+            "id": "quiz-1", "title": "Python", "questions_created": 2,
+            "question_ids": ["q-1", "q-2"], "is_active": False,
+        })
         result = await self.core._execute_write("create_quiz_with_questions", {
             "title": "Python", "slug": "python", "category_id": "category-1",
             "difficulty_level": "EASY", "time_limit": 600, "quiz_type": "MULTIPLE_CHOICE",
@@ -281,6 +288,7 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["id"], "quiz-1")
         self.assertEqual(result["questions_created"], 2)
         self.assertFalse(result["is_active"])
+        self.core.tools.create_quiz_with_questions.assert_awaited_once()
 
 
 class ScopeContractTests(unittest.TestCase):
@@ -337,6 +345,82 @@ class UiPolicyContractTests(unittest.TestCase):
         self.assertEqual(surface.actions[0].value, "/user/quizzes/add")
         self.assertEqual(surface.blocks[0].type, "form")
 
+    def test_completed_quiz_form_does_not_render_again(self):
+        plan = {
+            "intent": "quiz_create",
+            "missing_fields": ["title", "category", "difficulty", "time_limit", "quiz_type"],
+            "entities": {},
+        }
+        hydrated = AIAgentCore._hydrate_form_submission(
+            plan,
+            "Dùng thông tin sau để tiếp tục tạo quiz: Tên quiz: a; "
+            "Chủ đề / category: a; Độ khó: EASY; Thời gian (giây): 12; "
+            "Loại quiz: MULTIPLE_CHOICE",
+        )
+        surface = self.policy.resolve(hydrated, "creator", {"route": "/user/quizzes"})
+        self.assertEqual(hydrated["missing_fields"], [])
+        self.assertEqual(surface.title, "Đã đủ thông tin tạo quiz")
+        self.assertEqual(surface.blocks[0].type, "notice")
+
+    def test_complete_quiz_plan_builds_create_proposal_from_real_category(self):
+        proposal = AIAgentCore._build_quiz_create_proposal(
+            {
+                "entities": {
+                    "title": "Python cơ bản",
+                    "category": "Lập trình",
+                    "difficulty_level": "EASY",
+                    "time_limit": 12,
+                    "quiz_type": "MULTIPLE",
+                }
+            },
+            {"list_categories": {"items": [{"id": "cat-1", "name": "Lập trình", "slug": "lap-trinh"}]}},
+        )
+        self.assertEqual(proposal["category_id"], "cat-1")
+        self.assertEqual(proposal["quiz_type"], "MULTIPLE_CHOICE")
+        self.assertEqual(proposal["slug"], "python-co-ban")
+
+    def test_category_selection_request_is_detected_in_vietnamese(self):
+        self.assertTrue(AIAgentCore._is_category_selection_request(
+            "Có các catrgoy nào bạn chọn 1 cái phù hợp nhất là được"
+        ))
+
+    def test_owned_quiz_followup_is_not_reclassified_as_search(self):
+        repaired = AIAgentCore._repair_owned_quiz_followup(
+            {"intent": "quiz_history", "confidence": 0.95},
+            "à quiz tôi đã tạo cơ",
+        )
+        self.assertEqual(repaired["intent"], "quiz_owned")
+        self.assertEqual(repaired["risk"], "read")
+
+    def test_learning_followups_have_distinct_intents(self):
+        attempts = AIAgentCore._repair_learning_and_category_intent(
+            {}, "Cho tôi xem các lần làm quiz của tôi"
+        )
+        in_progress = AIAgentCore._repair_learning_and_category_intent(
+            {}, "Tôi còn quiz nào đang làm dở không?"
+        )
+        categories = AIAgentCore._repair_learning_and_category_intent(
+            {}, "Có category nào, chọn một cái phù hợp nhất"
+        )
+        self.assertEqual(attempts["intent"], "quiz_attempts")
+        self.assertEqual(in_progress["intent"], "quiz_in_progress")
+        self.assertEqual(categories["intent"], "category_recommend")
+
+    def test_single_available_category_is_selected_for_completed_form(self):
+        proposal = AIAgentCore._build_quiz_create_proposal(
+            {
+                "entities": {
+                    "title": "Quiz thử",
+                    "category": "a",
+                    "difficulty_level": "EASY",
+                    "time_limit": 12,
+                    "quiz_type": "MULTIPLE_CHOICE",
+                }
+            },
+            {"list_categories": {"items": [{"id": "cat-only", "name": "AI Evaluation"}]}},
+        )
+        self.assertEqual(proposal["category_id"], "cat-only")
+
     def test_learner_quiz_create_gets_login_instead_of_creator_route(self):
         surface = self.policy.resolve({"intent": "quiz_create"}, "learner", {"route": "/"})
         self.assertEqual(surface.actions[0].value, "/auth/login")
@@ -354,12 +438,40 @@ class UiPolicyContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ChatRequest(message="hello", context={"route": "https://evil.example"})
 
+    def test_chat_request_bounds_session_and_locale(self):
+        with self.assertRaises(ValueError):
+            ChatRequest(message="hello", session_id="x" * 129)
+        with self.assertRaises(ValueError):
+            ChatRequest(message="hello", locale="vi_VN")
+
     def test_special_policy_surface_has_server_owned_action(self):
         surface = self.policy.resolve({"intent": "quiz_create"}, "learner", {"route": "/"})
         self.assertEqual([action.id for action in surface.actions], ["open_login", "browse_quizzes"])
 
 
 class LangGraphContractTests(unittest.TestCase):
+    def test_taxonomy_domains_partition_every_leaf_intent(self):
+        members = [intent for intents in INTENT_DOMAINS.values() for intent in intents]
+        self.assertEqual(set(members), set(ALL_INTENTS))
+        self.assertEqual(len(members), len(set(members)))
+        self.assertEqual(set(INTENT_METADATA), set(ALL_INTENTS))
+
+    def test_plan_schema_exposes_dialogue_and_reference_axes(self):
+        schema = InteractionPlan.model_json_schema()["properties"]
+        self.assertIn("dialogue_act", schema)
+        self.assertIn("reference_mode", schema)
+        self.assertIn("selection_strategy", schema)
+        self.assertIn("resource", schema)
+        self.assertIn("operation", schema)
+
+    def test_every_catalog_tool_is_reachable_from_an_intent(self):
+        catalog_names = {str(item.get("name")) for item in TOOLS}
+        reachable = set().union(*INTENT_ALLOWED_TOOLS.values())
+        # plan_interaction is added by AIAgentCore after intent scoping as a
+        # server-owned internal policy call, so it is intentionally absent
+        # from the public per-intent executor map.
+        self.assertEqual(catalog_names - (reachable | {"plan_interaction"}), set())
+
     def test_graph_tool_node_keeps_existing_tool_coverage(self):
         async def dispatch(_name, _args):
             return "{}"
@@ -477,14 +589,128 @@ class LangGraphContractTests(unittest.TestCase):
         self.assertEqual(core.graph_timeout_seconds, 90)
         self.assertEqual(core.max_empty_tool_streak, 2)
 
+    def test_graph_runner_receives_postgres_url_for_durable_checkpointing(self):
+        core = AIAgentCore({"openai_api_key": "test-key", "checkpoint_database_url": "postgresql://checkpoint"})
+        self.assertEqual(core.graph_runner.postgres_url, "postgresql://checkpoint")
+
     def test_only_retrieval_tools_are_guarded_against_empty_retries(self):
         self.assertEqual(RETRY_GUARDED_TOOLS, {
             "search_quizzes", "get_quiz", "search_knowledge", "web_search",
         })
 
+    def test_write_or_ambiguous_plan_escalates_to_strong_model(self):
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+            planner_fast_model="fast", planner_strong_model="strong",
+        )
+        self.assertTrue(runner._should_escalate(InteractionPlan(
+            intent="quiz_create", confidence=0.99, ambiguity="none",
+            risk="write", route="approval",
+        )))
+        self.assertTrue(runner._should_escalate(InteractionPlan(
+            intent="quiz_recommend", confidence=0.7, ambiguity="high",
+            risk="read", route="tool",
+        )))
+
+    def test_clear_read_plan_stays_on_fast_model(self):
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+            planner_fast_model="fast", planner_strong_model="strong",
+        )
+        self.assertFalse(runner._should_escalate(InteractionPlan(
+            intent="quiz_recommend", confidence=0.96, ambiguity="none",
+            risk="read", route="tool",
+        )))
+
     def test_general_intent_is_supported_by_planner_contract(self):
-        surface = UiPolicyResolver().resolve({"intent": "general"}, "learner", {"route": "/"})
+        surface = UiPolicyResolver().resolve({"intent": "conversation_general"}, "learner", {"route": "/"})
         self.assertIsNone(surface)
+
+    def test_discovery_intent_cannot_expose_write_tools(self):
+        allowed = AIAgentCore._tools_for_intent("quiz_recommend", SCOPE_TOOLS["creator"])
+        self.assertNotIn("create_quiz", allowed)
+        self.assertNotIn("delete_quiz", allowed)
+        self.assertIn("search_quizzes", allowed)
+        self.assertIn("recommend_quizzes", allowed)
+        self.assertNotIn("get_quiz_history", allowed)
+
+    def test_discovery_policy_does_not_render_create_form(self):
+        surface = UiPolicyResolver().resolve(
+            {"intent": "quiz_recommend"}, "creator", {"route": "/user/quizzes"},
+        )
+        self.assertIsNotNone(surface)
+        self.assertFalse(any(block.type == "form" for block in surface.blocks))
+        self.assertEqual(surface.actions[0].value, "/quiz")
+
+
+class PlannerModelRoutingTests(unittest.IsolatedAsyncioTestCase):
+    def test_planner_extracts_json_when_provider_omits_tool_calls(self):
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+        )
+        message = AIMessage(content='```json\n{"intent":"quiz_search","confidence":0.9,"entities":{"query":"Python"}}\n```')
+        plan = runner._extract_plan(message)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.intent, "quiz_search")
+        self.assertEqual(plan.entities.query, "Python")
+
+    async def test_planner_returns_safe_clarification_when_both_tiers_fail(self):
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+            planner_fast_model="fast", planner_strong_model="strong",
+        )
+        runner._plan_once = AsyncMock(side_effect=RuntimeError("no tool call"))
+
+        result = await runner.plan(
+            "Làm gì đó", "/", "learner", {}, history=[],
+        )
+
+        self.assertEqual(result["intent"], "unsupported")
+        self.assertTrue(result["needs_clarification"])
+        self.assertEqual(runner._plan_once.await_count, 2)
+
+    async def test_strong_planner_corrects_fast_write_misclassification(self):
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+            planner_fast_model="fast", planner_strong_model="strong",
+        )
+        runner._plan_once = AsyncMock(side_effect=[
+            InteractionPlan(
+                intent="quiz_create", confidence=0.97, ambiguity="none",
+                risk="write", route="approval",
+            ),
+            InteractionPlan(
+                intent="quiz_recommend", confidence=0.96, ambiguity="none",
+                risk="read", route="tool",
+                entities={"topic": "IT", "query": "IT"},
+            ),
+        ])
+
+        result = await runner.plan(
+            "Tôi muốn làm quiz về chủ đề IT, recommend cho tôi được không?",
+            "/quiz", "learner", {}, history=[],
+        )
+
+        self.assertEqual(result["intent"], "quiz_recommend")
+        self.assertEqual(result["entities"]["topic"], "IT")
+        self.assertEqual(runner._plan_once.await_count, 2)
+
+    async def test_clear_read_plan_uses_only_fast_model(self):
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+            planner_fast_model="fast", planner_strong_model="strong",
+        )
+        runner._plan_once = AsyncMock(return_value=InteractionPlan(
+            intent="quiz_recommend", confidence=0.97, ambiguity="none",
+            risk="read", route="tool", entities={"topic": "Python"},
+        ))
+
+        result = await runner.plan(
+            "Gợi ý quiz Python", "/quiz", "learner", {}, history=[],
+        )
+
+        self.assertEqual(result["intent"], "quiz_recommend")
+        self.assertEqual(runner._plan_once.await_count, 1)
 
 
 class WebSearchContractTests(unittest.IsolatedAsyncioTestCase):
@@ -566,6 +792,18 @@ class ToolBackendRouteContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(status["ready_to_publish"])
         self.assertIn("Câu hỏi 1 cần đúng 1 đáp án đúng", status["issues"])
+
+    async def test_topic_recommendation_falls_back_to_popular_with_explicit_mode(self):
+        self.tools.call_backend_api = AsyncMock(side_effect=[
+            {"data": {"items": [], "pagination": {"total": 0}}},
+            {"data": {"items": [{"title": "Python Basics", "slug": "python-basics"}]}},
+        ])
+
+        result, citations = await self.tools.recommend_quizzes_with_citations(5, "IT")
+
+        self.assertEqual(result["mode"], "general_fallback")
+        self.assertEqual(result["requested_topic"], "IT")
+        self.assertEqual(citations[0]["title"], "Python Basics")
 
 
 class RetrievalCitationContractTests(unittest.TestCase):
@@ -665,6 +903,32 @@ class ObservabilityContractTests(unittest.TestCase):
         metrics = AgentMetrics()
         metrics.record_tool('quoted"tool', "error")
         self.assertIn('tool="quoted\\"tool"', metrics.prometheus())
+
+    def test_prometheus_metrics_include_model_usage(self):
+        metrics = AgentMetrics()
+        metrics.record_model(
+            "test-model", "success", 0.4,
+            {"input_tokens": 100, "output_tokens": 25, "cached_tokens": 10},
+        )
+        output = metrics.prometheus()
+        self.assertIn('quiz_ai_model_calls_total{model="test-model",outcome="success"} 1', output)
+        self.assertIn('quiz_ai_model_tokens_total{model="test-model",type="input"} 100', output)
+        self.assertIn('quiz_ai_model_tokens_total{model="test-model",type="output"} 25', output)
+        self.assertIn('quiz_ai_model_tokens_total{model="test-model",type="cached"} 10', output)
+
+    def test_prometheus_metrics_include_run_quality_and_budget_signals(self):
+        metrics = AgentMetrics()
+        metrics.record_run("completed")
+        metrics.record_planner("quiz_search")
+        metrics.record_verification("question_schema", False)
+        metrics.record_memory("search", "success")
+        metrics.record_budget("tool_calls")
+        output = metrics.prometheus()
+        self.assertIn('quiz_ai_run_outcomes_total{status="completed"} 1', output)
+        self.assertIn('quiz_ai_planner_decisions_total{intent="quiz_search",outcome="selected"} 1', output)
+        self.assertIn('quiz_ai_verification_checks_total{check="question_schema",outcome="failed"} 1', output)
+        self.assertIn('quiz_ai_memory_operations_total{operation="search",outcome="success"} 1', output)
+        self.assertIn('quiz_ai_budget_events_total{resource="tool_calls"} 1', output)
 
 
 if __name__ == "__main__":

@@ -43,7 +43,7 @@ export default function AddCourse() {
         watch,
         setValue,
         formState: { errors },
-    } = useForm<CourseFormData>({
+    } = useForm<z.input<typeof courseSchema>, unknown, CourseFormData>({
         resolver: zodResolver(courseSchema),
         defaultValues: {
             title: "",

@@ -20,8 +20,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Category } from '@prisma/client';
 import { Auth } from '@/common/guards/auth.guard';
 import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
+import { AiIdempotencyInterceptor } from '@/common/interceptors/ai-idempotency.interceptor';
 
 @Controller('/api/categories')
+@UseInterceptors(AiIdempotencyInterceptor)
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 

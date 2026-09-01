@@ -29,7 +29,7 @@ export const fetchCategories = createAsyncThunk(
       );
     }
 
-    return response.data || response;
+    return response.data || [];
   }
 );
 
@@ -47,7 +47,7 @@ export const fetchCategoryBySlug = createAsyncThunk(
       );
     }
 
-    return response.data || response;
+    return response.data as Category;
   }
 );
 

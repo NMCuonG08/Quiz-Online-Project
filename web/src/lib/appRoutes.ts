@@ -18,6 +18,7 @@ export const APP_ROUTES = {
     DO_QUIZ: (slug: string) => `/quiz/${slug}/do-quiz`,
     RESULT: (sessionId: string) => `/quiz/result/${sessionId}`,
   },
+  QUIZZES: "/category",
   ADMIN: {
     DASHBOARD: "/admin",
     QUIZZES: "/admin/quizzes",

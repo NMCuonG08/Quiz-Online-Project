@@ -1,6 +1,6 @@
 import { AuthenticationService } from "@/modules/auth/common/services/auth.service";
 import { detectLocaleFromPath, withLocalePrefix } from "@/lib/locale";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse } from "axios";
 import { Subject, filter, take } from "rxjs";
 // Note: AuthenticationService will be dynamically imported to avoid circular dependencies
 // Enhanced error interface with comprehensive error information
@@ -254,7 +254,7 @@ apiClient.interceptors.request.use(
     // Auto-attach token if available
     const token = getAccessToken();
     if (token && !config.headers?.Authorization) {
-      config.headers = config.headers || {};
+      config.headers = config.headers || new AxiosHeaders();
       config.headers.Authorization = `Bearer ${token}`;
     }
 

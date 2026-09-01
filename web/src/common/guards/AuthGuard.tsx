@@ -1,7 +1,7 @@
 // components/guards/AuthGuard.tsx
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useSelector } from "react-redux";
+import { useAppSelector } from "@/hooks/useRedux";
 import { ReactNode } from "react";
 import CreateLoading from "@/common/components/CreateLoading";
 import { withLocalePrefix, detectLocaleFromPath } from "@/lib/locale";
@@ -22,7 +22,7 @@ const AuthGuard = ({
   const router = useRouter();
   const pathname = usePathname();
   const [isChecking, setIsChecking] = useState(true);
-  const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
+  const { isAuthenticated, user, loading } = useAppSelector((state) => state.auth);
 
   const localizedRedirect = useMemo(() => {
     const locale = detectLocaleFromPath(pathname ?? "/");

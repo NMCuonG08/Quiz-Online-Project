@@ -14,10 +14,13 @@ import {
   Minimize2,
   RotateCcw,
   History,
+  Clock3,
+  RefreshCw,
   Sparkles,
   Square,
   Table2,
   X,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useLocale } from "next-intl";
 import { usePathname } from "next/navigation";
@@ -28,7 +31,15 @@ import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { forceLogout, tokenRefreshed } from "@/modules/auth/common/slices/authSlice";
 import { cn } from "@/lib/utils";
 import { AgentStreamError, streamAgentChat } from "../services/agent-stream.service";
+import {
+  cancelAgentRun,
+  enqueueAgentRun,
+  getAgentRun,
+  type AgentRun,
+  type BackgroundRun,
+} from "../services/agent-control.service";
 import type { AgentStreamEvent, ChatAction, ChatMessage, ChatRole, ChatScope, UIBlock, UISurface } from "../types";
+import AgentControlCenter from "./AgentControlCenter";
 
 const WELCOME_MESSAGE: ChatMessage = {
   id: "welcome",
@@ -177,7 +188,17 @@ function hydrateHistoryMessages(items: PersistedMessage[]): ChatMessage[] {
       );
     }
   });
-  return items.map((item) => {
+  const orderedItems = items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.item.created_at);
+      const rightTime = Date.parse(right.item.created_at);
+      if (leftTime !== rightTime) return leftTime - rightTime;
+      if (left.item.role !== right.item.role) return left.item.role === "user" ? -1 : 1;
+      return left.index - right.index;
+    })
+    .map(({ item }) => item);
+  return orderedItems.map((item) => {
     const metadata = asRecord(item.metadata);
     const rawSurface = metadata.surface;
     const surface = isUISurface(rawSurface)
@@ -213,6 +234,11 @@ export default function QuizAIChat() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Array<{ session_id: string; title: string; updated_at: string }>>([]);
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
+  const [backgroundRun, setBackgroundRun] = useState<BackgroundRun | null>(null);
+  const [backgroundStatus, setBackgroundStatus] = useState<string | null>(null);
+  const [backgroundError, setBackgroundError] = useState<string | null>(null);
+  const [backgroundBusy, setBackgroundBusy] = useState(false);
+  const [controlCenterOpen, setControlCenterOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -224,6 +250,38 @@ export default function QuizAIChat() {
   const user = auth.user;
   const principalKey = user?.id ? `user:${user.id}` : "unauthenticated";
   const sessionStorageKey = `quiz_ai_session_id:${principalKey}`;
+
+  useEffect(() => {
+    if (!backgroundRun?.run_id) return;
+
+    let active = true;
+    const terminalStatuses = new Set(["completed", "failed", "cancelled", "expired"]);
+    const poll = async () => {
+      try {
+        const response = await getAgentRun(backgroundRun.run_id);
+        if (!active) return;
+        const run = response.run as AgentRun;
+        setBackgroundStatus(run.status);
+        if (terminalStatuses.has(run.status)) {
+          setBackgroundBusy(false);
+        }
+      } catch (error: unknown) {
+        if (active) {
+          setBackgroundError(error instanceof Error ? error.message : "Không đọc được trạng thái run nền.");
+          setBackgroundBusy(false);
+        }
+      }
+    };
+
+    void poll();
+    const timer = window.setInterval(() => {
+      if (!terminalStatuses.has(backgroundStatus || "")) void poll();
+    }, 2500);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [backgroundRun?.run_id, backgroundStatus]);
   const scope: ChatScope = user?.isAdmin && pathname.includes("/admin")
     ? "admin"
     : pathname.includes("/user/quizzes")
@@ -386,10 +444,15 @@ export default function QuizAIChat() {
     }
   };
 
-  const sendMessage = async (rawMessage?: string, hideUserMessage = false) => {
+  const sendMessage = async (
+    rawMessage?: string,
+    hideUserMessage = false,
+    backendMessage?: string,
+  ) => {
     if (!auth.isAuthenticated || !auth.token || !user?.id) return;
     const value = (rawMessage ?? input).trim();
-    if (!value || isStreaming) return;
+    const requestValue = (backendMessage ?? value).trim();
+    if (!value || !requestValue || isStreaming) return;
 
     setInput("");
     setIsStreaming(true);
@@ -413,7 +476,7 @@ export default function QuizAIChat() {
     let approvalCompleted = false;
     try {
       await streamAgentChat({
-        message: value,
+        message: requestValue,
         userId: user.id,
         sessionId,
         locale,
@@ -433,7 +496,7 @@ export default function QuizAIChat() {
       });
       patchAssistant(assistantId, { isStreaming: false, status: undefined });
       if (approvalFinished && hideUserMessage) {
-        const resolvedToken = value.slice("__approve__:".length);
+        const resolvedToken = requestValue.slice("__approve__:".length);
         setMessages((current) => current.map((message) => message.surface
           ? { ...message, surface: disableApproval(message.surface, new Map([[resolvedToken, approvalCompleted]])) }
           : message));
@@ -476,9 +539,88 @@ export default function QuizAIChat() {
       if (!action.value.startsWith("/")) return;
       setOpen(false);
       router.push(action.value);
+    } else if (action.kind === "prompt" && action.value.startsWith("__confirm_action__:")) {
+      void sendMessage("Xác nhận xóa", false, action.value);
+    } else if (action.kind === "prompt" && /^Xác nhận xóa\s+(quiz|câu hỏi|category)\s+/i.test(action.value)) {
+      // Legacy history cards stored a plain prompt before confirmation
+      // tokens existed. Convert those cards to the same structured fast path
+      // so clicking an old button also skips planner reclassification.
+      const match = action.value.match(/^Xác nhận xóa\s+(quiz|câu hỏi|category)\s+(.+)$/i);
+      const resource = match?.[1]?.toLowerCase();
+      const label = match?.[2]?.trim();
+      if (resource && label) {
+        const intent = resource === "quiz" ? "quiz_delete" : resource === "câu hỏi" ? "question_delete" : "category_delete";
+        const entities = resource === "quiz"
+          ? { title: label }
+          : resource === "câu hỏi"
+            ? { question_id: label }
+            : { category_id: label };
+        const plan = {
+          intent,
+          confidence: 1,
+          ambiguity: "none",
+          needs_clarification: false,
+          risk: "destructive",
+          route: "tool",
+          dialogue_act: "confirmation",
+          reference_mode: "pending_workflow",
+          refers_to_previous_turn: true,
+          selection_strategy: "exact",
+          resource,
+          operation: "delete",
+          entities,
+          missing_fields: [],
+        };
+        void sendMessage(
+          "Xác nhận xóa",
+          false,
+          "__fast_form__:" + JSON.stringify({ display_message: "Xác nhận xóa", plan }),
+        );
+      }
     } else {
       void sendMessage(action.value);
     }
+  };
+
+  const submitStructuredForm = (block: UIBlock, values: Record<string, string>) => {
+    const details = block.fields
+      .map((field) => `${field.label}: ${values[field.name] || ""}`)
+      .join("\n");
+    const displayMessage = `${block.submit_prompt}\n${details}`.trim();
+    const fieldNames = new Set(block.fields.map((field) => field.name));
+    const isQuizCreateForm = ["title", "category", "difficulty", "time_limit", "quiz_type"]
+      .every((field) => fieldNames.has(field));
+    if (!isQuizCreateForm) {
+      void sendMessage(displayMessage);
+      return;
+    }
+    const plan = {
+      intent: "quiz_create",
+      confidence: 1,
+      ambiguity: "none",
+      needs_clarification: false,
+      risk: "write",
+      route: "approval",
+      dialogue_act: "clarification_answer",
+      reference_mode: "pending_workflow",
+      refers_to_previous_turn: true,
+      selection_strategy: "best_match",
+      resource: "quiz",
+      operation: "create",
+      missing_fields: [],
+      entities: {
+        title: values.title || "",
+        category: values.category || "",
+        difficulty_level: values.difficulty || "",
+        time_limit: Number(values.time_limit || 0),
+        quiz_type: values.quiz_type || "",
+      },
+    };
+    void sendMessage(
+      displayMessage,
+      false,
+      "__fast_form__:" + JSON.stringify({ display_message: displayMessage, plan }),
+    );
   };
 
   const resetChat = () => {
@@ -487,6 +629,37 @@ export default function QuizAIChat() {
     setSessionId(undefined);
     setMessages([WELCOME_MESSAGE]);
     setInput("");
+  };
+
+  const startBackgroundRun = async () => {
+    if (!auth.token || !user?.id || !input.trim() || backgroundBusy || isStreaming) return;
+    setBackgroundBusy(true);
+    setBackgroundError(null);
+    setBackgroundStatus("queued");
+    try {
+      const run = await enqueueAgentRun({
+        message: input.trim(),
+        session_id: sessionId,
+        locale,
+        scope,
+        context: { route: pathname || "/", source: "quiz-ai-chat" },
+      });
+      setBackgroundRun(run);
+      setInput("");
+    } catch (error: unknown) {
+      setBackgroundBusy(false);
+      setBackgroundError(error instanceof Error ? error.message : "Không xếp được tác vụ nền.");
+    }
+  };
+
+  const stopBackgroundRun = async () => {
+    if (!backgroundRun?.run_id) return;
+    try {
+      await cancelAgentRun(backgroundRun.run_id);
+      setBackgroundStatus("cancel_requested");
+    } catch (error: unknown) {
+      setBackgroundError(error instanceof Error ? error.message : "Không thể hủy tác vụ nền.");
+    }
   };
 
   if (!auth.isAuthenticated || !auth.token || !user?.id) return null;
@@ -517,6 +690,9 @@ export default function QuizAIChat() {
             <button onClick={() => { setHistoryOpen((value) => !value); void loadHistory(); }} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Lịch sử chat">
               <History className="size-4" />
             </button>
+            <button onClick={() => setControlCenterOpen((value) => !value)} className={cn("grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground", controlCenterOpen && "bg-amber-400/15 text-amber-700")} aria-label="Mở trung tâm điều khiển agent" aria-pressed={controlCenterOpen}>
+              <SlidersHorizontal className="size-4" />
+            </button>
             <button onClick={() => setOpen(false)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Thu nhỏ chat">
               <Minimize2 className="size-4" />
             </button>
@@ -542,13 +718,32 @@ export default function QuizAIChat() {
             </div>
           )}
 
+          <AgentControlCenter
+            open={controlCenterOpen}
+            run={backgroundRun}
+            runStatus={backgroundStatus}
+            scope={scope}
+          />
+
           <div ref={scrollRef} className="flex-1 space-y-5 overflow-y-auto bg-muted/20 px-4 py-5" aria-live="polite">
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} onAction={handleAction} onPrompt={sendMessage} />
+              <MessageBubble key={message.id} message={message} onAction={handleAction} onPrompt={sendMessage} onFormSubmit={submitStructuredForm} />
             ))}
           </div>
 
           <div className="border-t border-border/70 bg-background px-3 pb-3 pt-2.5">
+            {(backgroundRun || backgroundError) && (
+              <div className="mb-2 rounded-xl border border-border bg-muted/30 px-3 py-2 text-[10px]">
+                <div className="flex items-center gap-2">
+                  {backgroundBusy ? <RefreshCw className="size-3.5 animate-spin text-amber-600" /> : <Clock3 className="size-3.5 text-muted-foreground" />}
+                  <span className="min-w-0 flex-1 truncate">
+                    {backgroundError || `Tác vụ nền: ${backgroundStatus || backgroundRun?.status || "queued"}`}
+                  </span>
+                  {backgroundBusy && <button type="button" onClick={() => void stopBackgroundRun()} className="font-bold text-red-600 hover:underline">Hủy</button>}
+                </div>
+                {backgroundRun?.run_id && <p className="mt-1 truncate font-mono text-[9px] text-muted-foreground">run · {backgroundRun.run_id}</p>}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="flex items-end gap-2 rounded-2xl border border-border bg-muted/35 p-2 pl-3 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/15">
               <textarea
                 ref={inputRef}
@@ -565,9 +760,14 @@ export default function QuizAIChat() {
                   <Square className="size-3.5 fill-current" />
                 </button>
               ) : (
-                <button type="submit" disabled={!input.trim()} className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#FDD239] text-slate-950 shadow-sm hover:bg-[#f5c923] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Gửi tin nhắn">
-                  <ArrowUp className="size-4" />
-                </button>
+                <>
+                  <button type="button" onClick={() => void startBackgroundRun()} disabled={!input.trim() || backgroundBusy} className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-background text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40" aria-label="Chạy tác vụ nền" title="Chạy tác vụ nền">
+                    <Clock3 className="size-4" />
+                  </button>
+                  <button type="submit" disabled={!input.trim()} className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#FDD239] text-slate-950 shadow-sm hover:bg-[#f5c923] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Gửi tin nhắn">
+                    <ArrowUp className="size-4" />
+                  </button>
+                </>
               )}
             </form>
             <p className="mt-2 text-center text-[9px] text-muted-foreground">Agent dùng tool thật • Thao tác xóa luôn cần xác nhận</p>
@@ -594,10 +794,12 @@ function MessageBubble({
   message,
   onAction,
   onPrompt,
+  onFormSubmit,
 }: {
   message: ChatMessage;
   onAction: (action: ChatAction) => void;
   onPrompt: (prompt: string) => Promise<void>;
+  onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   const assistant = message.role === "assistant";
   return (
@@ -624,7 +826,7 @@ function MessageBubble({
           )}
           {message.content && message.isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-amber-500 align-middle" />}
         </div>
-        {message.surface && <DynamicSurface surface={message.surface} onAction={onAction} onPrompt={onPrompt} />}
+        {message.surface && <DynamicSurface surface={message.surface} onAction={onAction} onPrompt={onPrompt} onFormSubmit={onFormSubmit} />}
         {!!message.citations?.length && (
           <div className="mt-3 border-t border-border pt-2">
             <p className="mb-1.5 text-[9px] font-bold uppercase text-muted-foreground">Nguồn</p>
@@ -700,10 +902,12 @@ function DynamicSurface({
   surface,
   onAction,
   onPrompt,
+  onFormSubmit,
 }: {
   surface: UISurface;
   onAction: (action: ChatAction) => void;
   onPrompt: (prompt: string) => Promise<void>;
+  onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
@@ -715,7 +919,7 @@ function DynamicSurface({
       )}
       <div className="divide-y divide-border">
         {surface.blocks.map((block) => (
-          <DynamicBlock key={block.id} block={block} onPrompt={onPrompt} />
+          <DynamicBlock key={block.id} block={block} onPrompt={onPrompt} onFormSubmit={onFormSubmit} />
         ))}
       </div>
       {!!surface.actions.length && (
@@ -741,7 +945,15 @@ function DynamicSurface({
   );
 }
 
-function DynamicBlock({ block, onPrompt }: { block: UIBlock; onPrompt: (prompt: string) => Promise<void> }) {
+function DynamicBlock({
+  block,
+  onPrompt,
+  onFormSubmit,
+}: {
+  block: UIBlock;
+  onPrompt: (prompt: string) => Promise<void>;
+  onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
   const toneIcon = block.tone === "success"
     ? <CheckCircle2 className="size-4 text-emerald-500" />
@@ -751,6 +963,12 @@ function DynamicBlock({ block, onPrompt }: { block: UIBlock; onPrompt: (prompt: 
 
   const submitForm = (event: FormEvent) => {
     event.preventDefault();
+    const isQuizCreateForm = ["title", "category", "difficulty", "time_limit", "quiz_type"]
+      .every((field) => block.fields.some((item) => item.name === field));
+    if (isQuizCreateForm) {
+      onFormSubmit(block, values);
+      return;
+    }
     const details = block.fields.map((field) => `${field.label}: ${values[field.name] || ""}`).join("\n");
     void onPrompt(`${block.submit_prompt}\n${details}`.trim());
   };

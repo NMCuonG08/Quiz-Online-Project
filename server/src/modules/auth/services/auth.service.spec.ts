@@ -6,6 +6,19 @@ import { AuthService } from './auth.service';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 import { CryptoRepository } from '@/common/repositories/crypto.repository';
 import { EventRepository } from '@/common/repositories/event.repository';
+import { LoggingRepository } from '@/common/repositories/logging.repository';
+import { QuizRepository } from '@/modules/quizz/repositories/quiz.repository';
+import { CategoryRepository } from '@/modules/category/repositories/category.repository';
+import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
+import { JobRepository } from '@/common/repositories/job.repository';
+import { RedisService } from '@/infrastructure/cache/redis/redis.service';
+import { AuthCacheService } from './auth-cache.service';
+import { EmailRepository } from '@/common/repositories/email.repository';
+import { NotificationRepository } from '@/modules/notification/repositories/notification.repository';
+import { PrismaService } from '@/infrastructure/database/prisma.service';
+import { QuestionRepository } from '@/modules/questions/repositories/question.repository';
+import { QuestionOptionRepository } from '@/modules/questions/repositories/question-option.repository';
+import { RoomRepository } from '@/modules/room-play/repositories/room.repository';
 import { LoginDto, SignupDto } from '../dto';
 
 describe('AuthService', () => {
@@ -13,13 +26,18 @@ describe('AuthService', () => {
   let eventRepository: EventRepository;
   let userRepository: UserRepository;
   let cryptoRepository: CryptoRepository;
+  let jwtService: JwtService;
 
   const mockUser = {
     id: 'user-123',
+    created_at: new Date(),
+    updated_at: new Date(),
     email: 'test@example.com',
     username: 'testuser',
     full_name: 'Test User',
     password: 'hashedPassword',
+    avatar: null,
+    bio: null,
     isAdmin: false,
     deletedAt: null,
   };
@@ -41,6 +59,7 @@ describe('AuthService', () => {
         {
           provide: ConfigService,
           useValue: {
+            getOrThrow: jest.fn().mockReturnValue('test-secret'),
             get: jest.fn().mockImplementation((key: string) => {
               const config = {
                 JWT_SECRET: 'test-secret',
@@ -78,23 +97,32 @@ describe('AuthService', () => {
           },
         },
         // Mock all other dependencies
-        { provide: 'LoggingRepository', useValue: {} },
-        { provide: 'QuizRepository', useValue: {} },
-        { provide: 'CategoryRepository', useValue: {} },
-        { provide: 'CloudinaryService', useValue: {} },
-        { provide: 'JobRepository', useValue: {} },
-        { provide: 'RedisService', useValue: {} },
-        { provide: 'AuthCacheService', useValue: {} },
-        { provide: 'EmailRepository', useValue: {} },
-        { provide: 'NotificationRepository', useValue: {} },
-        { provide: 'PrismaService', useValue: {} },
-        { provide: 'QuestionRepository', useValue: {} },
-        { provide: 'QuestionOptionRepository', useValue: {} },
-        { provide: 'RoomRepository', useValue: {} },
+        { provide: LoggingRepository, useValue: {} },
+        { provide: QuizRepository, useValue: {} },
+        { provide: CategoryRepository, useValue: {} },
+        { provide: CloudinaryService, useValue: {} },
+        { provide: JobRepository, useValue: {} },
+        { provide: RedisService, useValue: {} },
+        {
+          provide: AuthCacheService,
+          useValue: {
+            getCachedUserRoles: jest.fn().mockResolvedValue(null),
+            cacheUserRoles: jest.fn().mockResolvedValue(undefined),
+            getCachedUserPermissions: jest.fn().mockResolvedValue(null),
+            cacheUserPermissions: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        { provide: EmailRepository, useValue: {} },
+        { provide: NotificationRepository, useValue: {} },
+        { provide: PrismaService, useValue: {} },
+        { provide: QuestionRepository, useValue: {} },
+        { provide: QuestionOptionRepository, useValue: {} },
+        { provide: RoomRepository, useValue: {} },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
+    jwtService = module.get<JwtService>(JwtService);
     eventRepository = module.get<EventRepository>(EventRepository);
     userRepository = module.get<UserRepository>(UserRepository);
     cryptoRepository = module.get<CryptoRepository>(CryptoRepository);
@@ -165,6 +193,22 @@ describe('AuthService', () => {
         {
           keys: [`auth:permissions:${userId}`, `auth:roles:${userId}`],
           userId,
+        },
+      );
+    });
+  });
+
+  describe('agent token', () => {
+    it('issues a short-lived audience-bound delegated token', async () => {
+      const result = await service.generateAgentAccessToken('user-123');
+
+      expect(result).toBe('mock-jwt-token');
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        { sub: 'user-123', type: 'agent' },
+        {
+          secret: 'test-secret',
+          expiresIn: '10m',
+          audience: 'quiz-ai',
         },
       );
     });

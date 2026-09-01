@@ -47,6 +47,8 @@ export type ValidateRequest = {
 
 export interface JwtPayload {
   sub: string; // user ID
+  type?: string;
+  aud?: string;
 }
 
 interface UserData {
@@ -442,7 +444,7 @@ export class AuthService extends BaseService {
       // First, check cache for complete auth data
       const cachedAuthData =
         await this.authCacheService.getCachedAuthData(token);
-      if (cachedAuthData) {
+      if (cachedAuthData && cachedAuthData.user?.name && cachedAuthData.user?.email) {
         this.logger.debug('Using cached auth data for token validation');
         return cachedAuthData;
       }
@@ -454,6 +456,17 @@ export class AuthService extends BaseService {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
 
+      // The auth cache historically stored empty profile fields. Always
+      // hydrate the profile when that legacy shape is encountered so /me and
+      // downstream agents can identify the current user correctly.
+      const user = (await this.userRepository.findOne(payload.sub)) as UserData;
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+      if (user.deletedAt) {
+        throw new UnauthorizedException('User account is deactivated');
+      }
+
       // Try to get roles and permissions from cache first
       let roles = await this.authCacheService.getCachedUserRoles(payload.sub);
       let permissions = await this.authCacheService.getCachedUserPermissions(
@@ -463,19 +476,6 @@ export class AuthService extends BaseService {
       // If not in cache, fetch from database and cache it
       if (!roles || !permissions) {
         this.logger.debug('User data not in cache, fetching from database');
-
-        // Check if user still exists in database
-        const user = (await this.userRepository.findOne(
-          payload.sub,
-        )) as UserData;
-        if (!user) {
-          throw new UnauthorizedException('User not found');
-        }
-
-        // Check if user is still active
-        if (user.deletedAt) {
-          throw new UnauthorizedException('User account is deactivated');
-        }
 
         // Fetch roles and permissions
         roles = await this.getUserRoles(user.id);
@@ -494,8 +494,8 @@ export class AuthService extends BaseService {
           id: payload.sub,
           roles,
           isAdmin: permissions?.includes(Permission.All) || false,
-          name: '', // Will be filled from user data if needed
-          email: '', // Will be filled from user data if needed
+          name: user.full_name || user.username || user.email,
+          email: user.email,
           quotaUsageInBytes: 0,
           quotaSizeInBytes: null,
         },
@@ -524,6 +524,22 @@ export class AuthService extends BaseService {
     return this.jwtService.signAsync(payload, {
       secret,
       expiresIn,
+    });
+  }
+
+  async generateAgentAccessToken(userId: string): Promise<string> {
+    const payload: JwtPayload = {
+      sub: userId,
+      type: 'agent',
+    };
+    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
+    const expiresInConfig = this.configService.get<string>('AGENT_TOKEN_EXPIRES_IN');
+    const expiresIn: StringValue | number | undefined = expiresInConfig ?? '10m';
+
+    return this.jwtService.signAsync(payload, {
+      secret,
+      expiresIn,
+      audience: 'quiz-ai',
     });
   }
 

@@ -74,6 +74,7 @@ export const apiRoutes = {
   AUTH: {
     LOGIN: "/api/auth/login",
     REGISTER: "/api/auth/register",
+    FORGOT_PASSWORD: "/api/auth/forgot-password",
     LOGOUT: "/api/auth/logout",
     PROFILE: "/api/auth/profile",
     REFRESH: "/api/auth/refresh-cookie",

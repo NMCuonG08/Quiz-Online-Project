@@ -50,7 +50,7 @@ const initialState: QuizState = {
 // Async thunks
 export const fetchRecentlyPublishedQuizzes = createAsyncThunk(
   "clientQuiz/fetchRecentlyPublishedQuizzes",
-  async (params?: QuizQueryParams, { rejectWithValue }) => {
+  async (params: QuizQueryParams | undefined, { rejectWithValue }) => {
     const response = await ClientQuizService.getRecentlyPublishedQuizzes(
       params
     );
@@ -65,7 +65,7 @@ export const fetchRecentlyPublishedQuizzes = createAsyncThunk(
 
 export const fetchBestRatedQuizzes = createAsyncThunk(
   "clientQuiz/fetchBestRatedQuizzes",
-  async (params?: QuizQueryParams, { rejectWithValue }) => {
+  async (params: QuizQueryParams | undefined, { rejectWithValue }) => {
     const response = await ClientQuizService.getBestRatedQuizzes(params);
     if (!response.success) {
       return rejectWithValue(
@@ -78,7 +78,7 @@ export const fetchBestRatedQuizzes = createAsyncThunk(
 
 export const fetchPopularQuizzes = createAsyncThunk(
   "clientQuiz/fetchPopularQuizzes",
-  async (params?: QuizQueryParams, { rejectWithValue }) => {
+  async (params: QuizQueryParams | undefined, { rejectWithValue }) => {
     const response = await ClientQuizService.getPopularQuizzes(params);
     if (!response.success) {
       return rejectWithValue(
@@ -91,7 +91,7 @@ export const fetchPopularQuizzes = createAsyncThunk(
 
 export const fetchEasyQuizzes = createAsyncThunk(
   "clientQuiz/fetchEasyQuizzes",
-  async (params?: QuizQueryParams, { rejectWithValue }) => {
+  async (params: QuizQueryParams | undefined, { rejectWithValue }) => {
     const response = await ClientQuizService.getEasyQuizzes(params);
     if (!response.success) {
       return rejectWithValue(
@@ -104,7 +104,7 @@ export const fetchEasyQuizzes = createAsyncThunk(
 
 export const fetchHardQuizzes = createAsyncThunk(
   "clientQuiz/fetchHardQuizzes",
-  async (params?: QuizQueryParams, { rejectWithValue }) => {
+  async (params: QuizQueryParams | undefined, { rejectWithValue }) => {
     const response = await ClientQuizService.getHardQuizzes(params);
     if (!response.success) {
       return rejectWithValue(

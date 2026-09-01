@@ -11,7 +11,7 @@ import { EssayStrategy } from "../strategies/EssayStrategy";
 import { MatchingStrategy } from "../strategies/MatchingStrategy";
 
 export class QuestionRendererFactory {
-  private static strategies: Map<string, IQuestionRendererStrategy> = new Map([
+  private static strategies: Map<string, IQuestionRendererStrategy> = new Map<string, IQuestionRendererStrategy>([
     ["single_choice", new SingleChoiceStrategy()],
     ["multiple_choice", new MultipleChoiceStrategy()],
     ["true_false", new TrueFalseStrategy()],

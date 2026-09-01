@@ -132,6 +132,15 @@ export async function streamAgentChat(options: StreamChatOptions): Promise<void>
   const decoder = new TextDecoder();
   let buffer = "";
 
+  const emitBlock = (block: string): boolean => {
+    const event = parseEventBlock(block);
+    if (!event) return false;
+    options.onEvent(event);
+    // The UI has all data it needs at this point. Do not wait for a proxy or
+    // upstream server to close the HTTP stream cleanly.
+    return event.type === "done" || event.type === "error";
+  };
+
   while (true) {
     const { value, done } = await reader.read();
     buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
@@ -139,14 +148,15 @@ export async function streamAgentChat(options: StreamChatOptions): Promise<void>
     buffer = blocks.pop() || "";
 
     for (const block of blocks) {
-      const event = parseEventBlock(block);
-      if (event) options.onEvent(event);
+      if (emitBlock(block)) {
+        await reader.cancel();
+        return;
+      }
     }
     if (done) break;
   }
 
   if (buffer.trim()) {
-    const event = parseEventBlock(buffer);
-    if (event) options.onEvent(event);
+    emitBlock(buffer);
   }
 }

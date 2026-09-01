@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/common/components/ui/button";
 import InputGroup from "@/modules/admin/common/components/InputGroup";
 import { TextAreaGroup } from "@/modules/admin/common/components/InputGroup/text-area";
@@ -50,7 +51,7 @@ const EditQuiz = () => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const form = useForm<QuizFormData>({
+  const form = useForm<z.input<typeof quizSchema>, unknown, QuizFormData>({
     resolver: zodResolver(quizSchema),
     mode: "onChange",
     reValidateMode: "onChange",
@@ -102,12 +103,12 @@ const EditQuiz = () => {
       description: quiz.description || "",
       instructions: quiz.instructions || "",
       category_id: quiz.category_id || "",
-      difficulty_level: quiz.difficulty_level || "EASY",
+      difficulty_level: (quiz.difficulty_level || "EASY") as QuizFormData["difficulty_level"],
       time_limit: quiz.time_limit || 30,
       max_attempts: quiz.max_attempts || 3,
       passing_score: quiz.passing_score || 60,
       is_active: quiz.is_active ?? true,
-      quiz_type: quiz.quiz_type || "MULTIPLE_CHOICE",
+      quiz_type: (quiz.quiz_type || "MULTIPLE_CHOICE") as QuizFormData["quiz_type"],
       tags: quiz.tags || [],
       thumbnailFile: null,
       thumbnailPreview: quiz.thumbnail_url || null,
@@ -540,12 +541,12 @@ const EditQuiz = () => {
                   description: quiz.description || "",
                   instructions: quiz.instructions || "",
                   category_id: quiz.category_id || "",
-                  difficulty_level: quiz.difficulty_level || "EASY",
+                  difficulty_level: (quiz.difficulty_level || "EASY") as QuizFormData["difficulty_level"],
                   time_limit: quiz.time_limit || 30,
                   max_attempts: quiz.max_attempts || 3,
                   passing_score: quiz.passing_score || 60,
                   is_active: quiz.is_active ?? true,
-                  quiz_type: quiz.quiz_type || "MULTIPLE_CHOICE",
+                  quiz_type: (quiz.quiz_type || "MULTIPLE_CHOICE") as QuizFormData["quiz_type"],
                   tags: quiz.tags || [],
                   thumbnailFile: null,
                   thumbnailPreview: quiz.thumbnail_url || null,

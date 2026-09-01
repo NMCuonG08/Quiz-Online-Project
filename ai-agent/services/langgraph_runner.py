@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import time
+import json
+import logging
+import re
+from contextlib import AsyncExitStack
 from typing import Annotated, Any, Awaitable, Callable, Literal, Optional
 from langchain_core._api.deprecation import suppress_langchain_deprecation_warning
 
@@ -8,6 +13,17 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from .protocol import UIAction, UIBlock
+from .intent_schema import (
+    GENERAL_INTENTS,
+    INTENT_DOMAINS,
+    STRONG_PLANNER_INTENTS,
+    InteractionPlan,
+)
+from .harness.context import ContextBuilder
+try:
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+except ImportError:  # pragma: no cover - optional in minimal local installs
+    AsyncPostgresSaver = None  # type: ignore[assignment,misc]
 with suppress_langchain_deprecation_warning():
     from langgraph.graph import END, START, MessagesState, StateGraph
     from langgraph.prebuilt import ToolNode, tools_condition
@@ -15,18 +31,14 @@ with suppress_langchain_deprecation_warning():
 
 
 ToolDispatcher = Callable[[str, dict[str, Any]], Awaitable[str]]
+ModelObserver = Callable[[str, str, float, dict[str, object]], None]
+BeforeModelCall = Callable[[], None]
+
+logger = logging.getLogger(__name__)
 
 DifficultyLevel = Literal["EASY", "MEDIUM", "HARD"]
 QuizType = Literal["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]
 QuestionType = Literal["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]
-InteractionIntent = Literal[
-    "quiz_create", "quiz_discovery", "quiz_delete", "learning_history",
-    "knowledge_import", "auth_required", "no_evidence", "temporal",
-    "account_data", "app_data", "creator_data", "admin_data", "general",
-]
-MissingField = Literal[
-    "title", "category", "category_id", "difficulty", "difficulty_level", "time_limit", "quiz_type",
-]
 KnowledgeVisibility = Literal["PUBLIC", "PRIVATE"]
 KnowledgeReviewStatus = Literal["PUBLISHED", "QUARANTINED"]
 Limit10 = Annotated[int, Field(ge=1, le=10)]
@@ -71,13 +83,104 @@ class LangGraphQuizRunner:
         model: str,
         api_key: str,
         base_url: Optional[str],
+        postgres_url: Optional[str] = None,
+        *,
+        planner_fast_model: Optional[str] = None,
+        planner_fast_api_key: Optional[str] = None,
+        planner_fast_base_url: Optional[str] = None,
+        planner_strong_model: Optional[str] = None,
+        planner_strong_api_key: Optional[str] = None,
+        planner_strong_base_url: Optional[str] = None,
+        executor_reasoning_effort: Optional[str] = None,
+        planner_fast_reasoning_effort: Optional[str] = None,
+        planner_strong_reasoning_effort: Optional[str] = None,
+        executor_timeout_seconds: float = 60,
+        planner_fast_timeout_seconds: float = 8,
+        planner_strong_timeout_seconds: float = 25,
+        model_max_retries: int = 1,
+        use_responses_api: bool = False,
+        planner_confidence_threshold: float = 0.82,
+        planner_escalate_writes: bool = True,
     ) -> None:
-        self.llm = ChatOpenAI(
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            temperature=0.2,
+        self.llm = self._make_llm(
+            model, api_key, base_url, 0.2, executor_reasoning_effort,
+            executor_timeout_seconds, model_max_retries, use_responses_api,
         )
+        self.planner_fast = self._make_llm(
+            planner_fast_model or model,
+            planner_fast_api_key or api_key,
+            planner_fast_base_url or base_url,
+            0,
+            planner_fast_reasoning_effort,
+            planner_fast_timeout_seconds,
+            model_max_retries,
+            use_responses_api,
+        )
+        self.planner_strong = self._make_llm(
+            planner_strong_model or model,
+            planner_strong_api_key or api_key,
+            planner_strong_base_url or base_url,
+            0,
+            planner_strong_reasoning_effort,
+            planner_strong_timeout_seconds,
+            model_max_retries,
+            use_responses_api,
+        )
+        self.planner_confidence_threshold = max(0.0, min(planner_confidence_threshold, 1.0))
+        self.planner_escalate_writes = planner_escalate_writes
+        self.postgres_url = postgres_url
+        self._checkpointer: Optional[Any] = None
+        self._checkpointer_context: Optional[Any] = None
+        self._checkpointer_stack = AsyncExitStack()
+        self._checkpointer_ready = False
+
+    @staticmethod
+    def _make_llm(
+        model: str,
+        api_key: str,
+        base_url: Optional[str],
+        temperature: float,
+        reasoning_effort: Optional[str],
+        timeout_seconds: float,
+        max_retries: int,
+        use_responses_api: bool,
+    ) -> ChatOpenAI:
+        options: dict[str, Any] = {
+            "model": model,
+            "api_key": api_key,
+            "base_url": base_url,
+            "temperature": temperature,
+            "request_timeout": max(1.0, timeout_seconds),
+            "max_retries": max(0, max_retries),
+            "use_responses_api": use_responses_api,
+        }
+        if reasoning_effort:
+            options["reasoning_effort"] = reasoning_effort
+        return ChatOpenAI(**options)
+
+    async def _get_checkpointer(self) -> Optional[Any]:
+        if not self.postgres_url or AsyncPostgresSaver is None:
+            return None
+        if self._checkpointer is None:
+            self._checkpointer_context = AsyncPostgresSaver.from_conn_string(self.postgres_url)
+            self._checkpointer = await self._checkpointer_stack.enter_async_context(
+                self._checkpointer_context
+            )
+        if not self._checkpointer_ready:
+            await self._checkpointer.setup()
+            self._checkpointer_ready = True
+        return self._checkpointer
+
+    async def checkpointer_ready(self) -> bool:
+        if not self.postgres_url:
+            return False
+        try:
+            return await self._get_checkpointer() is not None
+        except Exception:
+            return False
+
+    async def close(self) -> None:
+        await self._checkpointer_stack.aclose()
 
     async def invoke(
         self,
@@ -89,20 +192,49 @@ class LangGraphQuizRunner:
         should_stop_after_tools: Callable[[], bool],
         config: dict[str, Any],
         interaction_intent: str,
+        record_model: Optional[ModelObserver] = None,
+        interaction_plan: Optional[dict[str, Any]] = None,
+        before_model_call: Optional[BeforeModelCall] = None,
+        context_builder: Optional[ContextBuilder] = None,
+        page_context: Optional[dict[str, Any]] = None,
+        memory: Optional[list[Any]] = None,
+        evidence: Optional[list[Any]] = None,
     ) -> AIMessage:
         tools = self._build_tools(allowed_tools, dispatch)
         model = self.llm.bind_tools(tools)
 
         async def assistant(state: MessagesState) -> dict[str, list[AIMessage]]:
-            return {"messages": [await model.ainvoke(state["messages"], config=config)]}
+            started = time.perf_counter()
+            try:
+                if before_model_call:
+                    before_model_call()
+                message = await model.ainvoke(state["messages"], config=config)
+            except Exception:
+                if record_model:
+                    record_model(self.llm.model_name, "error", time.perf_counter() - started, {})
+                raise
+            if record_model:
+                record_model(self.llm.model_name, "success", time.perf_counter() - started, message.usage_metadata or {})
+            return {"messages": [message]}
 
         async def general_response(state: MessagesState) -> dict[str, list[AIMessage]]:
             """Fast path: general chat never receives tool schemas or ToolNode."""
-            return {"messages": [await self.llm.ainvoke(state["messages"], config=config)]}
+            started = time.perf_counter()
+            try:
+                if before_model_call:
+                    before_model_call()
+                message = await self.llm.ainvoke(state["messages"], config=config)
+            except Exception:
+                if record_model:
+                    record_model(self.llm.model_name, "error", time.perf_counter() - started, {})
+                raise
+            if record_model:
+                record_model(self.llm.model_name, "success", time.perf_counter() - started, message.usage_metadata or {})
+            return {"messages": [message]}
 
         async def router(_state: MessagesState) -> Command[Literal["general_response", "assistant"]]:
             """Explicit handoff keeps the intent boundary visible in graph traces."""
-            target = "general_response" if interaction_intent == "general" else "assistant"
+            target = "general_response" if interaction_intent in GENERAL_INTENTS else "assistant"
             return Command(goto=target)
 
         graph = StateGraph(MessagesState)
@@ -122,14 +254,25 @@ class LangGraphQuizRunner:
             lambda _state: END if should_stop_after_tools() else "assistant",
             {END: END, "assistant": "assistant"},
         )
-        compiled = graph.compile()
-        messages: list[BaseMessage] = [SystemMessage(content=system_prompt)]
-        for message in history:
+        compiled = graph.compile(checkpointer=await self._get_checkpointer())
+        context_snapshot = (context_builder or ContextBuilder()).build(
+            system_prompt=system_prompt,
+            history=history,
+            user_message=user_input,
+            interaction_plan=interaction_plan,
+            page_context=page_context,
+            memory=memory,
+            evidence=evidence,
+        )
+        messages: list[BaseMessage] = [
+            SystemMessage(content=context_snapshot.system_message())
+        ]
+        for message in context_snapshot.history:
             if message["role"] == "user":
                 messages.append(HumanMessage(content=message["content"]))
             elif message["role"] == "assistant":
                 messages.append(AIMessage(content=message["content"]))
-        messages.append(HumanMessage(content=user_input))
+        messages.append(HumanMessage(content=context_snapshot.user_message))
         result = await compiled.ainvoke({"messages": messages}, config=config)
         last = result["messages"][-1]
         return last if isinstance(last, AIMessage) else AIMessage(content="")
@@ -140,38 +283,216 @@ class LangGraphQuizRunner:
         route: str,
         scope: str,
         config: dict[str, Any],
+        history: Optional[list[dict[str, str]]] = None,
+        record_model: Optional[ModelObserver] = None,
+        before_model_call: Optional[BeforeModelCall] = None,
     ) -> dict[str, Any]:
-        @tool("plan_interaction")
-        async def plan_interaction(intent: InteractionIntent, missing_fields: Optional[list[MissingField]] = None) -> str:
-            """Classify the interaction as quiz_create, quiz_discovery, quiz_delete,
-            learning_history, knowledge_import, auth_required, no_evidence, temporal,
-            account_data, app_data, creator_data, admin_data, or general."""
-            return "Server policy will resolve this plan."
-
-        planner = self.llm.bind_tools([plan_interaction], tool_choice="plan_interaction")
-        message = await planner.ainvoke(
-            [
-                SystemMessage(content=(
-                    "Classify the user's interaction. Always call plan_interaction exactly once. "
-                    "Use temporal for questions about today, the current time, date, year, or relative dates. "
-                    "Use creator_data for owned quizzes/questions, editing, publishing, or creator analytics. "
-                    "Use account_data for identity, permissions, personal history, or progress. "
-                    "Use admin_data for platform administration. Use app_data for any other live application/database lookup. "
-                    "Use general ONLY for greetings, thanks, or casual conversation that requires no tool or application/account data. "
-                    "When uncertain, choose app_data instead of general. Do not answer the user."
-                )),
-                HumanMessage(content=f"route={route}; scope={scope}; user={user_input}"),
-            ],
-            config=config,
-        )
-        calls = message.tool_calls or []
-        if not calls:
-            return {"intent": "app_data", "missing_fields": []}
-        args = calls[0].get("args") or {}
-        return {
-            "intent": str(args.get("intent") or "app_data"),
-            "missing_fields": [str(item) for item in args.get("missing_fields", [])],
+        context_payload = {
+            "route": route,
+            "scope": scope,
+            "recent_history": (history or [])[-6:],
+            "current_user_message": user_input,
         }
+        taxonomy_lines = [
+            f"- {domain}: " + ", ".join(sorted(intents))
+            for domain, intents in INTENT_DOMAINS.items()
+        ]
+        base_prompt = """You are the semantic intent planner for Quiz Online.
+Understand the user's goal from meaning, recent conversation, page context and account scope. Do not classify by literal keyword matching.
+
+Critical distinction:
+- Wanting to take/do/find/get a quiz, asking for a recommendation, or saying 'I want to do a quiz about IT, recommend one' is quiz_recommend or quiz_search.
+- Authoring a new quiz for other users is quiz_create only when the user clearly asks to create/generate/compose a new quiz.
+- quiz_search means the user asks to find/show/list quizzes matching an explicit query or topic. Example: 'Tìm quiz Python cơ bản cho người mới' → quiz_search.
+- quiz_recommend means the user asks the assistant to rank, choose, suggest, personalize, or tell them which quiz is best. Example: 'Bạn recommend quiz Python nào cho tôi?' → quiz_recommend.
+
+Intent families cover conversation/help; quiz search/recommend/detail/create/update/delete/publish/unpublish/start/resume/result/history/owned/attempts/in-progress; question list/create/update/delete/duplicate/reorder; category list/recommend/create/update/delete; knowledge search/import/list/submit-review/review; account identity/permissions; admin dashboard/audit; temporal/auth/no-evidence/unsupported.
+
+Personal-data distinctions:
+- "lịch sử làm quiz" means completed learning history → quiz_history.
+- "các lần làm/attempt của tôi" means all attempts → quiz_attempts.
+- "quiz đang làm dở" means resumable attempts → quiz_in_progress or quiz_resume.
+- "quiz tôi đã tạo / quiz của tôi" means owned authoring data → quiz_owned, never quiz_search.
+- "có category nào, chọn một category phù hợp" means category_recommend when the user asks the agent to choose; category_list only lists them.
+
+Classify two independent axes:
+- intent is the leaf business task.
+- dialogue_act is request, correction, continuation, confirmation, rejection, selection, clarification_answer, cancel, or help.
+Set refers_to_previous_turn and reference_mode when the message depends on recent history. Corrections such as "à", "ý tôi là", or "không phải" replace the previous interpretation; never search their whole sentence as a keyword. Set selection_strategy for choice requests.
+
+Return plan_interaction exactly once. Extract entities and secondary intents. Set confidence honestly. If more context is required, set needs_clarification and provide one concise clarification question. Risk describes the requested effect, not the user's claimed role. Never infer authorization from the message."""
+        base_prompt += "\n\nLeaf intent taxonomy:\n" + "\n".join(taxonomy_lines)
+        base_prompt += (
+            "\nOnly use secondary_intents for an independently requested second goal. "
+            "Do not add conversation_general for politeness and do not add quiz_search merely "
+            "because search is an implementation step of quiz_recommend."
+        )
+
+        fast_plan: Optional[InteractionPlan] = None
+        try:
+            fast_plan = await self._plan_once(
+                self.planner_fast,
+                base_prompt,
+                context_payload,
+                config,
+                record_model,
+                "fast",
+                before_model_call,
+            )
+        except Exception:
+            fast_plan = None
+
+        escalate = fast_plan is None or self._should_escalate(fast_plan)
+        if escalate:
+            strong_prompt = base_prompt + (
+                "\n\nAct as the strong verifier. Independently inspect the user context and correct "
+                "the fast planner when necessary. Fast plan candidate:\n"
+                + (fast_plan.model_dump_json() if fast_plan else "unavailable")
+            )
+            try:
+                strong_plan = await self._plan_once(
+                    self.planner_strong,
+                    strong_prompt,
+                    context_payload,
+                    config,
+                    record_model,
+                    "strong",
+                    before_model_call,
+                )
+                return strong_plan.model_dump()
+            except Exception as exc:
+                logger.warning(
+                    "%s planner failed; using fast plan when available error=%s",
+                    "strong", type(exc).__name__,
+                )
+                if fast_plan is None:
+                    return self._fallback_plan()
+        return (fast_plan or InteractionPlan(
+            intent="unsupported", confidence=0, ambiguity="high",
+            needs_clarification=True, clarification_question="Bạn muốn tìm, làm hay tạo một quiz?",
+            risk="none", route="clarify",
+        )).model_dump()
+
+    def _should_escalate(self, plan: InteractionPlan) -> bool:
+        return (
+            plan.confidence < self.planner_confidence_threshold
+            or plan.ambiguity == "high"
+            or plan.needs_clarification
+            or bool(plan.secondary_intents)
+            or (
+                self.planner_escalate_writes
+                and (
+                    plan.intent in STRONG_PLANNER_INTENTS
+                    or plan.risk in {"write", "destructive", "admin"}
+                )
+            )
+        )
+
+    async def _plan_once(
+        self,
+        llm: ChatOpenAI,
+        system_prompt: str,
+        context_payload: dict[str, Any],
+        config: dict[str, Any],
+        record_model: Optional[ModelObserver],
+        tier: str,
+        before_model_call: Optional[BeforeModelCall] = None,
+    ) -> InteractionPlan:
+        @tool("plan_interaction", args_schema=InteractionPlan)
+        async def plan_interaction(**kwargs: Any) -> str:
+            """Return one validated semantic interaction plan."""
+            return json.dumps(kwargs, ensure_ascii=False)
+
+        # The planner exposes exactly one tool. `required` is more portable
+        # than naming the tool explicitly across strong/reasoning providers.
+        planner = llm.bind_tools([plan_interaction], tool_choice="required")
+        started = time.perf_counter()
+        try:
+            if before_model_call:
+                before_model_call()
+            message = await planner.ainvoke(
+                [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=json.dumps(context_payload, ensure_ascii=False)),
+                ],
+                config={**config, "run_name": f"quiz_ai_planner_{tier}"},
+            )
+        except Exception:
+            if record_model:
+                record_model(llm.model_name, "error", time.perf_counter() - started, {})
+            raise
+        if record_model:
+            record_model(llm.model_name, "success", time.perf_counter() - started, message.usage_metadata or {})
+        plan = self._extract_plan(message)
+        if plan is not None:
+            return plan
+
+        # Do not spend a second full provider timeout here. The caller may
+        # already have a valid fast plan, and the outer planner will safely
+        # fall back to it. JSON extraction above also covers providers that
+        # ignored the tool constraint without doubling latency.
+        logger.warning("%s planner returned no plan_interaction", tier)
+        raise RuntimeError(f"{tier} planner did not return plan_interaction")
+
+    @staticmethod
+    def _extract_plan(message: AIMessage) -> Optional[InteractionPlan]:
+        """Accept normal tool calls plus provider-compatible JSON fallbacks."""
+        calls = list(message.tool_calls or [])
+        for call in calls:
+            if call.get("name") == "plan_interaction":
+                try:
+                    return InteractionPlan.model_validate(call.get("args") or {})
+                except Exception:
+                    continue
+
+        # A few compatible providers expose raw tool calls only through the
+        # additional kwargs envelope.
+        for raw_call in (message.additional_kwargs or {}).get("tool_calls", []):
+            function = raw_call.get("function") if isinstance(raw_call, dict) else None
+            if not isinstance(function, dict) or function.get("name") != "plan_interaction":
+                continue
+            try:
+                arguments = function.get("arguments") or "{}"
+                return InteractionPlan.model_validate(
+                    json.loads(arguments) if isinstance(arguments, str) else arguments
+                )
+            except Exception:
+                continue
+
+        content = message.content
+        if isinstance(content, list):
+            content = "\n".join(
+                str(item.get("text") or item.get("content") or "")
+                for item in content
+                if isinstance(item, dict)
+            )
+        if not isinstance(content, str) or not content.strip():
+            return None
+        candidates = [content.strip()]
+        unfenced = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip(), flags=re.IGNORECASE)
+        if unfenced != content.strip():
+            candidates.append(unfenced)
+        match = re.search(r"\{.*\}", content, flags=re.DOTALL)
+        if match:
+            candidates.append(match.group(0))
+        for candidate in candidates:
+            try:
+                return InteractionPlan.model_validate(json.loads(candidate))
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _fallback_plan() -> dict[str, Any]:
+        return InteractionPlan(
+            intent="unsupported",
+            confidence=0,
+            ambiguity="high",
+            needs_clarification=True,
+            clarification_question="Mình chưa xác định chắc mục tiêu của bạn. Bạn muốn tìm, làm hay tạo một quiz?",
+            risk="none",
+            route="clarify",
+        ).model_dump()
 
     @staticmethod
     def _build_tools(allowed: set[str], dispatch: ToolDispatcher) -> list[Any]:
@@ -181,10 +502,10 @@ class LangGraphQuizRunner:
             return name in allowed
 
         if include("plan_interaction"):
-            @tool
-            async def plan_interaction(intent: InteractionIntent, missing_fields: Optional[list[MissingField]] = None) -> str:
-                """Request a server-owned special interaction template."""
-                return await dispatch("plan_interaction", {"intent": intent, "missing_fields": missing_fields or []})
+            @tool("plan_interaction", args_schema=InteractionPlan)
+            async def plan_interaction(**kwargs: Any) -> str:
+                """Request a server-owned interaction policy from a semantic plan."""
+                return await dispatch("plan_interaction", kwargs)
             tools.append(plan_interaction)
 
         if include("get_current_time"):
@@ -217,9 +538,9 @@ class LangGraphQuizRunner:
 
         if include("recommend_quizzes"):
             @tool
-            async def recommend_quizzes(limit: Limit20 = 10) -> str:
-                """Recommend popular quizzes from real application data."""
-                return await dispatch("recommend_quizzes", {"limit": limit})
+            async def recommend_quizzes(limit: Limit20 = 10, query: str = "") -> str:
+                """Recommend topic-matched quizzes first, then clearly labeled popular fallback results."""
+                return await dispatch("recommend_quizzes", {"limit": limit, "query": query})
             tools.append(recommend_quizzes)
 
         if include("get_quiz"):

@@ -91,9 +91,44 @@ jobs:
       - name: Validate Dockerfile
         run: docker build -t quiz-web-ci:latest -f Dockerfile .
 
+  test-ai-agent:
+    name: Test AI Agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./ai-agent
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-agent/requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Compile Python
+        run: python -m compileall -q services tests scripts
+
+      - name: Run AI agent tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q -p pytest_asyncio.plugin -p pytest_mock
+
+      - name: Validate evaluation corpus
+        run: python scripts/evaluate_agent_scenarios.py
+
+      - name: Validate Dockerfile
+        run: docker build -t quiz-ai-agent-ci:latest -f Dockerfile .
+
   trigger-deploy:
     name: Trigger CD Workflow
-    needs: [build-server, build-web]
+    needs: [build-server, build-web, test-ai-agent]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.PAT_TOKEN != ''
     steps:

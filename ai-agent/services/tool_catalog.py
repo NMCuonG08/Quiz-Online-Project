@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
+from .intent_schema import InteractionPlan
 
 
 def function_tool(name: str, description: str, properties: Dict[str, Any], required: List[str] | None = None) -> Dict[str, Any]:
@@ -95,28 +96,15 @@ UI_BLOCK = {
 
 
 TOOLS = [
-    function_tool(
-        "plan_interaction",
-        "Classify every request before routing. General is only casual conversation requiring no application/account data. Use creator_data, account_data, admin_data, or app_data whenever a backend tool may be required.",
-        {
-            "intent": {
-                "type": "string",
-                "enum": [
-                    "quiz_create", "quiz_discovery", "quiz_delete", "learning_history",
-                    "knowledge_import", "auth_required", "no_evidence", "temporal",
-                    "account_data", "app_data", "creator_data", "admin_data", "general",
-                ],
-            },
-            "missing_fields": {
-                "type": "array",
-                "items": {
-                    "type": "string",
-                    "enum": ["title", "category", "category_id", "difficulty", "difficulty_level", "time_limit", "quiz_type"],
-                },
-            },
-        },
-        ["intent"],
-    ),
+    {
+        "type": "function",
+        "name": "plan_interaction",
+        "description": (
+            "Return a structured semantic intent plan using conversation history, page context, "
+            "entities, confidence, ambiguity, risk and required clarification."
+        ),
+        "parameters": InteractionPlan.model_json_schema(),
+    },
     function_tool(
         "get_current_time",
         "Get the current server date, time, year and configured timezone. Use for questions about today, current time, current year, or relative dates.",
@@ -140,8 +128,8 @@ TOOLS = [
     ),
     function_tool(
         "recommend_quizzes",
-        "Recommend popular quizzes from real application data.",
-        {"limit": {"type": "integer", "minimum": 1, "maximum": 20}},
+        "Recommend popular quizzes from real application data. Use as a broad fallback when a topic search has no exact result, and clearly label it as a general recommendation.",
+        {"limit": {"type": "integer", "minimum": 1, "maximum": 20}, "query": STRING},
     ),
     function_tool(
         "get_my_quizzes",

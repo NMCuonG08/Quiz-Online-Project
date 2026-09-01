@@ -58,4 +58,5 @@ export type QuestionsResponse = {
 export type QuestionsQueryParams = {
   page?: number;
   limit?: number;
+  search?: string;
 };

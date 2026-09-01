@@ -52,13 +52,14 @@ const CreateLoading = ({ isVisible = true, videoSource = link }) => {
     <div className="fixed inset-0 w-screen h-screen bg-black/85 flex justify-center items-center z-[999999] backdrop-blur-lg pointer-events-auto touch-none select-none overflow-hidden animate-fade-in">
       <div className="flex flex-col items-center justify-center p-8 sm:p-6 rounded-2xl bg-black/60 shadow-[0_0_30px_rgba(0,0,0,0.5),0_0_60px_rgba(255,255,255,0.1)] max-w-80 w-[90%] animate-pulse-shadow">
         <div className="flex flex-col items-center">
-          <l-bouncy
-            size="45"
-            stroke="5"
-            speed="2.5"
-            color="white"
-            className="animate-pulse-custom drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]"
-          ></l-bouncy>
+          {React.createElement("l-bouncy", {
+            size: "45",
+            stroke: "5",
+            speed: "2.5",
+            color: "white",
+            className:
+              "animate-pulse-custom drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]",
+          })}
           <p className="text-white text-xl sm:text-lg mt-5 font-medium text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] animate-pulse-text">
             Please wait...
           </p>

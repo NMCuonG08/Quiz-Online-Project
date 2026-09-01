@@ -5,6 +5,13 @@ import type {
   CreateQuestionInput,
   UpdateQuestionInput,
 } from "../schema/question";
+export type {
+  QuestionItem,
+  QuestionOption,
+  QuestionsPagination,
+  QuestionsResponse,
+  QuestionsQueryParams,
+} from "../types/index";
 
 export class UserQuestionService {
   static async getQuestionsById(

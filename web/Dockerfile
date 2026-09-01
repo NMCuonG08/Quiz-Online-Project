@@ -21,20 +21,15 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-# Copy necessary files for Next.js execution
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.* ./
+# Run the standalone server emitted by output: standalone.
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./web/.next/static
+COPY --from=builder /app/public ./web/public
 
 ENV NODE_ENV=production
 
-# Re-enable pnpm for the runner stage if needed (for start script)
-RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
-
 EXPOSE 3000
 
-CMD ["pnpm", "run", "start"]
+CMD ["node", "web/server.js"]
 
 

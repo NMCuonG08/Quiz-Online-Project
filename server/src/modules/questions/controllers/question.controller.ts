@@ -32,9 +32,11 @@ import { PaginatedResponseDto } from '@/common/dtos/responses/base.response';
 import { Permission } from '@/common/enums/permisson';
 import { Auth, Authenticated, AuthGuard } from '@/common/guards/auth.guard';
 import { AuthDto } from '@/modules/auth/dto/base-auth.dto';
+import { AiIdempotencyInterceptor } from '@/common/interceptors/ai-idempotency.interceptor';
 
 @ApiTags('Questions')
 @Controller('/api/questions')
+@UseInterceptors(AiIdempotencyInterceptor)
 export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
 

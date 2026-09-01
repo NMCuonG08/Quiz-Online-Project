@@ -29,7 +29,7 @@ export const fetchCategories = createAsyncThunk(
       );
     }
 
-    return response.data || response;
+    return response.data || [];
   }
 );
 
@@ -47,7 +47,7 @@ export const fetchCategoryBySlug = createAsyncThunk(
       );
     }
 
-    return response.data || response;
+    return response.data as Category;
   }
 );
 
@@ -69,7 +69,7 @@ export const createCategory = createAsyncThunk(
     if (response.error) {
       return rejectWithValue(response.error);
     }
-    return response.data;
+    return response.data as Category;
   }
 );
 
@@ -97,7 +97,7 @@ export const updateCategory = createAsyncThunk(
     if (response.error) {
       return rejectWithValue(response.error);
     }
-    return response.data;
+    return response.data as Category;
   }
 );
 
@@ -109,7 +109,7 @@ export const deleteCategory = createAsyncThunk(
     if (response.error) {
       return rejectWithValue(response.error);
     }
-    return response.data;
+    return response.data === true;
   }
 );
 

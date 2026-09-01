@@ -14,10 +14,15 @@ class ChatPageContext(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     user_id: str = ""
-    session_id: Optional[str] = None
-    locale: str = "vi"
+    session_id: Optional[str] = Field(default=None, max_length=128)
+    locale: str = Field(default="vi", min_length=2, max_length=16, pattern=r"^[A-Za-z-]+$")
     scope: Literal["learner", "creator", "admin"] = "learner"
     context: ChatPageContext = Field(default_factory=ChatPageContext)
+
+
+class ReviewDecisionRequest(BaseModel):
+    decision: Literal["approved", "rejected"]
+    notes: str = Field(default="", max_length=4000)
 
 
 class UIAction(BaseModel):
