@@ -762,6 +762,10 @@ class AIAgentCore:
         values = submission.get("values")
         values = dict(values) if isinstance(values, dict) else {}
         trace_id = str(uuid4())
+        submission_id = str(submission.get("submission_id") or "")
+        idempotency_key = self._form_idempotency_key(
+            user_id, session_id, form_id, submission_id, values,
+        )
         allowed_tools = SCOPE_TOOLS.get(scope, SCOPE_TOOLS["learner"])
         used_tools: list[str] = []
         citations: list[dict[str, str]] = []
@@ -790,6 +794,7 @@ class AIAgentCore:
                 state,
                 user_input,
                 values,
+                str(submission.get("submission_id") or ""),
                 authorization,
                 user_id,
                 session_id,
@@ -883,22 +888,31 @@ class AIAgentCore:
             result, surface, create_citations = await self._execute_tool(
                 "create_quiz", proposal, authorization, user_id, scope, context,
                 allowed_tools=set(allowed_tools),
+                phase="execute",
+                approval_verified=True,
+                idempotency_key=idempotency_key,
             )
             used_tools.append("create_quiz")
             citations.extend(create_citations)
             self.metrics.record_tool("create_quiz", "success")
-            yield trace("approval_proposed", "create_quiz")
+            await self.state_store.audit(user_id, scope, "write_executed", "create_quiz")
+            yield trace("executed", "create_quiz")
         except Exception as exc:
             self.metrics.record_tool("create_quiz", "error")
             yield trace("tool_error", "create_quiz")
             yield {"type": "error", "message": self._safe_tool_error(exc)}
             return
 
-        if not isinstance(result, dict) or result.get("approval_required") is not True or surface is None:
-            yield {"type": "error", "message": "Agent không tạo được đề xuất xác nhận hợp lệ."}
+        if not isinstance(result, dict):
+            yield {"type": "error", "message": "Backend không trả về kết quả tạo quiz hợp lệ."}
             return
 
-        final_text = "Đề xuất tạo quiz đã sẵn sàng. Hãy kiểm tra thông tin rồi bấm Accept để thực hiện."
+        resource_id = str(result.get("id") or result.get("quiz_id") or "")
+        resource_title = str(result.get("title") or proposal.get("title") or "create_quiz")
+        surface = self._build_write_result_surface(
+            "create_quiz", proposal, result, scope, resource_id, resource_title,
+        )
+        final_text = f"Đã tạo quiz **{resource_title}** thành công."
         yield {"type": "token", "delta": final_text}
         yield {"type": "ui", "surface": surface.model_dump()}
         if citations:
@@ -908,7 +922,7 @@ class AIAgentCore:
             "type": "done", "intent": "quiz_create",
             "agent": "form-runtime", "tool": "create_quiz",
             "tools": used_tools, "trace_id": trace_id,
-            "run_status": "waiting_for_approval", "model_calls": 0,
+            "run_status": "completed", "model_calls": 0,
         }
 
     async def _stream_question_form_submission(
@@ -916,6 +930,7 @@ class AIAgentCore:
         state: SessionState,
         user_input: str,
         values: Dict[str, Any],
+        submission_id: str,
         authorization: Optional[str],
         user_id: str,
         session_id: str,
@@ -978,20 +993,31 @@ class AIAgentCore:
             result, surface, _ = await self._execute_tool(
                 "create_question", question, authorization, user_id, scope, context,
                 allowed_tools=set(allowed_tools),
+                phase="execute",
+                approval_verified=True,
+                idempotency_key=self._form_idempotency_key(
+                    user_id, session_id, "create_questions_form", submission_id, values,
+                ),
             )
             self.metrics.record_tool("create_question", "success")
-            yield trace("approval_proposed", "create_question")
+            await self.state_store.audit(user_id, scope, "write_executed", "create_question")
+            yield trace("executed", "create_question")
         except Exception as exc:
             self.metrics.record_tool("create_question", "error")
             yield trace("tool_error", "create_question")
             yield {"type": "error", "message": self._safe_tool_error(exc)}
             return
 
-        if not isinstance(result, dict) or result.get("approval_required") is not True or surface is None:
-            yield {"type": "error", "message": "Agent không tạo được đề xuất xác nhận hợp lệ."}
+        if not isinstance(result, dict):
+            yield {"type": "error", "message": "Backend không trả về kết quả tạo câu hỏi hợp lệ."}
             return
 
-        final_text = "Đề xuất tạo câu hỏi đã sẵn sàng. Hãy kiểm tra thông tin rồi bấm Accept."
+        resource_id = str(result.get("id") or result.get("question_id") or "")
+        resource_title = str(result.get("question_text") or question.get("question_text") or "câu hỏi")
+        surface = self._build_write_result_surface(
+            "create_question", question, result, scope, resource_id, resource_title,
+        )
+        final_text = "Đã tạo câu hỏi thành công."
         yield {"type": "token", "delta": final_text}
         yield {"type": "ui", "surface": surface.model_dump()}
         await self._remember_form_response(
@@ -1001,7 +1027,7 @@ class AIAgentCore:
             "type": "done", "intent": "question_create",
             "agent": "form-runtime", "tool": "create_question",
             "tools": ["create_question"], "trace_id": trace_id,
-            "run_status": "waiting_for_approval", "model_calls": 0,
+            "run_status": "completed", "model_calls": 0,
         }
 
     async def _remember_form_response(
@@ -1020,6 +1046,23 @@ class AIAgentCore:
         await self.state_store.set_chat_messages(
             user_id, session_id, state.chat_messages,
         )
+
+    @staticmethod
+    def _form_idempotency_key(
+        user_id: str,
+        session_id: str,
+        form_id: str,
+        submission_id: str,
+        values: Dict[str, Any],
+    ) -> str:
+        raw = json.dumps({
+            "user_id": user_id,
+            "session_id": session_id,
+            "form_id": form_id,
+            "submission_id": submission_id,
+            "values": values,
+        }, ensure_ascii=False, sort_keys=True, default=str)
+        return "form-" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _question_create_payload_from_form(

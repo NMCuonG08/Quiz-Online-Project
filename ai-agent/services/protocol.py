@@ -23,6 +23,11 @@ class ChatFormSubmission(BaseModel):
         max_length=128,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
+    submission_id: Optional[str] = Field(
+        default=None,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
+    )
     values: dict[str, Any]
 
     @field_validator("values")

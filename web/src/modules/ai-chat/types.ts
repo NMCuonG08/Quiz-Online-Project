@@ -19,6 +19,7 @@ export interface ChatAction {
 
 export interface ChatFormSubmission {
   form_id: string;
+  submission_id?: string;
   values: Record<string, string | number | boolean | null>;
 }
 

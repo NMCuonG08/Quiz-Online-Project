@@ -162,14 +162,16 @@ Form do server render gửi `form_submission` riêng trong request:
 validate JSON
   -> list_categories
   -> map category name/slug/id thành category_id thật
-  -> create_quiz proposal
-  -> trả UI Accept
+  -> create_quiz execute với idempotency key
+  -> trả kết quả backend
 ```
 
 Handler này không gọi planner hoặc executor LLM. Form ID chỉ chọn handler;
 client values vẫn là untrusted input và tiếp tục qua scope, schema, ownership,
-approval và backend validation. Form ID chưa có handler sẽ fallback về agent
-loop để không làm mất khả năng mở rộng các form mới.
+và backend validation. Tạo quiz/question từ form là tạo draft trực tiếp vì
+form submit đã là explicit user action. Delete, publish/unpublish, import và
+write do agent tự đề xuất vẫn giữ approval. Form ID chưa có handler sẽ báo lỗi
+an toàn thay vì biến dữ liệu thành một prompt mới.
 
 ## Model-call budget
 

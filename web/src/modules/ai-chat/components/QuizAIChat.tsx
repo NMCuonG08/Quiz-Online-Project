@@ -665,7 +665,7 @@ export default function QuizAIChat() {
       displayMessage,
       false,
       undefined,
-      { form_id: block.id, values },
+      { form_id: block.id, submission_id: uid("form"), values },
     );
   };
 

@@ -21,7 +21,7 @@ from services.state_store import AgentStateStore
 from services.tools import MCPToolWrapper
 from services.evaluation import RetrievalCase, evaluate_retrieval
 from services.observability import AgentMetrics
-from services.protocol import ChatRequest, UISurface
+from services.protocol import ChatRequest
 from services.ui_policy import UiPolicyResolver
 from services.langgraph_runner import LangGraphQuizRunner
 from services.intent_schema import ALL_INTENTS, INTENT_DOMAINS, INTENT_METADATA, InteractionPlan
@@ -883,17 +883,9 @@ class StructuredFormExecutionTests(unittest.IsolatedAsyncioTestCase):
         await self.core.close()
 
     async def test_complete_quiz_form_creates_proposal_without_model(self):
-        approval_surface = self.core._build_write_result_surface(
-            "create_quiz",
-            {"title": "Python cơ bản"},
-            {"approval_required": True},
-            "creator",
-            "",
-            "create_quiz",
-        )
         self.core._execute_tool = AsyncMock(side_effect=[
             ({"items": [{"id": "cat-1", "name": "Lập trình"}]}, None, []),
-            ({"approval_required": True, "operation": "create_quiz"}, approval_surface, []),
+            ({"id": "quiz-1", "title": "Python cơ bản", "slug": "python-co-ban"}, None, []),
         ])
 
         events = [event async for event in self.core._stream_message_events(
@@ -929,18 +921,18 @@ class StructuredFormExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(create_args["category_id"], "cat-1")
         self.assertEqual(create_args["description"], "Quiz nhập từ form")
         self.assertEqual(create_args["instructions"], "Làm bài")
-        self.assertEqual(next(event for event in events if event["type"] == "done")["model_calls"], 0)
+        create_call = self.core._execute_tool.await_args_list[1]
+        self.assertEqual(create_call.kwargs["phase"], "execute")
+        self.assertTrue(create_call.kwargs["approval_verified"])
+        self.assertTrue(create_call.kwargs["idempotency_key"].startswith("form-"))
+        done = next(event for event in events if event["type"] == "done")
+        self.assertEqual(done["model_calls"], 0)
+        self.assertEqual(done["run_status"], "completed")
 
     async def test_question_form_creates_proposal_without_prompt_or_model(self):
-        approval_surface = UISurface(
-            title="Xác nhận tạo câu hỏi",
-            description="Kiểm tra trước khi thực hiện",
-            blocks=[],
-            actions=[],
-        )
         self.core._execute_tool = AsyncMock(return_value=(
-            {"approval_required": True, "operation": "create_question"},
-            approval_surface,
+            {"id": "question-1", "question_text": "AI là gì?"},
+            None,
             [],
         ))
 
@@ -976,7 +968,11 @@ class StructuredFormExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["question_type"], "SINGLE_CHOICE")
         self.assertTrue(payload["options"][0]["is_correct"])
         self.assertFalse(payload["options"][1]["is_correct"])
-        self.assertEqual(next(event for event in events if event["type"] == "done")["model_calls"], 0)
+        self.assertEqual(call.kwargs["phase"], "execute")
+        self.assertTrue(call.kwargs["approval_verified"])
+        done = next(event for event in events if event["type"] == "done")
+        self.assertEqual(done["model_calls"], 0)
+        self.assertEqual(done["run_status"], "completed")
 
     async def test_question_form_rejects_one_unmarked_option_without_model(self):
         self.core._execute_tool = AsyncMock(
