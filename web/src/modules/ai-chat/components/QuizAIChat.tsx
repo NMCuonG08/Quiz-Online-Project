@@ -11,6 +11,7 @@ import {
   Info,
   List,
   MessageCircle,
+  Maximize2,
   Minimize2,
   RotateCcw,
   History,
@@ -286,6 +287,7 @@ function hydrateHistoryMessages(items: PersistedMessage[]): ChatMessage[] {
 
 export default function QuizAIChat() {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -712,7 +714,12 @@ export default function QuizAIChat() {
     <div className="fixed bottom-4 right-4 z-[99990] sm:bottom-6 sm:right-6">
       {open && (
         <section
-          className="mb-3 flex h-[calc(100dvh-6.5rem)] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[24px] border border-border/80 bg-background shadow-2xl shadow-black/15 sm:h-[min(680px,calc(100dvh-6.5rem))] sm:w-[430px]"
+          className={cn(
+            "flex flex-col overflow-hidden rounded-[24px] border border-border/80 bg-background shadow-2xl shadow-black/15",
+            expanded
+              ? "fixed inset-2 z-[99991] mb-0 h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] sm:inset-6 sm:h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)]"
+              : "mb-3 h-[calc(100dvh-6.5rem)] w-[calc(100vw-2rem)] sm:h-[min(680px,calc(100dvh-6.5rem))] sm:w-[430px]",
+          )}
           role="dialog"
           aria-label="Quiz AI Assistant"
         >
@@ -737,8 +744,11 @@ export default function QuizAIChat() {
             <button onClick={() => setControlCenterOpen((value) => !value)} className={cn("grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground", controlCenterOpen && "bg-amber-400/15 text-amber-700")} aria-label="Mở trung tâm điều khiển agent" aria-pressed={controlCenterOpen}>
               <SlidersHorizontal className="size-4" />
             </button>
-            <button onClick={() => setOpen(false)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Thu nhỏ chat">
-              <Minimize2 className="size-4" />
+            <button onClick={() => setExpanded((value) => !value)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={expanded ? "Thu về khung nhỏ" : "Mở chat toàn màn hình"} aria-pressed={expanded}>
+              {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </button>
+            <button onClick={() => { setExpanded(false); setOpen(false); }} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Thu nhỏ chat">
+              <X className="size-4" />
             </button>
           </header>
           {historyOpen && (
