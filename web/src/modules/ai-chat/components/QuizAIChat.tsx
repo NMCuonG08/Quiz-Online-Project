@@ -1033,6 +1033,10 @@ function DynamicBlock({
     return <div><BlockHeading icon={<BarChart3 className="size-4" />} block={block} /><div className="grid grid-cols-2 gap-px bg-border">{block.stats.map((stat) => <div key={stat.label} className="bg-background p-3"><p className="text-lg font-black">{stat.value}</p><p className="text-[9px] text-muted-foreground">{stat.label}</p>{stat.trend && <p className="mt-1 text-[8px] font-semibold text-emerald-600">{stat.trend}</p>}</div>)}</div></div>;
   }
 
+  if (block.fields.some((field) => field.name === "question_text")) {
+    return <QuestionForm block={block} onFormSubmit={onFormSubmit} />;
+  }
+
   return (
     <form onSubmit={submitForm} className="p-3.5">
       <BlockHeading block={block} />
@@ -1052,6 +1056,160 @@ function DynamicBlock({
             )}
           </label>
         ))}
+        {formError && <p role="alert" className="text-[10px] font-semibold text-red-600">{formError}</p>}
+        <button type="submit" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#FDD239] px-3 text-[11px] font-bold text-slate-950 hover:bg-[#f5c923]">{block.submit_label}<ArrowUp className="size-3.5" /></button>
+      </div>
+    </form>
+  );
+}
+
+type QuestionOptionDraft = { text: string; correct: boolean };
+
+function QuestionForm({
+  block,
+  onFormSubmit,
+}: {
+  block: UIBlock;
+  onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [options, setOptions] = useState<QuestionOptionDraft[]>([
+    { text: "", correct: false },
+    { text: "", correct: false },
+  ]);
+  const [formError, setFormError] = useState<string | null>(null);
+  const questionType = (values.question_type || "").toUpperCase();
+  const needsOptions = ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"].includes(questionType);
+  const singleCorrect = questionType === "SINGLE_CHOICE" || questionType === "TRUE_FALSE";
+
+  const updateValue = (name: string, value: string) => {
+    setValues((current) => ({ ...current, [name]: value }));
+    if (name === "question_type") {
+      setFormError(null);
+      if (value === "TRUE_FALSE") {
+        setOptions([
+          { text: "Đúng", correct: false },
+          { text: "Sai", correct: false },
+        ]);
+      } else if (value === "ESSAY" || value === "FILL_BLANK") {
+        setOptions([]);
+      } else if (options.length < 2) {
+        setOptions([
+          ...options,
+          ...Array.from({ length: 2 - options.length }, () => ({ text: "", correct: false })),
+        ]);
+      }
+    }
+  };
+
+  const updateOption = (index: number, patch: Partial<QuestionOptionDraft>) => {
+    setOptions((current) => current.map((option, optionIndex) =>
+      optionIndex === index ? { ...option, ...patch } : option,
+    ));
+    setFormError(null);
+  };
+
+  const markCorrect = (index: number) => {
+    setOptions((current) => current.map((option, optionIndex) => ({
+      ...option,
+      correct: singleCorrect ? optionIndex === index : optionIndex === index ? !option.correct : option.correct,
+    })));
+    setFormError(null);
+  };
+
+  const submitQuestionForm = (event: FormEvent) => {
+    event.preventDefault();
+    const questionText = (values.question_text || "").trim();
+    const filledOptions = options
+      .map((option, index) => ({
+        option_text: option.text.trim(),
+        is_correct: option.correct,
+        sort_order: index,
+      }))
+      .filter((option) => option.option_text);
+
+    if (!questionText) {
+      setFormError("Hãy nhập nội dung câu hỏi.");
+      return;
+    }
+    if (!questionType) {
+      setFormError("Hãy chọn loại câu hỏi.");
+      return;
+    }
+    if (needsOptions && filledOptions.length < 2) {
+      setFormError("Hãy nhập ít nhất 2 đáp án ở các ô bên dưới.");
+      return;
+    }
+    const correctCount = filledOptions.filter((option) => option.is_correct).length;
+    if (singleCorrect && correctCount !== 1) {
+      setFormError("Hãy chọn đúng 1 đáp án đúng.");
+      return;
+    }
+    if (questionType === "MULTIPLE_CHOICE" && correctCount < 1) {
+      setFormError("Hãy chọn ít nhất 1 đáp án đúng.");
+      return;
+    }
+    setFormError(null);
+    onFormSubmit(block, {
+      ...values,
+      options: JSON.stringify(filledOptions),
+    });
+  };
+
+  return (
+    <form onSubmit={submitQuestionForm} className="p-3.5">
+      <BlockHeading block={block} />
+      <div className="mt-3 space-y-3">
+        {block.fields.filter((field) => field.name !== "options").map((field) => (
+          <label key={field.name} className="block">
+            <span className="mb-1 block text-[9px] font-bold">{field.label}{field.required ? " *" : ""}</span>
+            {field.input_type === "select" ? (
+              <select required={field.required} value={values[field.name] || ""} onChange={(event) => updateValue(field.name, event.target.value)} className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-[11px] outline-none focus:border-amber-400">
+                <option value="">{field.placeholder || "Chọn một giá trị"}</option>
+                {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            ) : field.name === "question_text" || field.input_type === "textarea" ? (
+              <textarea required={field.required} placeholder={field.placeholder} value={values[field.name] || ""} onChange={(event) => updateValue(field.name, event.target.value)} className="min-h-24 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-[11px] outline-none focus:border-amber-400" />
+            ) : (
+              <input type={field.input_type} required={field.required} placeholder={field.placeholder} value={values[field.name] || ""} onChange={(event) => updateValue(field.name, event.target.value)} className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-[11px] outline-none focus:border-amber-400" />
+            )}
+          </label>
+        ))}
+
+        {needsOptions && (
+          <div className="rounded-xl border border-border bg-muted/20 p-2.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold">Đáp án</p>
+                <p className="text-[9px] text-muted-foreground">{singleCorrect ? "Chọn 1 đáp án đúng." : "Có thể chọn nhiều đáp án đúng."}</p>
+              </div>
+              <button type="button" onClick={() => setOptions((current) => [...current, { text: "", correct: false }])} className="rounded-lg border border-border px-2 py-1 text-[9px] font-bold hover:bg-muted">+ Thêm đáp án</button>
+            </div>
+            <div className="space-y-2">
+              {options.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type={singleCorrect ? "radio" : "checkbox"}
+                    name={singleCorrect ? `${block.id}-correct` : `${block.id}-correct-${index}`}
+                    checked={option.correct}
+                    onChange={() => markCorrect(index)}
+                    aria-label={`Đánh dấu đáp án ${index + 1} là đúng`}
+                    className="size-4 accent-amber-500"
+                  />
+                  <input
+                    type="text"
+                    value={option.text}
+                    onChange={(event) => updateOption(index, { text: event.target.value })}
+                    placeholder={`Đáp án ${index + 1}`}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-[11px] outline-none focus:border-amber-400"
+                  />
+                  {options.length > 2 && <button type="button" onClick={() => setOptions((current) => current.filter((_, optionIndex) => optionIndex !== index))} className="rounded-lg px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-red-600" aria-label={`Xóa đáp án ${index + 1}`}>×</button>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {formError && <p role="alert" className="text-[10px] font-semibold text-red-600">{formError}</p>}
         <button type="submit" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#FDD239] px-3 text-[11px] font-bold text-slate-950 hover:bg-[#f5c923]">{block.submit_label}<ArrowUp className="size-3.5" /></button>
       </div>

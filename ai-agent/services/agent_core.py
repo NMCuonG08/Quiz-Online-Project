@@ -1060,6 +1060,13 @@ class AIAgentCore:
                 flags=re.IGNORECASE,
             )
             quiz_id = str(match.group(1)).strip() if match else ""
+        if not quiz_id:
+            created_match = re.search(
+                r"create_quiz(?:_with_questions)?.*?\"id\"\s*:\s*\"([^\"]+)\"",
+                history_text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            quiz_id = str(created_match.group(1)).strip() if created_match else ""
 
         options = AIAgentCore._parse_form_options(values.get("options"))
         question_type = AIAgentCore._enum_key(text_value("question_type"))
