@@ -190,6 +190,15 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("BACKEND_HTTP", message)
 
+    def test_database_errors_do_not_expose_prisma_details(self):
+        message = self.core._safe_tool_error(RuntimeError(
+            'Invalid `prisma.quiz.create()` invocation: PostgresError invalid input value for enum "QuizType": "SINGLE_CHOICE"'
+        ))
+        self.assertEqual(
+            message,
+            "BACKEND_SCHEMA_MISMATCH: Backend và database chưa đồng bộ loại dữ liệu.",
+        )
+
     async def test_legacy_pending_approval_is_normalized_before_execution(self):
         await self.core.state_store.create_approval("legacy-token", {
             "name": "create_quiz",

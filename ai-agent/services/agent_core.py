@@ -3780,4 +3780,9 @@ class AIAgentCore:
                 return f"Backend trả về lỗi {status}."
         if isinstance(exc, httpx.RequestError):
             return "BACKEND_UNAVAILABLE: Không kết nối được NestJS Backend API"
-        return str(exc)[:1000]
+        raw_message = str(exc)
+        if "Invalid `prisma." in raw_message or "PostgresError" in raw_message:
+            if "invalid input value for enum" in raw_message.lower():
+                return "BACKEND_SCHEMA_MISMATCH: Backend và database chưa đồng bộ loại dữ liệu."
+            return "BACKEND_ERROR: Backend không thể hoàn tất thao tác lúc này."
+        return raw_message[:1000]

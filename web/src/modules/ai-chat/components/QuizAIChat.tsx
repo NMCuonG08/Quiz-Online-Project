@@ -38,7 +38,7 @@ import {
   type AgentRun,
   type BackgroundRun,
 } from "../services/agent-control.service";
-import type { AgentStreamEvent, ChatAction, ChatFormSubmission, ChatMessage, ChatRole, ChatScope, UIBlock, UISurface } from "../types";
+import type { AgentStreamEvent, ChatAction, ChatFormSubmission, ChatMessage, ChatRole, ChatScope, GraphTraceStep, UIBlock, UISurface } from "../types";
 import AgentControlCenter from "./AgentControlCenter";
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -110,6 +110,23 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function normalizeTraceStep(value: unknown): GraphTraceStep | null {
+  const raw = asRecord(value);
+  const payload = asRecord(raw.payload);
+  const read = (key: string) => raw[key] ?? payload[key];
+  const node = read("node");
+  const event = read("event");
+  if (typeof node !== "string" && typeof event !== "string") return null;
+  const traceId = read("trace_id") ?? read("run_id");
+  const tool = read("tool");
+  return {
+    trace_id: typeof traceId === "string" ? traceId : "",
+    node: typeof node === "string" && node ? node : "unknown",
+    event: typeof event === "string" && event ? event : "event",
+    ...(typeof tool === "string" && tool ? { tool } : {}),
+  };
 }
 
 function isUISurface(value: unknown): value is UISurface {
@@ -218,7 +235,9 @@ function hydrateHistoryMessages(items: PersistedMessage[]): ChatMessage[] {
       surface,
       citations: Array.isArray(metadata.citations) ? metadata.citations as ChatMessage["citations"] : undefined,
       traceId: typeof metadata.trace_id === "string" ? metadata.trace_id : undefined,
-      traceSteps: Array.isArray(metadata.trace_steps) ? metadata.trace_steps as ChatMessage["traceSteps"] : undefined,
+      traceSteps: Array.isArray(metadata.trace_steps)
+        ? metadata.trace_steps.map(normalizeTraceStep).filter((step): step is GraphTraceStep => Boolean(step))
+        : undefined,
       error: metadata.error === true,
     };
   });
@@ -422,10 +441,13 @@ export default function QuizAIChat() {
     } else if (event.type === "citations") {
       patchAssistant(messageId, { citations: event.items });
     } else if (event.type === "trace") {
-      patchAssistant(messageId, (message) => ({
-        traceId: event.trace_id,
-        traceSteps: [...(message.traceSteps || []), event],
-      }));
+      const traceStep = normalizeTraceStep(event);
+      if (traceStep) {
+        patchAssistant(messageId, (message) => ({
+          traceId: event.trace_id,
+          traceSteps: [...(message.traceSteps || []), traceStep],
+        }));
+      }
     } else if (event.type === "done") {
       patchAssistant(messageId, {
         isStreaming: false,
@@ -823,11 +845,11 @@ function MessageBubble({
           <details className="mt-2 text-[8px] text-muted-foreground">
             <summary className="cursor-pointer font-mono">Trace · {message.traceId}</summary>
             <ol className="mt-1 space-y-0.5 font-mono">
-              {message.traceSteps?.map((step, index) => (
+              {message.traceSteps?.length ? message.traceSteps.map((step, index) => (
                 <li key={`${step.node}-${step.event}-${step.tool || ""}-${index}`}>
                   {step.node} → {step.event}{step.tool ? ` · ${step.tool}` : ""}
                 </li>
-              ))}
+              )) : <li>Chưa có chi tiết trace.</li>}
             </ol>
           </details>
         )}
