@@ -176,6 +176,16 @@ def encode_sse(event: str, payload: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
+def build_request_context(
+    request: ChatRequest, authorization: str | None,
+) -> dict[str, object]:
+    context: dict[str, object] = request.context.model_dump()
+    context["is_authenticated"] = bool(authorization)
+    if request.form_submission is not None:
+        context["_form_submission"] = request.form_submission.model_dump()
+    return context
+
+
 @app.get("/")
 async def root():
     return {
@@ -238,8 +248,7 @@ async def enqueue_run(
     session_id = request.session_id or str(uuid.uuid4())
     if not await agent.allow_request(user_id, session_id):
         raise HTTPException(status_code=429, detail="Quá nhiều yêu cầu AI. Hãy thử lại sau một phút.")
-    context = request.context.model_dump()
-    context["is_authenticated"] = bool(authorization)
+    context = build_request_context(request, authorization)
     try:
         return await agent.enqueue_background_run(
             request.message,
@@ -340,8 +349,7 @@ async def chat_endpoint(
         user_id, scope = await resolve_identity(request, authorization)
         if not await agent.allow_request(user_id, session_id):
             raise HTTPException(status_code=429, detail="Quá nhiều yêu cầu AI. Hãy thử lại sau một phút.")
-        context = request.context.model_dump()
-        context["is_authenticated"] = bool(authorization)
+        context = build_request_context(request, authorization)
         response = await agent.process_message(
             request.message,
             user_id,
@@ -378,8 +386,7 @@ async def chat_stream_endpoint(
         user_id, scope = await resolve_identity(request, authorization)
         if not await agent.allow_request(user_id, session_id):
             raise HTTPException(status_code=429, detail="Quá nhiều yêu cầu AI. Hãy thử lại sau một phút.")
-        context = request.context.model_dump()
-        context["is_authenticated"] = bool(authorization)
+        context = build_request_context(request, authorization)
     except HTTPException:
         metrics.record_chat(request.scope, "rejected", time.perf_counter() - started_at)
         raise

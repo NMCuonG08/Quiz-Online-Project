@@ -1,4 +1,4 @@
-import type { AgentStreamEvent, ChatPageContext, ChatScope } from "../types";
+import type { AgentStreamEvent, ChatFormSubmission, ChatPageContext, ChatScope } from "../types";
 
 interface StreamChatOptions {
   message: string;
@@ -7,6 +7,7 @@ interface StreamChatOptions {
   locale?: string;
   scope: ChatScope;
   context: ChatPageContext;
+  formSubmission?: ChatFormSubmission;
   signal?: AbortSignal;
   accessToken?: string | null;
   onTokenRefreshed?: (token: string) => void;
@@ -88,6 +89,7 @@ async function openAgentStream(
       locale: options.locale || "vi",
       scope: options.scope,
       context: options.context,
+      form_submission: options.formSubmission,
     }),
     signal: options.signal,
   });

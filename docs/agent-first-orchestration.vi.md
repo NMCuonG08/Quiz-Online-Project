@@ -136,6 +136,41 @@ Native interrupt chỉ nên triển khai ở migration riêng khi client gửi
 `run_id + decision`, `_approve()` được thay bằng `Command(resume=...)`, và test
 đã chứng minh worker restart vẫn resume đúng checkpoint.
 
+## Structured form fast path
+
+Form do server render gửi `form_submission` riêng trong request:
+
+```json
+{
+  "message": "Thông tin tạo quiz từ form",
+  "form_submission": {
+    "form_id": "quiz-create-form",
+    "values": {
+      "title": "Python cơ bản",
+      "category": "Lập trình",
+      "difficulty": "EASY",
+      "time_limit": "300",
+      "quiz_type": "MULTIPLE_CHOICE"
+    }
+  }
+}
+```
+
+`quiz-create-form` đi qua server-owned handler:
+
+```text
+validate JSON
+  -> list_categories
+  -> map category name/slug/id thành category_id thật
+  -> create_quiz proposal
+  -> trả UI Accept
+```
+
+Handler này không gọi planner hoặc executor LLM. Form ID chỉ chọn handler;
+client values vẫn là untrusted input và tiếp tục qua scope, schema, ownership,
+approval và backend validation. Form ID chưa có handler sẽ fallback về agent
+loop để không làm mất khả năng mở rộng các form mới.
+
 ## Model-call budget
 
 Số liệu dưới đây là số model call theo topology, chưa phải benchmark latency
@@ -203,4 +238,3 @@ trusted scope và ToolRuntime.
 - Write chỉ trả thành công sau backend execute result.
 - Budget, cancellation, citation abstention và SSE contract không regression.
 - Toàn bộ AI-agent unit tests pass.
-

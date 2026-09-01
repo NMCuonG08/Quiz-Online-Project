@@ -188,6 +188,7 @@ CREATOR_WRITE_TOOLS = WRITE_TOOLS - {
 GROUNDED_RETRIEVAL_TOOLS = {"search_quizzes", "get_quiz", "search_knowledge"}
 RETRY_GUARDED_TOOLS = GROUNDED_RETRIEVAL_TOOLS | {"web_search"}
 DESTRUCTIVE_TOOLS = {"delete_quiz", "delete_question", "delete_category"}
+DIRECT_FORM_IDS = {"quiz-create-form"}
 TOOL_INTENT_HINTS = {
     "get_current_time": "temporal",
     "get_current_user": "account_identity",
@@ -473,6 +474,12 @@ class AIAgentCore:
                 if display_message and isinstance(fast_plan, dict):
                     user_input = display_message
                     execution_context["_fast_plan"] = fast_plan
+                    if str(fast_plan.get("intent") or "") == "quiz_create":
+                        entities = fast_plan.get("entities")
+                        execution_context["_form_submission"] = {
+                            "form_id": "quiz-create-form",
+                            "values": dict(entities) if isinstance(entities, dict) else {},
+                        }
             except (TypeError, ValueError, json.JSONDecodeError):
                 pass
         elif user_input.startswith("__confirm_action__:"):
@@ -592,6 +599,23 @@ class AIAgentCore:
         async with state.lock, self._conversation_lock(user_id, session_id):
             if user_input.startswith("__approve__:"):
                 async for event in self._approve(user_input[12:], authorization, user_id, scope, session_id):
+                    yield event
+                return
+            form_submission = (context or {}).get("_form_submission")
+            if (
+                isinstance(form_submission, dict)
+                and str(form_submission.get("form_id") or "") in DIRECT_FORM_IDS
+            ):
+                async for event in self._stream_form_submission(
+                    state,
+                    user_input,
+                    form_submission,
+                    authorization,
+                    user_id,
+                    session_id,
+                    scope,
+                    context,
+                ):
                     yield event
                 return
             if not self.client:
@@ -723,6 +747,202 @@ class AIAgentCore:
                 "tool": used_tools[-1] if used_tools else None,
                 "tools": used_tools,
             }
+
+    async def _stream_form_submission(
+        self,
+        state: SessionState,
+        user_input: str,
+        submission: Dict[str, Any],
+        authorization: Optional[str],
+        user_id: str,
+        session_id: str,
+        scope: str,
+        context: Optional[Dict[str, Any]],
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Execute server-owned structured forms without an LLM round trip."""
+        form_id = str(submission.get("form_id") or "")
+        values = submission.get("values")
+        values = dict(values) if isinstance(values, dict) else {}
+        trace_id = str(uuid4())
+        allowed_tools = SCOPE_TOOLS.get(scope, SCOPE_TOOLS["learner"])
+        used_tools: list[str] = []
+        citations: list[dict[str, str]] = []
+
+        async def remember(final_text: str) -> None:
+            state.chat_messages.extend([
+                {"role": "user", "content": user_input},
+                {"role": "assistant", "content": final_text},
+            ])
+            state.chat_messages = state.chat_messages[-20:]
+            await self.state_store.set_chat_messages(
+                user_id, session_id, state.chat_messages,
+            )
+
+        def trace(event: str, tool: str = "") -> Dict[str, Any]:
+            return {
+                "type": "trace",
+                "trace_id": trace_id,
+                "node": "form_runtime",
+                "event": event,
+                "tool": tool,
+            }
+
+        if form_id != "quiz-create-form":
+            raise ValueError(f"FORM_HANDLER_NOT_FOUND: {form_id}")
+
+        plan = self._quiz_create_plan_from_form(values)
+        yield trace("validated", "")
+        if scope not in {"creator", "admin"}:
+            surface = self.ui_policy.resolve(plan, scope, context)
+            final_text = "Tài khoản hiện tại chưa có quyền tạo quiz."
+            yield {"type": "token", "delta": final_text}
+            if surface is not None:
+                yield {"type": "ui", "surface": surface.model_dump()}
+            await remember(final_text)
+            yield {
+                "type": "done", "intent": "quiz_create",
+                "agent": "form-runtime", "tool": None, "tools": [],
+                "trace_id": trace_id, "model_calls": 0,
+            }
+            return
+
+        if plan.get("missing_fields"):
+            surface = self.ui_policy.resolve(plan, scope, context)
+            final_text = "Form còn thiếu dữ liệu bắt buộc. Bạn hãy bổ sung phần được đánh dấu."
+            yield {"type": "token", "delta": final_text}
+            if surface is not None:
+                yield {"type": "ui", "surface": surface.model_dump()}
+            await remember(final_text)
+            yield {
+                "type": "done", "intent": "quiz_create",
+                "agent": "form-runtime", "tool": "plan_interaction",
+                "tools": [], "trace_id": trace_id, "model_calls": 0,
+            }
+            return
+
+        yield {"type": "status", "label": self._tool_status("list_categories"), "tool": "list_categories"}
+        try:
+            categories_result, _, category_citations = await self._execute_tool(
+                "list_categories", {}, authorization, user_id, scope, context,
+                allowed_tools=set(allowed_tools),
+            )
+            used_tools.append("list_categories")
+            citations.extend(category_citations)
+            self.metrics.record_tool("list_categories", "success")
+            yield trace("tool_success", "list_categories")
+        except Exception as exc:
+            self.metrics.record_tool("list_categories", "error")
+            yield trace("tool_error", "list_categories")
+            yield {"type": "error", "message": self._safe_tool_error(exc)}
+            return
+
+        proposal = self._build_quiz_create_proposal(
+            plan, {"list_categories": categories_result},
+        )
+        if proposal is None:
+            category_items = DiscoveryCapability.result_items(categories_result)
+            available = [
+                str(item.get("name") or item.get("title") or item.get("slug") or "").strip()
+                for item in category_items if isinstance(item, dict)
+            ]
+            surface = self._build_category_mismatch_surface(
+                [name for name in available if name],
+            )
+            final_text = "Category trong form chưa khớp dữ liệu hiện có. Các trường quiz khác vẫn được giữ ở giao diện."
+            yield {"type": "token", "delta": final_text}
+            yield {"type": "ui", "surface": surface.model_dump()}
+            if citations:
+                yield {"type": "citations", "items": citations}
+            await remember(final_text)
+            yield {
+                "type": "done", "intent": "quiz_create",
+                "agent": "form-runtime", "tool": "list_categories",
+                "tools": used_tools, "trace_id": trace_id, "model_calls": 0,
+            }
+            return
+
+        yield {"type": "status", "label": self._tool_status("create_quiz"), "tool": "create_quiz"}
+        try:
+            result, surface, create_citations = await self._execute_tool(
+                "create_quiz", proposal, authorization, user_id, scope, context,
+                allowed_tools=set(allowed_tools),
+            )
+            used_tools.append("create_quiz")
+            citations.extend(create_citations)
+            self.metrics.record_tool("create_quiz", "success")
+            yield trace("approval_proposed", "create_quiz")
+        except Exception as exc:
+            self.metrics.record_tool("create_quiz", "error")
+            yield trace("tool_error", "create_quiz")
+            yield {"type": "error", "message": self._safe_tool_error(exc)}
+            return
+
+        if not isinstance(result, dict) or result.get("approval_required") is not True or surface is None:
+            yield {"type": "error", "message": "Agent không tạo được đề xuất xác nhận hợp lệ."}
+            return
+
+        final_text = "Đề xuất tạo quiz đã sẵn sàng. Hãy kiểm tra thông tin rồi bấm Accept để thực hiện."
+        yield {"type": "token", "delta": final_text}
+        yield {"type": "ui", "surface": surface.model_dump()}
+        if citations:
+            yield {"type": "citations", "items": citations}
+        await remember(final_text)
+        yield {
+            "type": "done", "intent": "quiz_create",
+            "agent": "form-runtime", "tool": "create_quiz",
+            "tools": used_tools, "trace_id": trace_id,
+            "run_status": "waiting_for_approval", "model_calls": 0,
+        }
+
+    @staticmethod
+    def _quiz_create_plan_from_form(values: Dict[str, Any]) -> Dict[str, Any]:
+        def text_value(*keys: str) -> str:
+            for key in keys:
+                value = values.get(key)
+                if value not in (None, ""):
+                    return str(value).strip()
+            return ""
+
+        def int_value(key: str, default: int = 0) -> int:
+            value = values.get(key)
+            if value in (None, ""):
+                return default
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                return default
+
+        entities = {
+            "title": text_value("title"),
+            "slug": text_value("slug"),
+            "category": text_value("category", "category_id"),
+            "difficulty_level": text_value("difficulty_level", "difficulty").upper(),
+            "time_limit": int_value("time_limit"),
+            "quiz_type": text_value("quiz_type").upper(),
+            "description": text_value("description"),
+            "instructions": text_value("instructions"),
+            "max_attempts": int_value("max_attempts"),
+            "passing_score": int_value("passing_score"),
+        }
+        required = ("title", "category", "difficulty_level", "time_limit", "quiz_type")
+        missing = [field for field in required if entities.get(field) in (None, "", 0)]
+        return {
+            "intent": "quiz_create",
+            "confidence": 1.0,
+            "ambiguity": "none",
+            "needs_clarification": bool(missing),
+            "clarification_question": "",
+            "risk": "write",
+            "route": "approval" if not missing else "clarify",
+            "dialogue_act": "clarification_answer",
+            "reference_mode": "pending_workflow",
+            "refers_to_previous_turn": True,
+            "selection_strategy": "best_match",
+            "resource": "quiz",
+            "operation": "create",
+            "entities": entities,
+            "missing_fields": missing,
+        }
 
     async def _stream_langgraph(
         self,
@@ -2298,7 +2518,7 @@ class AIAgentCore:
 
         normalized = AIAgentCore._normalize_write_args("create_quiz", {
             "title": title,
-            "slug": AIAgentCore._slugify(title),
+            "slug": str(entities.get("slug") or "").strip() or AIAgentCore._slugify(title),
             "category_id": category_id,
             "difficulty_level": difficulty,
             "time_limit": int(time_limit),

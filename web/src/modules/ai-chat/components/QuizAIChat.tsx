@@ -38,7 +38,7 @@ import {
   type AgentRun,
   type BackgroundRun,
 } from "../services/agent-control.service";
-import type { AgentStreamEvent, ChatAction, ChatMessage, ChatRole, ChatScope, UIBlock, UISurface } from "../types";
+import type { AgentStreamEvent, ChatAction, ChatFormSubmission, ChatMessage, ChatRole, ChatScope, UIBlock, UISurface } from "../types";
 import AgentControlCenter from "./AgentControlCenter";
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -448,6 +448,7 @@ export default function QuizAIChat() {
     rawMessage?: string,
     hideUserMessage = false,
     backendMessage?: string,
+    formSubmission?: ChatFormSubmission,
   ) => {
     if (!auth.isAuthenticated || !auth.token || !user?.id) return;
     const value = (rawMessage ?? input).trim();
@@ -482,6 +483,7 @@ export default function QuizAIChat() {
         locale,
         scope,
         context: { route: pathname || "/" },
+        formSubmission,
         signal: controller.signal,
         accessToken: auth.token,
         onTokenRefreshed: (token) => dispatch(tokenRefreshed(token)),
@@ -587,39 +589,11 @@ export default function QuizAIChat() {
       .map((field) => `${field.label}: ${values[field.name] || ""}`)
       .join("\n");
     const displayMessage = `${block.submit_prompt}\n${details}`.trim();
-    const fieldNames = new Set(block.fields.map((field) => field.name));
-    const isQuizCreateForm = ["title", "category", "difficulty", "time_limit", "quiz_type"]
-      .every((field) => fieldNames.has(field));
-    if (!isQuizCreateForm) {
-      void sendMessage(displayMessage);
-      return;
-    }
-    const plan = {
-      intent: "quiz_create",
-      confidence: 1,
-      ambiguity: "none",
-      needs_clarification: false,
-      risk: "write",
-      route: "approval",
-      dialogue_act: "clarification_answer",
-      reference_mode: "pending_workflow",
-      refers_to_previous_turn: true,
-      selection_strategy: "best_match",
-      resource: "quiz",
-      operation: "create",
-      missing_fields: [],
-      entities: {
-        title: values.title || "",
-        category: values.category || "",
-        difficulty_level: values.difficulty || "",
-        time_limit: Number(values.time_limit || 0),
-        quiz_type: values.quiz_type || "",
-      },
-    };
     void sendMessage(
       displayMessage,
       false,
-      "__fast_form__:" + JSON.stringify({ display_message: displayMessage, plan }),
+      undefined,
+      { form_id: block.id, values },
     );
   };
 
@@ -727,7 +701,7 @@ export default function QuizAIChat() {
 
           <div ref={scrollRef} className="flex-1 space-y-5 overflow-y-auto bg-muted/20 px-4 py-5" aria-live="polite">
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} onAction={handleAction} onPrompt={sendMessage} onFormSubmit={submitStructuredForm} />
+              <MessageBubble key={message.id} message={message} onAction={handleAction} onFormSubmit={submitStructuredForm} />
             ))}
           </div>
 
@@ -793,12 +767,10 @@ export default function QuizAIChat() {
 function MessageBubble({
   message,
   onAction,
-  onPrompt,
   onFormSubmit,
 }: {
   message: ChatMessage;
   onAction: (action: ChatAction) => void;
-  onPrompt: (prompt: string) => Promise<void>;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   const assistant = message.role === "assistant";
@@ -826,7 +798,7 @@ function MessageBubble({
           )}
           {message.content && message.isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-amber-500 align-middle" />}
         </div>
-        {message.surface && <DynamicSurface surface={message.surface} onAction={onAction} onPrompt={onPrompt} onFormSubmit={onFormSubmit} />}
+        {message.surface && <DynamicSurface surface={message.surface} onAction={onAction} onFormSubmit={onFormSubmit} />}
         {!!message.citations?.length && (
           <div className="mt-3 border-t border-border pt-2">
             <p className="mb-1.5 text-[9px] font-bold uppercase text-muted-foreground">Nguồn</p>
@@ -901,12 +873,10 @@ function ChatMarkdown({ content }: { content: string }) {
 function DynamicSurface({
   surface,
   onAction,
-  onPrompt,
   onFormSubmit,
 }: {
   surface: UISurface;
   onAction: (action: ChatAction) => void;
-  onPrompt: (prompt: string) => Promise<void>;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   return (
@@ -919,7 +889,7 @@ function DynamicSurface({
       )}
       <div className="divide-y divide-border">
         {surface.blocks.map((block) => (
-          <DynamicBlock key={block.id} block={block} onPrompt={onPrompt} onFormSubmit={onFormSubmit} />
+          <DynamicBlock key={block.id} block={block} onFormSubmit={onFormSubmit} />
         ))}
       </div>
       {!!surface.actions.length && (
@@ -947,11 +917,9 @@ function DynamicSurface({
 
 function DynamicBlock({
   block,
-  onPrompt,
   onFormSubmit,
 }: {
   block: UIBlock;
-  onPrompt: (prompt: string) => Promise<void>;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -963,14 +931,7 @@ function DynamicBlock({
 
   const submitForm = (event: FormEvent) => {
     event.preventDefault();
-    const isQuizCreateForm = ["title", "category", "difficulty", "time_limit", "quiz_type"]
-      .every((field) => block.fields.some((item) => item.name === field));
-    if (isQuizCreateForm) {
-      onFormSubmit(block, values);
-      return;
-    }
-    const details = block.fields.map((field) => `${field.label}: ${values[field.name] || ""}`).join("\n");
-    void onPrompt(`${block.submit_prompt}\n${details}`.trim());
+    onFormSubmit(block, values);
   };
 
   if (block.type === "notice") {

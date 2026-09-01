@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -11,6 +11,37 @@ class ChatPageContext(BaseModel):
     selected_knowledge_source_id: Optional[str] = Field(default=None, max_length=128)
 
 
+class ChatFormSubmission(BaseModel):
+    """Structured values from a server-rendered form.
+
+    `form_id` selects a server-owned handler. Client values are always
+    untrusted and must still pass domain validation and authorization.
+    """
+
+    form_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
+    )
+    values: dict[str, Any]
+
+    @field_validator("values")
+    @classmethod
+    def validate_values(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if len(values) > 40:
+            raise ValueError("form submission có quá nhiều trường")
+        normalized: dict[str, Any] = {}
+        for key, value in values.items():
+            if not key or len(key) > 128 or not key.replace("_", "").isalnum():
+                raise ValueError("form field name không hợp lệ")
+            if not isinstance(value, (str, int, float, bool)) and value is not None:
+                raise ValueError("form value chỉ được là scalar")
+            if isinstance(value, str) and len(value) > 4000:
+                raise ValueError("form value quá dài")
+            normalized[key] = value
+        return normalized
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     user_id: str = ""
@@ -18,6 +49,7 @@ class ChatRequest(BaseModel):
     locale: str = Field(default="vi", min_length=2, max_length=16, pattern=r"^[A-Za-z-]+$")
     scope: Literal["learner", "creator", "admin"] = "learner"
     context: ChatPageContext = Field(default_factory=ChatPageContext)
+    form_submission: Optional[ChatFormSubmission] = None
 
 
 class ReviewDecisionRequest(BaseModel):

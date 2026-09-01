@@ -17,6 +17,11 @@ export interface ChatAction {
   disabled?: boolean;
 }
 
+export interface ChatFormSubmission {
+  form_id: string;
+  values: Record<string, string | number | boolean | null>;
+}
+
 export interface UIItem {
   label: string;
   value: string;

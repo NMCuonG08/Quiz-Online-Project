@@ -859,6 +859,70 @@ class AgentFirstOrchestrationTests(unittest.IsolatedAsyncioTestCase):
         dispatch.assert_awaited_once_with("get_current_time", {})
 
 
+class StructuredFormExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.core = AIAgentCore({
+            "orchestration_mode": "agent_first",
+        })
+        self.core.graph_runner = SimpleNamespace(
+            plan=AsyncMock(side_effect=AssertionError("structured form must not call planner")),
+            invoke=AsyncMock(side_effect=AssertionError("structured form must not call executor")),
+            close=AsyncMock(return_value=None),
+        )
+
+    async def asyncTearDown(self):
+        await self.core.close()
+
+    async def test_complete_quiz_form_creates_proposal_without_model(self):
+        approval_surface = self.core._build_write_result_surface(
+            "create_quiz",
+            {"title": "Python cơ bản"},
+            {"approval_required": True},
+            "creator",
+            "",
+            "create_quiz",
+        )
+        self.core._execute_tool = AsyncMock(side_effect=[
+            ({"items": [{"id": "cat-1", "name": "Lập trình"}]}, None, []),
+            ({"approval_required": True, "operation": "create_quiz"}, approval_surface, []),
+        ])
+
+        events = [event async for event in self.core._stream_message_events(
+            "Thông tin tạo quiz từ form",
+            "user-1",
+            "Bearer token",
+            "session-form",
+            scope="creator",
+            context={
+                "route": "/user/quizzes",
+                "_form_submission": {
+                    "form_id": "quiz-create-form",
+                    "values": {
+                        "title": "Python cơ bản",
+                        "category": "Lập trình",
+                        "difficulty": "EASY",
+                        "time_limit": "300",
+                        "quiz_type": "MULTIPLE_CHOICE",
+                        "description": "Quiz nhập từ form",
+                        "instructions": "Làm bài",
+                    },
+                },
+            },
+        )]
+
+        self.core.graph_runner.plan.assert_not_awaited()
+        self.core.graph_runner.invoke.assert_not_awaited()
+        self.assertEqual(
+            [call.args[0] for call in self.core._execute_tool.await_args_list],
+            ["list_categories", "create_quiz"],
+        )
+        create_args = self.core._execute_tool.await_args_list[1].args[1]
+        self.assertEqual(create_args["category_id"], "cat-1")
+        self.assertEqual(create_args["description"], "Quiz nhập từ form")
+        self.assertEqual(create_args["instructions"], "Làm bài")
+        self.assertEqual(next(event for event in events if event["type"] == "done")["model_calls"], 0)
+
+
 class WebSearchContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_search_is_disabled_without_explicit_configuration(self):
         provider = WebSearchProvider()
