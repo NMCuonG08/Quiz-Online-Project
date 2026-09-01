@@ -1082,8 +1082,18 @@ class AIAgentCore:
             missing.append("nội dung câu hỏi")
         if not question_type:
             missing.append("loại câu hỏi")
-        if question_type in {"SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"} and not options:
-            missing.append("các đáp án")
+        if question_type in {"SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"}:
+            if not options:
+                missing.append("các đáp án")
+            elif len(options) < 2:
+                missing.append("ít nhất 2 đáp án")
+            correct_count = sum(
+                1 for option in options if option.get("is_correct") is True
+            )
+            if question_type in {"SINGLE_CHOICE", "TRUE_FALSE"} and correct_count != 1:
+                missing.append("đúng 1 đáp án đúng")
+            elif question_type == "MULTIPLE_CHOICE" and correct_count < 1:
+                missing.append("ít nhất 1 đáp án đúng")
         payload["_missing"] = missing
         return AIAgentCore._normalize_write_args("create_question", payload)
 
@@ -1135,12 +1145,12 @@ class AIAgentCore:
     def _build_question_form_surface(question: Dict[str, Any]) -> UISurface:
         return UISurface.model_validate({
             "title": "Bổ sung câu hỏi",
-            "description": "Điền đủ quiz đích và các đáp án; hệ thống sẽ tạo đề xuất trực tiếp từ form.",
+            "description": "Điền đủ quiz đích và các đáp án; hệ thống sẽ tạo đề xuất trực tiếp từ form, không hỏi lại bằng tin nhắn.",
             "blocks": [{
                 "id": "create_questions_form",
                 "type": "form",
                 "title": "Thông tin câu hỏi",
-                "description": "Các đáp án ghi mỗi dòng một lựa chọn; đánh dấu đáp án đúng bằng dấu *.",
+                "description": "SINGLE_CHOICE cần ít nhất 2 dòng và đúng 1 dòng bắt đầu bằng *. Ví dụ: * Đáp án đúng.",
                 "tone": "info",
                 "fields": [
                     {"name": "quiz_id", "label": "Quiz ID", "input_type": "text", "required": True, "placeholder": question.get("quiz_id") or "ID quiz", "options": []},

@@ -58,6 +58,41 @@ function selectedQuizIdFromPathname(pathname: string | null): string | undefined
   return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 }
 
+function questionFormValidationError(block: UIBlock, values: Record<string, string>): string | null {
+  const fieldNames = new Set(block.fields.map((field) => field.name));
+  if (!fieldNames.has("question_text") || !fieldNames.has("question_type") || !fieldNames.has("options")) {
+    return null;
+  }
+  const questionType = (values.question_type || "").trim().toUpperCase();
+  if (!questionType || !values.question_text?.trim()) return null;
+  const raw = values.options?.trim() || "";
+  let optionCount = 0;
+  let correctCount = 0;
+  try {
+    const decoded: unknown = JSON.parse(raw);
+    if (Array.isArray(decoded)) {
+      optionCount = decoded.filter((item) => typeof item === "object" && item !== null).length;
+      correctCount = decoded.filter((item) => asRecord(item).is_correct === true).length;
+    }
+  } catch {
+    const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean);
+    optionCount = lines.filter((line) => !/^(?:đáp án đúng|đap an dung|correct)\s*:/i.test(line)).length;
+    correctCount = lines.filter((line) => /^(?:\*|\[x\]|đúng\s*[:.)-])/i.test(line)).length;
+    const correctLine = lines.find((line) => /^(?:đáp án đúng|đap an dung|correct)\s*:/i.test(line));
+    if (correctLine) correctCount = Math.max(correctCount, 1);
+  }
+  if (["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"].includes(questionType) && optionCount < 2) {
+    return "Cần nhập ít nhất 2 đáp án, mỗi đáp án một dòng.";
+  }
+  if (["SINGLE_CHOICE", "TRUE_FALSE"].includes(questionType) && correctCount !== 1) {
+    return "Hãy đánh dấu đúng 1 đáp án bằng dấu * ở đầu dòng.";
+  }
+  if (questionType === "MULTIPLE_CHOICE" && correctCount < 1) {
+    return "Hãy đánh dấu ít nhất 1 đáp án đúng bằng dấu * ở đầu dòng.";
+  }
+  return null;
+}
+
 const TOOL_LABELS: Record<string, string> = {
   plan_interaction: "Hiểu yêu cầu",
   get_current_time: "Đọc thời gian hệ thống",
@@ -572,6 +607,10 @@ export default function QuizAIChat() {
       if (!action.value.startsWith("/")) return;
       setOpen(false);
       router.push(action.value);
+    } else if (action.kind === "prompt" && action.id === "add_question") {
+      // Legacy question cards exposed a prompt button next to the form. The
+      // form itself is now the only submission surface; never re-enter chat.
+      return;
     } else if (action.kind === "prompt" && action.value.startsWith("__confirm_action__:")) {
       void sendMessage("Xác nhận xóa", false, action.value);
     } else if (action.kind === "prompt" && /^Xác nhận xóa\s+(quiz|câu hỏi|category)\s+/i.test(action.value)) {
@@ -910,6 +949,12 @@ function DynamicSurface({
   onAction: (action: ChatAction) => void;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
+  const isQuestionForm = surface.blocks.some((block) =>
+    block.fields.some((field) => field.name === "question_text"),
+  );
+  const actions = isQuestionForm
+    ? surface.actions.filter((action) => action.id !== "add_question")
+    : surface.actions;
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
       {(surface.title || surface.description) && (
@@ -923,9 +968,9 @@ function DynamicSurface({
           <DynamicBlock key={block.id} block={block} onFormSubmit={onFormSubmit} />
         ))}
       </div>
-      {!!surface.actions.length && (
+      {!!actions.length && (
         <div className="flex flex-wrap gap-2 border-t border-border p-3">
-          {surface.actions.map((action) => (
+          {actions.map((action) => (
             <button
               key={action.id}
               onClick={() => onAction(action)}
@@ -954,6 +999,7 @@ function DynamicBlock({
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const toneIcon = block.tone === "success"
     ? <CheckCircle2 className="size-4 text-emerald-500" />
     : block.tone === "warning" || block.tone === "danger"
@@ -962,6 +1008,12 @@ function DynamicBlock({
 
   const submitForm = (event: FormEvent) => {
     event.preventDefault();
+    const validationError = questionFormValidationError(block, values);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+    setFormError(null);
     onFormSubmit(block, values);
   };
 
@@ -1000,6 +1052,7 @@ function DynamicBlock({
             )}
           </label>
         ))}
+        {formError && <p role="alert" className="text-[10px] font-semibold text-red-600">{formError}</p>}
         <button type="submit" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#FDD239] px-3 text-[11px] font-bold text-slate-950 hover:bg-[#f5c923]">{block.submit_label}<ArrowUp className="size-3.5" /></button>
       </div>
     </form>

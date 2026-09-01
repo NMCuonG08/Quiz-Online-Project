@@ -978,6 +978,41 @@ class StructuredFormExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(payload["options"][1]["is_correct"])
         self.assertEqual(next(event for event in events if event["type"] == "done")["model_calls"], 0)
 
+    async def test_question_form_rejects_one_unmarked_option_without_model(self):
+        self.core._execute_tool = AsyncMock(
+            side_effect=AssertionError("invalid question form must not call a tool")
+        )
+
+        events = [event async for event in self.core._stream_message_events(
+            "Thông tin câu hỏi từ form",
+            "user-1",
+            "Bearer token",
+            "session-question-invalid",
+            scope="creator",
+            context={
+                "route": "/user/quizzes/questions/quiz-1",
+                "selected_quiz_id": "quiz-1",
+                "_form_submission": {
+                    "form_id": "create_questions_form",
+                    "values": {
+                        "question_text": "AI là gì?",
+                        "question_type": "SINGLE_CHOICE",
+                        "options": "aaa",
+                    },
+                },
+            },
+        )]
+
+        self.core._execute_tool.assert_not_awaited()
+        self.assertIn("ít nhất 2 đáp án", next(
+            event["delta"] for event in events if event["type"] == "token"
+        ))
+        surface = next(event["surface"] for event in events if event["type"] == "ui")
+        options_field = next(
+            field for field in surface["blocks"][0]["fields"] if field["name"] == "options"
+        )
+        self.assertTrue(options_field["required"])
+
 
 class WebSearchContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_search_is_disabled_without_explicit_configuration(self):
