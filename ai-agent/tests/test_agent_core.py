@@ -21,7 +21,7 @@ from services.state_store import AgentStateStore
 from services.tools import MCPToolWrapper
 from services.evaluation import RetrievalCase, evaluate_retrieval
 from services.observability import AgentMetrics
-from services.protocol import ChatRequest
+from services.protocol import ChatRequest, UISurface
 from services.ui_policy import UiPolicyResolver
 from services.langgraph_runner import LangGraphQuizRunner
 from services.intent_schema import ALL_INTENTS, INTENT_DOMAINS, INTENT_METADATA, InteractionPlan
@@ -929,6 +929,53 @@ class StructuredFormExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(create_args["category_id"], "cat-1")
         self.assertEqual(create_args["description"], "Quiz nhập từ form")
         self.assertEqual(create_args["instructions"], "Làm bài")
+        self.assertEqual(next(event for event in events if event["type"] == "done")["model_calls"], 0)
+
+    async def test_question_form_creates_proposal_without_prompt_or_model(self):
+        approval_surface = UISurface(
+            title="Xác nhận tạo câu hỏi",
+            description="Kiểm tra trước khi thực hiện",
+            blocks=[],
+            actions=[],
+        )
+        self.core._execute_tool = AsyncMock(return_value=(
+            {"approval_required": True, "operation": "create_question"},
+            approval_surface,
+            [],
+        ))
+
+        events = [event async for event in self.core._stream_message_events(
+            "Thông tin câu hỏi từ form",
+            "user-1",
+            "Bearer token",
+            "session-question-form",
+            scope="creator",
+            context={
+                "route": "/user/quizzes/questions/quiz-1",
+                "selected_quiz_id": "quiz-1",
+                "_form_submission": {
+                    "form_id": "create_questions_form",
+                    "values": {
+                        "question_text": "AI là gì?",
+                        "question_type": "SINGLE_CHOICE",
+                        "options": "* Là trí tuệ nhân tạo\nLà một trình duyệt",
+                        "points": "1",
+                        "sort_order": "1",
+                    },
+                },
+            },
+        )]
+
+        self.core.graph_runner.plan.assert_not_awaited()
+        self.core.graph_runner.invoke.assert_not_awaited()
+        self.core._execute_tool.assert_awaited_once()
+        call = self.core._execute_tool.await_args
+        self.assertEqual(call.args[0], "create_question")
+        payload = call.args[1]
+        self.assertEqual(payload["quiz_id"], "quiz-1")
+        self.assertEqual(payload["question_type"], "SINGLE_CHOICE")
+        self.assertTrue(payload["options"][0]["is_correct"])
+        self.assertFalse(payload["options"][1]["is_correct"])
         self.assertEqual(next(event for event in events if event["type"] == "done")["model_calls"], 0)
 
 

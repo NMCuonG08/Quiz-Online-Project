@@ -188,7 +188,8 @@ CREATOR_WRITE_TOOLS = WRITE_TOOLS - {
 GROUNDED_RETRIEVAL_TOOLS = {"search_quizzes", "get_quiz", "search_knowledge"}
 RETRY_GUARDED_TOOLS = GROUNDED_RETRIEVAL_TOOLS | {"web_search"}
 DESTRUCTIVE_TOOLS = {"delete_quiz", "delete_question", "delete_category"}
-DIRECT_FORM_IDS = {"quiz-create-form"}
+QUIZ_FORM_IDS = {"quiz-create-form", "create_quiz_form"}
+QUESTION_FORM_IDS = {"create_questions_form", "question-create-form", "create_question_form"}
 TOOL_INTENT_HINTS = {
     "get_current_time": "temporal",
     "get_current_user": "account_identity",
@@ -602,10 +603,7 @@ class AIAgentCore:
                     yield event
                 return
             form_submission = (context or {}).get("_form_submission")
-            if (
-                isinstance(form_submission, dict)
-                and str(form_submission.get("form_id") or "") in DIRECT_FORM_IDS
-            ):
+            if isinstance(form_submission, dict):
                 async for event in self._stream_form_submission(
                     state,
                     user_input,
@@ -787,8 +785,27 @@ class AIAgentCore:
                 "tool": tool,
             }
 
-        if form_id != "quiz-create-form":
-            raise ValueError(f"FORM_HANDLER_NOT_FOUND: {form_id}")
+        if form_id in QUESTION_FORM_IDS:
+            async for event in self._stream_question_form_submission(
+                state,
+                user_input,
+                values,
+                authorization,
+                user_id,
+                session_id,
+                scope,
+                context,
+            ):
+                yield event
+            return
+
+        if form_id not in QUIZ_FORM_IDS:
+            yield trace("handler_not_found", form_id)
+            yield {
+                "type": "error",
+                "message": "Form chưa có handler server-owned; không thể thực hiện an toàn.",
+            }
+            return
 
         plan = self._quiz_create_plan_from_form(values)
         yield trace("validated", "")
@@ -893,6 +910,251 @@ class AIAgentCore:
             "tools": used_tools, "trace_id": trace_id,
             "run_status": "waiting_for_approval", "model_calls": 0,
         }
+
+    async def _stream_question_form_submission(
+        self,
+        state: SessionState,
+        user_input: str,
+        values: Dict[str, Any],
+        authorization: Optional[str],
+        user_id: str,
+        session_id: str,
+        scope: str,
+        context: Optional[Dict[str, Any]],
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Create a question proposal directly from structured form values."""
+        trace_id = str(uuid4())
+        allowed_tools = SCOPE_TOOLS.get(scope, SCOPE_TOOLS["learner"])
+        question = self._question_create_payload_from_form(
+            values,
+            context=context,
+            history=await self.state_store.get_chat_messages(user_id, session_id),
+            state_messages=state.chat_messages,
+        )
+
+        def trace(event: str, tool: str = "") -> Dict[str, Any]:
+            return {
+                "type": "trace", "trace_id": trace_id,
+                "node": "form_runtime", "event": event, "tool": tool,
+            }
+
+        yield trace("validated", "")
+        if scope not in {"creator", "admin"}:
+            final_text = "Tài khoản hiện tại chưa có quyền tạo câu hỏi."
+            yield {"type": "token", "delta": final_text}
+            await self._remember_form_response(
+                state, user_id, session_id, user_input, final_text,
+            )
+            yield {
+                "type": "done", "intent": "question_create",
+                "agent": "form-runtime", "tool": None, "tools": [],
+                "trace_id": trace_id, "model_calls": 0,
+            }
+            return
+
+        missing = question.pop("_missing", [])
+        if missing:
+            final_text = "Form câu hỏi còn thiếu: " + ", ".join(missing) + "."
+            yield {"type": "token", "delta": final_text}
+            yield {
+                "type": "ui",
+                "surface": self._build_question_form_surface(question).model_dump(),
+            }
+            await self._remember_form_response(
+                state, user_id, session_id, user_input, final_text,
+            )
+            yield {
+                "type": "done", "intent": "question_create",
+                "agent": "form-runtime", "tool": None, "tools": [],
+                "trace_id": trace_id, "model_calls": 0,
+            }
+            return
+
+        yield {
+            "type": "status", "label": self._tool_status("create_question"),
+            "tool": "create_question",
+        }
+        try:
+            result, surface, _ = await self._execute_tool(
+                "create_question", question, authorization, user_id, scope, context,
+                allowed_tools=set(allowed_tools),
+            )
+            self.metrics.record_tool("create_question", "success")
+            yield trace("approval_proposed", "create_question")
+        except Exception as exc:
+            self.metrics.record_tool("create_question", "error")
+            yield trace("tool_error", "create_question")
+            yield {"type": "error", "message": self._safe_tool_error(exc)}
+            return
+
+        if not isinstance(result, dict) or result.get("approval_required") is not True or surface is None:
+            yield {"type": "error", "message": "Agent không tạo được đề xuất xác nhận hợp lệ."}
+            return
+
+        final_text = "Đề xuất tạo câu hỏi đã sẵn sàng. Hãy kiểm tra thông tin rồi bấm Accept."
+        yield {"type": "token", "delta": final_text}
+        yield {"type": "ui", "surface": surface.model_dump()}
+        await self._remember_form_response(
+            state, user_id, session_id, user_input, final_text,
+        )
+        yield {
+            "type": "done", "intent": "question_create",
+            "agent": "form-runtime", "tool": "create_question",
+            "tools": ["create_question"], "trace_id": trace_id,
+            "run_status": "waiting_for_approval", "model_calls": 0,
+        }
+
+    async def _remember_form_response(
+        self,
+        state: SessionState,
+        user_id: str,
+        session_id: str,
+        user_input: str,
+        final_text: str,
+    ) -> None:
+        state.chat_messages.extend([
+            {"role": "user", "content": user_input},
+            {"role": "assistant", "content": final_text},
+        ])
+        state.chat_messages = state.chat_messages[-20:]
+        await self.state_store.set_chat_messages(
+            user_id, session_id, state.chat_messages,
+        )
+
+    @staticmethod
+    def _question_create_payload_from_form(
+        values: Dict[str, Any],
+        *,
+        context: Optional[Dict[str, Any]],
+        history: list[dict[str, str]],
+        state_messages: list[dict[str, Any]],
+    ) -> Dict[str, Any]:
+        def text_value(*keys: str) -> str:
+            for key in keys:
+                value = values.get(key)
+                if value not in (None, ""):
+                    return str(value).strip()
+            return ""
+
+        def number_value(key: str, default: float = 0) -> float:
+            value = values.get(key)
+            if value in (None, ""):
+                return default
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        quiz_id = text_value("quiz_id") or str(
+            (context or {}).get("selected_quiz_id") or ""
+        ).strip()
+        history_text = "\n".join(
+            str(item.get("content") or "")
+            for item in [*history, *state_messages]
+            if isinstance(item, dict)
+        )
+        if not quiz_id:
+            match = re.search(
+                r"(?:quiz[_ ]?id|quiz ID|quiz)\s*[:=]?\s*([0-9a-f]{8}-[0-9a-f-]{27,}|[A-Za-z0-9_-]{6,})",
+                history_text,
+                flags=re.IGNORECASE,
+            )
+            quiz_id = str(match.group(1)).strip() if match else ""
+
+        options = AIAgentCore._parse_form_options(values.get("options"))
+        question_type = AIAgentCore._enum_key(text_value("question_type"))
+        payload: Dict[str, Any] = {
+            "quiz_id": quiz_id,
+            "question_text": text_value("question_text", "content"),
+            "question_type": question_type,
+            "options": options,
+            "points": number_value("points", 1),
+            "time_limit": number_value("time_limit", 0),
+            "sort_order": int(number_value("sort_order", 0)),
+            "explanation": text_value("explanation"),
+            "difficulty_level": text_value("difficulty_level", "difficulty"),
+            "is_required": values.get("is_required", True),
+        }
+        missing: list[str] = []
+        if not quiz_id:
+            missing.append("quiz_id của quiz đích")
+        if not payload["question_text"]:
+            missing.append("nội dung câu hỏi")
+        if not question_type:
+            missing.append("loại câu hỏi")
+        if question_type in {"SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"} and not options:
+            missing.append("các đáp án")
+        payload["_missing"] = missing
+        return AIAgentCore._normalize_write_args("create_question", payload)
+
+    @staticmethod
+    def _parse_form_options(raw_options: Any) -> list[dict[str, Any]]:
+        if isinstance(raw_options, list):
+            return [dict(item) for item in raw_options if isinstance(item, dict)]
+        if not isinstance(raw_options, str) or not raw_options.strip():
+            return []
+        text = raw_options.strip()
+        try:
+            decoded = json.loads(text)
+            if isinstance(decoded, list):
+                return [dict(item) for item in decoded if isinstance(item, dict)]
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+
+        correct_labels: set[str] = set()
+        lines: list[str] = []
+        for line in text.splitlines():
+            clean = line.strip()
+            if not clean:
+                continue
+            correct_match = re.match(r"(?:đáp án đúng|đap an dung|correct)\s*:\s*(.+)$", clean, re.IGNORECASE)
+            if correct_match:
+                correct_labels.update(
+                    part.strip().casefold()
+                    for part in re.split(r"[,;]", correct_match.group(1))
+                    if part.strip()
+                )
+                continue
+            lines.append(clean)
+
+        options: list[dict[str, Any]] = []
+        for index, line in enumerate(lines):
+            is_correct = bool(re.match(r"^(?:\*|\[x\]|đúng\s*[:.)-])\s*", line, re.IGNORECASE))
+            clean = re.sub(r"^(?:\*|\[x\]|\[\s*\]|đúng\s*[:.)-])\s*", "", line, flags=re.IGNORECASE)
+            clean = re.sub(r"^[A-Za-zÀ-ỹ0-9]+[.)]\s*", "", clean)
+            if clean.casefold() in correct_labels:
+                is_correct = True
+            options.append({
+                "option_text": clean,
+                "is_correct": is_correct,
+                "sort_order": index,
+            })
+        return options
+
+    @staticmethod
+    def _build_question_form_surface(question: Dict[str, Any]) -> UISurface:
+        return UISurface.model_validate({
+            "title": "Bổ sung câu hỏi",
+            "description": "Điền đủ quiz đích và các đáp án; hệ thống sẽ tạo đề xuất trực tiếp từ form.",
+            "blocks": [{
+                "id": "create_questions_form",
+                "type": "form",
+                "title": "Thông tin câu hỏi",
+                "description": "Các đáp án ghi mỗi dòng một lựa chọn; đánh dấu đáp án đúng bằng dấu *.",
+                "tone": "info",
+                "fields": [
+                    {"name": "quiz_id", "label": "Quiz ID", "input_type": "text", "required": True, "placeholder": question.get("quiz_id") or "ID quiz", "options": []},
+                    {"name": "question_text", "label": "Nội dung câu hỏi", "input_type": "textarea", "required": True, "placeholder": question.get("question_text") or "Ví dụ: AI là gì?", "options": []},
+                    {"name": "question_type", "label": "Loại câu hỏi", "input_type": "select", "required": True, "placeholder": "Chọn loại", "options": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]},
+                    {"name": "options", "label": "Các đáp án", "input_type": "textarea", "required": True, "placeholder": "* Đáp án đúng\nĐáp án sai", "options": []},
+                    {"name": "points", "label": "Điểm", "input_type": "number", "required": False, "placeholder": "1", "options": []},
+                    {"name": "sort_order", "label": "Thứ tự", "input_type": "number", "required": False, "placeholder": "0", "options": []},
+                ],
+                "submit_label": "Gửi câu hỏi",
+                "submit_prompt": "",
+            }],
+            "actions": [],
+        })
 
     @staticmethod
     def _quiz_create_plan_from_form(values: Dict[str, Any]) -> Dict[str, Any]:

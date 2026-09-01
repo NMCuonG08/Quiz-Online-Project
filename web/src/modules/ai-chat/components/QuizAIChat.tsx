@@ -52,6 +52,12 @@ function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function selectedQuizIdFromPathname(pathname: string | null): string | undefined {
+  if (!pathname) return undefined;
+  const match = pathname.match(/\/questions\/([^/]+)/i);
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+}
+
 const TOOL_LABELS: Record<string, string> = {
   plan_interaction: "Hiểu yêu cầu",
   get_current_time: "Đọc thời gian hệ thống",
@@ -504,7 +510,10 @@ export default function QuizAIChat() {
         sessionId,
         locale,
         scope,
-        context: { route: pathname || "/" },
+        context: {
+          route: pathname || "/",
+          selected_quiz_id: selectedQuizIdFromPathname(pathname),
+        },
         formSubmission,
         signal: controller.signal,
         accessToken: auth.token,
