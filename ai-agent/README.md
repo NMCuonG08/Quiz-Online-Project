@@ -69,10 +69,17 @@ OPENAI_API_KEY=...
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4.1-mini
 LLM_API_MODE=responses
+AI_ORCHESTRATION_MODE=agent_first
 ```
 
-Intent planner dùng semantic structured output, không dùng keyword/regex routing.
-Cấu hình nhiều model/API độc lập:
+`agent_first` là live path mặc định: executor model tự trả lời hoặc chọn tool
+trong một ReAct loop, không phải trả latency cho một planner call bắt buộc trước
+mỗi request. Auth, scope, schema, approval, idempotency và budget vẫn do runtime
+deterministic kiểm soát. Có thể rollback tức thì bằng
+`AI_ORCHESTRATION_MODE=planner_legacy`.
+
+Legacy planner vẫn được giữ trong giai đoạn migration và cho offline intent eval.
+Cấu hình nhiều model/API độc lập khi dùng `planner_legacy`:
 
 ```env
 AI_EXECUTOR_MODEL=gpt-5.6-terra
@@ -94,8 +101,8 @@ AI_PLANNER_CONFIDENCE_THRESHOLD=0.82
 AI_PLANNER_ESCALATE_WRITES=true
 ```
 
-Fast planner xử lý read intent rõ ràng. Request ambiguous, multi-intent,
-confidence thấp, write/destructive/admin luôn được strong planner kiểm tra lại.
+Trong `planner_legacy`, fast planner xử lý read intent rõ ràng. Request ambiguous,
+multi-intent, confidence thấp, write/destructive/admin được strong planner kiểm tra lại.
 Mỗi tier có thể dùng OpenAI-compatible base URL/key riêng; nếu không đặt thì
 fallback về `OPENAI_MODEL`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` hiện có.
 

@@ -84,6 +84,7 @@ agent = AIAgentCore(
         "planner_escalate_writes": os.getenv("AI_PLANNER_ESCALATE_WRITES", "true").lower() == "true",
         "llm_api_mode": os.getenv("LLM_API_MODE", "responses"),
         "agent_orchestrator": os.getenv("AGENT_ORCHESTRATOR", "langgraph"),
+        "orchestration_mode": os.getenv("AI_ORCHESTRATION_MODE", "agent_first"),
         "max_graph_steps": int(os.getenv("AGENT_MAX_GRAPH_STEPS", "12")),
         "graph_timeout_seconds": int(os.getenv("AGENT_GRAPH_TIMEOUT_SECONDS", "90")),
         "max_empty_tool_streak": int(os.getenv("AGENT_MAX_EMPTY_TOOL_STREAK", "2")),
@@ -184,6 +185,7 @@ async def root():
         "model": agent.model,
         "api_mode": agent.api_mode,
         "orchestrator": agent.orchestrator,
+        "orchestration_mode": agent.orchestration_mode,
         "model_configured": agent.client is not None,
     }
 

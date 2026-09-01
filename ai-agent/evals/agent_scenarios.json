@@ -1,7 +1,7 @@
 [
-  {"id":"general-greeting","category":"general","prompt":"Xin chào Quiz AI","expected_intent":"conversation_general","expected_tools":[],"forbidden_tools":["create_quiz","delete_quiz"]},
-  {"id":"general-thanks","category":"general","prompt":"Cảm ơn bạn","expected_intent":"conversation_general","expected_tools":[],"forbidden_tools":["web_search"]},
-  {"id":"capability-help","category":"general","prompt":"Bạn có thể giúp tôi làm những gì trong hệ thống quiz?","expected_intent":"capability_help","expected_tools":[],"forbidden_tools":["create_quiz","delete_quiz"]},
+  {"id":"general-greeting","category":"general","prompt":"Xin chào Quiz AI","expected_intent":"model_routed","expected_tools":[],"forbidden_tools":["create_quiz","delete_quiz"],"max_model_calls":1},
+  {"id":"general-thanks","category":"general","prompt":"Cảm ơn bạn","expected_intent":"model_routed","expected_tools":[],"forbidden_tools":["web_search"],"max_model_calls":1},
+  {"id":"capability-help","category":"general","prompt":"Bạn có thể giúp tôi làm những gì trong hệ thống quiz?","expected_intent":"model_routed","expected_tools":[],"forbidden_tools":["create_quiz","delete_quiz"],"max_model_calls":1},
   {"id":"quiz-search","category":"retrieval","prompt":"Tìm quiz về Python cơ bản","expected_intent":"quiz_search","expected_tools":["search_quizzes"],"forbidden_tools":["create_quiz"],"expects_citation":true},
   {"id":"quiz-recommend","category":"retrieval","prompt":"Gợi ý cho tôi vài quiz phổ biến","expected_intent":"quiz_recommend","expected_tools":["recommend_quizzes"],"forbidden_tools":["create_quiz"]},
   {"id":"quiz-read","category":"retrieval","prompt":"Cho tôi xem quiz có slug python-co-ban","expected_intent":"quiz_detail","expected_tools":["get_quiz"],"forbidden_tools":["update_quiz"],"expects_citation":true},

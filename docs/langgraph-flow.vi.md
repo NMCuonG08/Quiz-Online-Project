@@ -1,5 +1,8 @@
 # Luồng LangGraph của Quiz AI Agent
 
+> Tài liệu này mô tả flow planner legacy tại thời điểm audit. Live path mới là
+> agent-first; xem [`agent-first-orchestration.vi.md`](agent-first-orchestration.vi.md).
+
 Tài liệu này mô tả luồng đang chạy trong code hiện tại, tập trung vào đường
 `AGENT_ORCHESTRATOR=langgraph`.
 
@@ -410,4 +413,3 @@ done intent=approved_write
 - [`ai-agent/services/policies/tool_policy.py`](../ai-agent/services/policies/tool_policy.py) — scope/allowlist policy.
 - [`ai-agent/services/policies/approval_policy.py`](../ai-agent/services/policies/approval_policy.py) — approval contract.
 - [`ai-agent/services/harness/budgets.py`](../ai-agent/services/harness/budgets.py) — graph/model/tool/token/cost budget.
-

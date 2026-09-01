@@ -75,6 +75,15 @@ class QuestionOrderInput(BaseModel):
     sort_order: int = Field(ge=0)
 
 
+class AgentGraphState(MessagesState):
+    """Checkpointed state owned by the live agent graph."""
+
+    run_id: str
+    scope: str
+    intent: str
+    orchestration_mode: str
+
+
 class LangGraphQuizRunner:
     """ReAct graph with an explicit ToolNode and a guarded post-tool edge."""
 
@@ -199,11 +208,15 @@ class LangGraphQuizRunner:
         page_context: Optional[dict[str, Any]] = None,
         memory: Optional[list[Any]] = None,
         evidence: Optional[list[Any]] = None,
+        agent_first: bool = False,
     ) -> AIMessage:
         tools = self._build_tools(allowed_tools, dispatch)
-        model = self.llm.bind_tools(tools)
+        model = self.llm.bind_tools(
+            tools,
+            **({"parallel_tool_calls": False} if agent_first else {}),
+        )
 
-        async def assistant(state: MessagesState) -> dict[str, list[AIMessage]]:
+        async def assistant(state: AgentGraphState) -> dict[str, list[AIMessage]]:
             started = time.perf_counter()
             try:
                 if before_model_call:
@@ -217,7 +230,7 @@ class LangGraphQuizRunner:
                 record_model(self.llm.model_name, "success", time.perf_counter() - started, message.usage_metadata or {})
             return {"messages": [message]}
 
-        async def general_response(state: MessagesState) -> dict[str, list[AIMessage]]:
+        async def general_response(state: AgentGraphState) -> dict[str, list[AIMessage]]:
             """Fast path: general chat never receives tool schemas or ToolNode."""
             started = time.perf_counter()
             try:
@@ -232,18 +245,23 @@ class LangGraphQuizRunner:
                 record_model(self.llm.model_name, "success", time.perf_counter() - started, message.usage_metadata or {})
             return {"messages": [message]}
 
-        async def router(_state: MessagesState) -> Command[Literal["general_response", "assistant"]]:
+        async def router(_state: AgentGraphState) -> Command[Literal["general_response", "assistant"]]:
             """Explicit handoff keeps the intent boundary visible in graph traces."""
             target = "general_response" if interaction_intent in GENERAL_INTENTS else "assistant"
             return Command(goto=target)
 
-        graph = StateGraph(MessagesState)
-        graph.add_node("router", router)
+        graph = StateGraph(AgentGraphState)
         graph.add_node("assistant", assistant)
-        graph.add_node("general_response", general_response)
         graph.add_node("tools", ToolNode(tools, handle_tool_errors=True))
-        graph.add_edge(START, "router")
-        graph.add_edge("general_response", END)
+        if agent_first:
+            # The model decides whether to answer or use a tool in one loop.
+            # Auth, scope and tool policy remain deterministic in dispatch().
+            graph.add_edge(START, "assistant")
+        else:
+            graph.add_node("router", router)
+            graph.add_node("general_response", general_response)
+            graph.add_edge(START, "router")
+            graph.add_edge("general_response", END)
         graph.add_conditional_edges(
             "assistant",
             tools_condition,
@@ -273,7 +291,14 @@ class LangGraphQuizRunner:
             elif message["role"] == "assistant":
                 messages.append(AIMessage(content=message["content"]))
         messages.append(HumanMessage(content=context_snapshot.user_message))
-        result = await compiled.ainvoke({"messages": messages}, config=config)
+        metadata = config.get("metadata") if isinstance(config.get("metadata"), dict) else {}
+        result = await compiled.ainvoke({
+            "messages": messages,
+            "run_id": str(metadata.get("local_trace_id") or "unknown"),
+            "scope": str(metadata.get("scope") or "learner"),
+            "intent": interaction_intent,
+            "orchestration_mode": "agent_first" if agent_first else "planner_legacy",
+        }, config=config)
         last = result["messages"][-1]
         return last if isinstance(last, AIMessage) else AIMessage(content="")
 

@@ -65,6 +65,14 @@ def evaluate(scenarios: list[dict[str, Any]], results: dict[str, dict[str, Any]]
                 "run_status",
                 actual.get("run_status") == scenario["expected_run_status"],
             ))
+        if "max_model_calls" in scenario:
+            usage = actual.get("usage") if isinstance(actual.get("usage"), dict) else {}
+            model_calls = actual.get("model_calls", usage.get("model_calls"))
+            scenario_checks.append((
+                "model_calls",
+                isinstance(model_calls, int)
+                and model_calls <= int(scenario["max_model_calls"]),
+            ))
         for field, check_name in (
             ("expected_dialogue_act", "dialogue_act"),
             ("expected_reference_mode", "reference_mode"),
