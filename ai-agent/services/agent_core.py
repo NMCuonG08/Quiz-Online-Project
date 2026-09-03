@@ -3127,6 +3127,12 @@ class AIAgentCore:
         )
 
         async def runtime_handler(normalized: Dict[str, Any]) -> ToolHandlerResult:
+            if (
+                name in {"create_question", "create_quiz_with_questions"}
+                and str((context or {}).get("locale") or "vi").lower().startswith("vi")
+                and not (context or {}).get("_form_submission")
+            ):
+                self._assert_vietnamese_generated_content(normalized)
             if name == "create_quiz_with_questions":
                 durable_run_id = str((context or {}).get("run_id") or "")
                 draft = await self.question_pipeline.prepare_draft(
@@ -3820,6 +3826,29 @@ class AIAgentCore:
                 for question in normalized.get("questions") or []
             ]
         return normalized
+
+    @staticmethod
+    def _assert_vietnamese_generated_content(payload: Dict[str, Any]) -> None:
+        """Reject likely ASCII-transliterated content from a Vietnamese agent run."""
+        vietnamese_marks = set("ăâđêôơưĂÂĐÊÔƠƯáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ")
+        questions = payload.get("questions") if isinstance(payload.get("questions"), list) else [payload]
+        for question in questions:
+            if not isinstance(question, dict):
+                continue
+            text_values = [str(question.get("question_text") or ""), str(question.get("explanation") or "")]
+            text_values.extend(
+                str(option.get("option_text") or "")
+                for option in question.get("options") or []
+                if isinstance(option, dict)
+            )
+            content = " ".join(value.strip() for value in text_values if value.strip())
+            letters = [character for character in content if character.isalpha()]
+            if len(letters) >= 20 and " " in content and not any(
+                character in vietnamese_marks for character in content
+            ):
+                raise ValueError(
+                    "QUESTION_LANGUAGE_INVALID: Nội dung sinh ra phải dùng tiếng Việt có đầy đủ dấu Unicode. Hãy sinh lại, không chuyển sang tiếng Việt không dấu."
+                )
 
     @staticmethod
     def _normalize_question_option(option: Any) -> Dict[str, Any]:

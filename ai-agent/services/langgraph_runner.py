@@ -732,7 +732,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                 description: str = "", max_attempts: NonNegativeNumber = 0,
                 passing_score: Percentage = 0, instructions: str = "",
             ) -> str:
-                """Propose one inactive quiz draft plus all questions/options; execution requires Accept."""
+                """Propose one inactive quiz draft plus all questions/options; preserve the user's language and Unicode diacritics, and execution requires Accept."""
                 return await dispatch("create_quiz_with_questions", {
                     "title": title, "slug": slug, "category_id": category_id,
                     "difficulty_level": difficulty_level, "time_limit": time_limit,
@@ -800,7 +800,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                 difficulty_level: Optional[DifficultyLevel] = None, sort_order: NonNegativeInteger = 0,
                 is_required: bool = True, slug: str = "",
             ) -> str:
-                """Propose creating a question; execution still requires Accept."""
+                """Propose creating a question; preserve the user's language and Unicode diacritics, and execution still requires Accept."""
                 return await dispatch("create_question", {
                     "quiz_id": quiz_id, "question_text": question_text,
                     "question_type": question_type,

@@ -346,6 +346,16 @@ class ScopeContractTests(unittest.TestCase):
         self.assertIn("đầy đủ dấu Unicode", prompt)
         self.assertIn("question_text", prompt)
 
+    def test_generated_ascii_transliteration_is_rejected_for_vietnamese(self):
+        with self.assertRaisesRegex(ValueError, "QUESTION_LANGUAGE_INVALID"):
+            AIAgentCore._assert_vietnamese_generated_content({
+                "question_text": "Day la cau hoi tieng Viet khong dau",
+                "options": [
+                    {"option_text": "Dap an dung", "is_correct": True},
+                    {"option_text": "Dap an sai", "is_correct": False},
+                ],
+            })
+
 
 class UiPolicyContractTests(unittest.TestCase):
     def setUp(self):
