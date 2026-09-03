@@ -173,6 +173,26 @@ form submit đã là explicit user action. Delete, publish/unpublish, import và
 write do agent tự đề xuất vẫn giữ approval. Form ID chưa có handler sẽ báo lỗi
 an toàn thay vì biến dữ liệu thành một prompt mới.
 
+## Auto-generate là nhánh ưu tiên
+
+Khi user nêu chủ đề hoặc mục tiêu đủ rõ, agent tự sinh nội dung có cấu trúc;
+không mở `create_questions_form`:
+
+```text
+"Tạo 5 câu hỏi Python cơ bản, SINGLE_CHOICE"
+  -> generate question JSON
+  -> question quality/schema review
+  -> preview
+  -> user Accept
+  -> create_questions trực tiếp
+```
+
+`create_questions_form` chỉ xuất hiện khi user nói rõ muốn nhập tay hoặc request
+thiếu thông tin không thể tự suy ra. Với quiz hoàn chỉnh, agent dùng
+`create_quiz_with_questions` để gom toàn bộ nội dung vào một preview. Với chủ đề
+phổ thông, model tự sinh; knowledge nội bộ hoặc web chỉ được dùng khi user yêu
+cầu tài liệu/current facts hoặc nội dung cần kiểm chứng.
+
 ## Model-call budget
 
 Số liệu dưới đây là số model call theo topology, chưa phải benchmark latency

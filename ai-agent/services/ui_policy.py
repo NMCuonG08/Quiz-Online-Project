@@ -12,6 +12,7 @@ ACTION_REGISTRY = {
     "open_quiz_create_admin": {"kind": "navigate", "value": "/admin/quizzes/add", "label": "Mở form tạo quiz", "variant": "primary"},
     "open_quiz_manager": {"kind": "navigate", "value": "/user/quizzes", "label": "Mở Quiz Manager", "variant": "primary"},
     "open_learning_history": {"kind": "navigate", "value": "/user", "label": "Xem lịch sử học", "variant": "secondary"},
+    "auto_generate_quiz": {"kind": "prompt", "value": "Tự sinh quiz bằng AI theo yêu cầu trước đó", "label": "Tự sinh bằng AI", "variant": "primary"},
 }
 
 
@@ -82,7 +83,7 @@ class UiPolicyResolver:
             action = "open_quiz_create_admin" if scope == "admin" else "open_quiz_create_creator"
             return self._surface(
                 "Hoàn thiện quiz",
-                "Agent sẽ dùng dữ liệu bạn gửi và category thật từ database trước khi đề xuất tạo.",
+                "Mặc định agent sẽ tự sinh quiz từ chủ đề bạn đã nêu. Chọn nhập tay nếu bạn muốn tự điền từng trường.",
                 [{
                     "id": "quiz-create-form", "type": "form", "title": "Thông tin còn thiếu",
                     "description": "Điền phần cần thiết, sau đó agent sẽ kiểm tra lại trước khi hiện Accept.",
@@ -90,7 +91,7 @@ class UiPolicyResolver:
                     "submit_label": "Gửi cho agent",
                     "submit_prompt": "Dùng thông tin sau để tiếp tục tạo quiz:",
                 }],
-                [action],
+                ["auto_generate_quiz", action],
             )
 
         if intent in {"quiz_search", "quiz_recommend", "quiz_detail"}:

@@ -609,6 +609,8 @@ export default function QuizAIChat() {
       if (!action.value.startsWith("/")) return;
       setOpen(false);
       router.push(action.value);
+    } else if (action.id === "auto_generate_quiz") {
+      void sendMessage("Tự sinh quiz bằng AI theo yêu cầu trước đó");
     } else if (action.kind === "prompt" && action.id === "add_question") {
       // Legacy question cards exposed a prompt button next to the form. The
       // form itself is now the only submission surface; never re-enter chat.

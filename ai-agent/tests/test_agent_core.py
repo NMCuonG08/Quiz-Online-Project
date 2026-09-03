@@ -352,7 +352,8 @@ class UiPolicyContractTests(unittest.TestCase):
             "creator",
             {"route": "/user/quizzes"},
         )
-        self.assertEqual(surface.actions[0].value, "/user/quizzes/add")
+        self.assertEqual(surface.actions[0].id, "auto_generate_quiz")
+        self.assertEqual(surface.actions[1].value, "/user/quizzes/add")
         self.assertEqual(surface.blocks[0].type, "form")
 
     def test_completed_quiz_form_does_not_render_again(self):
