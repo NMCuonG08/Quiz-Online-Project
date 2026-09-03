@@ -11,6 +11,7 @@ import {
   Info,
   List,
   MessageCircle,
+  Maximize2,
   Minimize2,
   RotateCcw,
   History,
@@ -38,7 +39,7 @@ import {
   type AgentRun,
   type BackgroundRun,
 } from "../services/agent-control.service";
-import type { AgentStreamEvent, ChatAction, ChatMessage, ChatRole, ChatScope, UIBlock, UISurface } from "../types";
+import type { AgentStreamEvent, ChatAction, ChatFormSubmission, ChatMessage, ChatRole, ChatScope, GraphTraceStep, UIBlock, UISurface } from "../types";
 import AgentControlCenter from "./AgentControlCenter";
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -50,6 +51,47 @@ const WELCOME_MESSAGE: ChatMessage = {
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function selectedQuizIdFromPathname(pathname: string | null): string | undefined {
+  if (!pathname) return undefined;
+  const match = pathname.match(/\/questions\/([^/]+)/i);
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+}
+
+function questionFormValidationError(block: UIBlock, values: Record<string, string>): string | null {
+  const fieldNames = new Set(block.fields.map((field) => field.name));
+  if (!fieldNames.has("question_text") || !fieldNames.has("question_type") || !fieldNames.has("options")) {
+    return null;
+  }
+  const questionType = (values.question_type || "").trim().toUpperCase();
+  if (!questionType || !values.question_text?.trim()) return null;
+  const raw = values.options?.trim() || "";
+  let optionCount = 0;
+  let correctCount = 0;
+  try {
+    const decoded: unknown = JSON.parse(raw);
+    if (Array.isArray(decoded)) {
+      optionCount = decoded.filter((item) => typeof item === "object" && item !== null).length;
+      correctCount = decoded.filter((item) => asRecord(item).is_correct === true).length;
+    }
+  } catch {
+    const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean);
+    optionCount = lines.filter((line) => !/^(?:đáp án đúng|đap an dung|correct)\s*:/i.test(line)).length;
+    correctCount = lines.filter((line) => /^(?:\*|\[x\]|đúng\s*[:.)-])/i.test(line)).length;
+    const correctLine = lines.find((line) => /^(?:đáp án đúng|đap an dung|correct)\s*:/i.test(line));
+    if (correctLine) correctCount = Math.max(correctCount, 1);
+  }
+  if (["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"].includes(questionType) && optionCount < 2) {
+    return "Cần nhập ít nhất 2 đáp án, mỗi đáp án một dòng.";
+  }
+  if (["SINGLE_CHOICE", "TRUE_FALSE"].includes(questionType) && correctCount !== 1) {
+    return "Hãy đánh dấu đúng 1 đáp án bằng dấu * ở đầu dòng.";
+  }
+  if (questionType === "MULTIPLE_CHOICE" && correctCount < 1) {
+    return "Hãy đánh dấu ít nhất 1 đáp án đúng bằng dấu * ở đầu dòng.";
+  }
+  return null;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -110,6 +152,23 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function normalizeTraceStep(value: unknown): GraphTraceStep | null {
+  const raw = asRecord(value);
+  const payload = asRecord(raw.payload);
+  const read = (key: string) => raw[key] ?? payload[key];
+  const node = read("node");
+  const event = read("event");
+  if (typeof node !== "string" && typeof event !== "string") return null;
+  const traceId = read("trace_id") ?? read("run_id");
+  const tool = read("tool");
+  return {
+    trace_id: typeof traceId === "string" ? traceId : "",
+    node: typeof node === "string" && node ? node : "unknown",
+    event: typeof event === "string" && event ? event : "event",
+    ...(typeof tool === "string" && tool ? { tool } : {}),
+  };
 }
 
 function isUISurface(value: unknown): value is UISurface {
@@ -218,7 +277,9 @@ function hydrateHistoryMessages(items: PersistedMessage[]): ChatMessage[] {
       surface,
       citations: Array.isArray(metadata.citations) ? metadata.citations as ChatMessage["citations"] : undefined,
       traceId: typeof metadata.trace_id === "string" ? metadata.trace_id : undefined,
-      traceSteps: Array.isArray(metadata.trace_steps) ? metadata.trace_steps as ChatMessage["traceSteps"] : undefined,
+      traceSteps: Array.isArray(metadata.trace_steps)
+        ? metadata.trace_steps.map(normalizeTraceStep).filter((step): step is GraphTraceStep => Boolean(step))
+        : undefined,
       error: metadata.error === true,
     };
   });
@@ -226,6 +287,7 @@ function hydrateHistoryMessages(items: PersistedMessage[]): ChatMessage[] {
 
 export default function QuizAIChat() {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -422,10 +484,13 @@ export default function QuizAIChat() {
     } else if (event.type === "citations") {
       patchAssistant(messageId, { citations: event.items });
     } else if (event.type === "trace") {
-      patchAssistant(messageId, (message) => ({
-        traceId: event.trace_id,
-        traceSteps: [...(message.traceSteps || []), event],
-      }));
+      const traceStep = normalizeTraceStep(event);
+      if (traceStep) {
+        patchAssistant(messageId, (message) => ({
+          traceId: event.trace_id,
+          traceSteps: [...(message.traceSteps || []), traceStep],
+        }));
+      }
     } else if (event.type === "done") {
       patchAssistant(messageId, {
         isStreaming: false,
@@ -448,6 +513,7 @@ export default function QuizAIChat() {
     rawMessage?: string,
     hideUserMessage = false,
     backendMessage?: string,
+    formSubmission?: ChatFormSubmission,
   ) => {
     if (!auth.isAuthenticated || !auth.token || !user?.id) return;
     const value = (rawMessage ?? input).trim();
@@ -481,7 +547,11 @@ export default function QuizAIChat() {
         sessionId,
         locale,
         scope,
-        context: { route: pathname || "/" },
+        context: {
+          route: pathname || "/",
+          selected_quiz_id: selectedQuizIdFromPathname(pathname),
+        },
+        formSubmission,
         signal: controller.signal,
         accessToken: auth.token,
         onTokenRefreshed: (token) => dispatch(tokenRefreshed(token)),
@@ -539,6 +609,12 @@ export default function QuizAIChat() {
       if (!action.value.startsWith("/")) return;
       setOpen(false);
       router.push(action.value);
+    } else if (action.id === "auto_generate_quiz") {
+      void sendMessage("Tự sinh quiz bằng AI theo yêu cầu trước đó");
+    } else if (action.kind === "prompt" && action.id === "add_question") {
+      // Legacy question cards exposed a prompt button next to the form. The
+      // form itself is now the only submission surface; never re-enter chat.
+      return;
     } else if (action.kind === "prompt" && action.value.startsWith("__confirm_action__:")) {
       void sendMessage("Xác nhận xóa", false, action.value);
     } else if (action.kind === "prompt" && /^Xác nhận xóa\s+(quiz|câu hỏi|category)\s+/i.test(action.value)) {
@@ -587,39 +663,11 @@ export default function QuizAIChat() {
       .map((field) => `${field.label}: ${values[field.name] || ""}`)
       .join("\n");
     const displayMessage = `${block.submit_prompt}\n${details}`.trim();
-    const fieldNames = new Set(block.fields.map((field) => field.name));
-    const isQuizCreateForm = ["title", "category", "difficulty", "time_limit", "quiz_type"]
-      .every((field) => fieldNames.has(field));
-    if (!isQuizCreateForm) {
-      void sendMessage(displayMessage);
-      return;
-    }
-    const plan = {
-      intent: "quiz_create",
-      confidence: 1,
-      ambiguity: "none",
-      needs_clarification: false,
-      risk: "write",
-      route: "approval",
-      dialogue_act: "clarification_answer",
-      reference_mode: "pending_workflow",
-      refers_to_previous_turn: true,
-      selection_strategy: "best_match",
-      resource: "quiz",
-      operation: "create",
-      missing_fields: [],
-      entities: {
-        title: values.title || "",
-        category: values.category || "",
-        difficulty_level: values.difficulty || "",
-        time_limit: Number(values.time_limit || 0),
-        quiz_type: values.quiz_type || "",
-      },
-    };
     void sendMessage(
       displayMessage,
       false,
-      "__fast_form__:" + JSON.stringify({ display_message: displayMessage, plan }),
+      undefined,
+      { form_id: block.id, submission_id: uid("form"), values },
     );
   };
 
@@ -668,7 +716,12 @@ export default function QuizAIChat() {
     <div className="fixed bottom-4 right-4 z-[99990] sm:bottom-6 sm:right-6">
       {open && (
         <section
-          className="mb-3 flex h-[calc(100dvh-6.5rem)] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[24px] border border-border/80 bg-background shadow-2xl shadow-black/15 sm:h-[min(680px,calc(100dvh-6.5rem))] sm:w-[430px]"
+          className={cn(
+            "flex flex-col overflow-hidden rounded-[24px] border border-border/80 bg-background shadow-2xl shadow-black/15",
+            expanded
+              ? "fixed inset-2 z-[99991] mb-0 h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] sm:inset-6 sm:h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)]"
+              : "mb-3 h-[calc(100dvh-6.5rem)] w-[calc(100vw-2rem)] sm:h-[min(680px,calc(100dvh-6.5rem))] sm:w-[430px]",
+          )}
           role="dialog"
           aria-label="Quiz AI Assistant"
         >
@@ -693,8 +746,11 @@ export default function QuizAIChat() {
             <button onClick={() => setControlCenterOpen((value) => !value)} className={cn("grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground", controlCenterOpen && "bg-amber-400/15 text-amber-700")} aria-label="Mở trung tâm điều khiển agent" aria-pressed={controlCenterOpen}>
               <SlidersHorizontal className="size-4" />
             </button>
-            <button onClick={() => setOpen(false)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Thu nhỏ chat">
-              <Minimize2 className="size-4" />
+            <button onClick={() => setExpanded((value) => !value)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={expanded ? "Thu về khung nhỏ" : "Mở chat toàn màn hình"} aria-pressed={expanded}>
+              {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </button>
+            <button onClick={() => { setExpanded(false); setOpen(false); }} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Thu nhỏ chat">
+              <X className="size-4" />
             </button>
           </header>
           {historyOpen && (
@@ -727,7 +783,7 @@ export default function QuizAIChat() {
 
           <div ref={scrollRef} className="flex-1 space-y-5 overflow-y-auto bg-muted/20 px-4 py-5" aria-live="polite">
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} onAction={handleAction} onPrompt={sendMessage} onFormSubmit={submitStructuredForm} />
+              <MessageBubble key={message.id} message={message} onAction={handleAction} onFormSubmit={submitStructuredForm} />
             ))}
           </div>
 
@@ -793,12 +849,10 @@ export default function QuizAIChat() {
 function MessageBubble({
   message,
   onAction,
-  onPrompt,
   onFormSubmit,
 }: {
   message: ChatMessage;
   onAction: (action: ChatAction) => void;
-  onPrompt: (prompt: string) => Promise<void>;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   const assistant = message.role === "assistant";
@@ -826,7 +880,7 @@ function MessageBubble({
           )}
           {message.content && message.isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-amber-500 align-middle" />}
         </div>
-        {message.surface && <DynamicSurface surface={message.surface} onAction={onAction} onPrompt={onPrompt} onFormSubmit={onFormSubmit} />}
+        {message.surface && <DynamicSurface surface={message.surface} onAction={onAction} onFormSubmit={onFormSubmit} />}
         {!!message.citations?.length && (
           <div className="mt-3 border-t border-border pt-2">
             <p className="mb-1.5 text-[9px] font-bold uppercase text-muted-foreground">Nguồn</p>
@@ -851,11 +905,11 @@ function MessageBubble({
           <details className="mt-2 text-[8px] text-muted-foreground">
             <summary className="cursor-pointer font-mono">Trace · {message.traceId}</summary>
             <ol className="mt-1 space-y-0.5 font-mono">
-              {message.traceSteps?.map((step, index) => (
+              {message.traceSteps?.length ? message.traceSteps.map((step, index) => (
                 <li key={`${step.node}-${step.event}-${step.tool || ""}-${index}`}>
                   {step.node} → {step.event}{step.tool ? ` · ${step.tool}` : ""}
                 </li>
-              ))}
+              )) : <li>Chưa có chi tiết trace.</li>}
             </ol>
           </details>
         )}
@@ -901,14 +955,18 @@ function ChatMarkdown({ content }: { content: string }) {
 function DynamicSurface({
   surface,
   onAction,
-  onPrompt,
   onFormSubmit,
 }: {
   surface: UISurface;
   onAction: (action: ChatAction) => void;
-  onPrompt: (prompt: string) => Promise<void>;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
+  const isQuestionForm = surface.blocks.some((block) =>
+    block.fields.some((field) => field.name === "question_text"),
+  );
+  const actions = isQuestionForm
+    ? surface.actions.filter((action) => action.id !== "add_question")
+    : surface.actions;
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
       {(surface.title || surface.description) && (
@@ -919,12 +977,12 @@ function DynamicSurface({
       )}
       <div className="divide-y divide-border">
         {surface.blocks.map((block) => (
-          <DynamicBlock key={block.id} block={block} onPrompt={onPrompt} onFormSubmit={onFormSubmit} />
+          <DynamicBlock key={block.id} block={block} onFormSubmit={onFormSubmit} />
         ))}
       </div>
-      {!!surface.actions.length && (
+      {!!actions.length && (
         <div className="flex flex-wrap gap-2 border-t border-border p-3">
-          {surface.actions.map((action) => (
+          {actions.map((action) => (
             <button
               key={action.id}
               onClick={() => onAction(action)}
@@ -947,14 +1005,13 @@ function DynamicSurface({
 
 function DynamicBlock({
   block,
-  onPrompt,
   onFormSubmit,
 }: {
   block: UIBlock;
-  onPrompt: (prompt: string) => Promise<void>;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const toneIcon = block.tone === "success"
     ? <CheckCircle2 className="size-4 text-emerald-500" />
     : block.tone === "warning" || block.tone === "danger"
@@ -963,14 +1020,13 @@ function DynamicBlock({
 
   const submitForm = (event: FormEvent) => {
     event.preventDefault();
-    const isQuizCreateForm = ["title", "category", "difficulty", "time_limit", "quiz_type"]
-      .every((field) => block.fields.some((item) => item.name === field));
-    if (isQuizCreateForm) {
-      onFormSubmit(block, values);
+    const validationError = questionFormValidationError(block, values);
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
-    const details = block.fields.map((field) => `${field.label}: ${values[field.name] || ""}`).join("\n");
-    void onPrompt(`${block.submit_prompt}\n${details}`.trim());
+    setFormError(null);
+    onFormSubmit(block, values);
   };
 
   if (block.type === "notice") {
@@ -987,6 +1043,10 @@ function DynamicBlock({
 
   if (block.type === "stats") {
     return <div><BlockHeading icon={<BarChart3 className="size-4" />} block={block} /><div className="grid grid-cols-2 gap-px bg-border">{block.stats.map((stat) => <div key={stat.label} className="bg-background p-3"><p className="text-lg font-black">{stat.value}</p><p className="text-[9px] text-muted-foreground">{stat.label}</p>{stat.trend && <p className="mt-1 text-[8px] font-semibold text-emerald-600">{stat.trend}</p>}</div>)}</div></div>;
+  }
+
+  if (block.fields.some((field) => field.name === "question_text")) {
+    return <QuestionForm block={block} onFormSubmit={onFormSubmit} />;
   }
 
   return (
@@ -1008,6 +1068,161 @@ function DynamicBlock({
             )}
           </label>
         ))}
+        {formError && <p role="alert" className="text-[10px] font-semibold text-red-600">{formError}</p>}
+        <button type="submit" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#FDD239] px-3 text-[11px] font-bold text-slate-950 hover:bg-[#f5c923]">{block.submit_label}<ArrowUp className="size-3.5" /></button>
+      </div>
+    </form>
+  );
+}
+
+type QuestionOptionDraft = { text: string; correct: boolean };
+
+function QuestionForm({
+  block,
+  onFormSubmit,
+}: {
+  block: UIBlock;
+  onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [options, setOptions] = useState<QuestionOptionDraft[]>([
+    { text: "", correct: false },
+    { text: "", correct: false },
+  ]);
+  const [formError, setFormError] = useState<string | null>(null);
+  const questionType = (values.question_type || "").toUpperCase();
+  const needsOptions = ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING"].includes(questionType);
+  const singleCorrect = questionType === "SINGLE_CHOICE" || questionType === "TRUE_FALSE";
+
+  const updateValue = (name: string, value: string) => {
+    setValues((current) => ({ ...current, [name]: value }));
+    if (name === "question_type") {
+      setFormError(null);
+      if (value === "TRUE_FALSE") {
+        setOptions([
+          { text: "Đúng", correct: false },
+          { text: "Sai", correct: false },
+        ]);
+      } else if (value === "ESSAY" || value === "FILL_BLANK") {
+        setOptions([]);
+      } else if (options.length < 2) {
+        setOptions([
+          ...options,
+          ...Array.from({ length: 2 - options.length }, () => ({ text: "", correct: false })),
+        ]);
+      }
+    }
+  };
+
+  const updateOption = (index: number, patch: Partial<QuestionOptionDraft>) => {
+    setOptions((current) => current.map((option, optionIndex) =>
+      optionIndex === index ? { ...option, ...patch } : option,
+    ));
+    setFormError(null);
+  };
+
+  const markCorrect = (index: number) => {
+    setOptions((current) => current.map((option, optionIndex) => ({
+      ...option,
+      correct: singleCorrect ? optionIndex === index : optionIndex === index ? !option.correct : option.correct,
+    })));
+    setFormError(null);
+  };
+
+  const submitQuestionForm = (event: FormEvent) => {
+    event.preventDefault();
+    const questionText = (values.question_text || "").trim();
+    const filledOptions = options
+      .map((option, index) => ({
+        option_text: option.text.trim(),
+        is_correct: option.correct,
+        sort_order: index,
+      }))
+      .filter((option) => option.option_text);
+
+    if (!questionText) {
+      setFormError("Hãy nhập nội dung câu hỏi.");
+      return;
+    }
+    if (!questionType) {
+      setFormError("Hãy chọn loại câu hỏi.");
+      return;
+    }
+    if (needsOptions && filledOptions.length < 2) {
+      setFormError("Hãy nhập ít nhất 2 đáp án ở các ô bên dưới.");
+      return;
+    }
+    const correctCount = filledOptions.filter((option) => option.is_correct).length;
+    if (singleCorrect && correctCount !== 1) {
+      setFormError("Hãy chọn đúng 1 đáp án đúng.");
+      return;
+    }
+    if (questionType === "MULTIPLE_CHOICE" && correctCount < 1) {
+      setFormError("Hãy chọn ít nhất 1 đáp án đúng.");
+      return;
+    }
+    setFormError(null);
+    onFormSubmit(block, {
+      ...values,
+      options: JSON.stringify(filledOptions),
+    });
+  };
+
+  return (
+    <form onSubmit={submitQuestionForm} className="p-3.5">
+      <BlockHeading block={block} />
+      <div className="mt-3 space-y-3">
+        {block.fields.filter((field) => field.name !== "options").map((field) => (
+          <label key={field.name} className="block">
+            <span className="mb-1 block text-[9px] font-bold">{field.label}{field.required ? " *" : ""}</span>
+            {field.input_type === "select" ? (
+              <select required={field.required} value={values[field.name] || ""} onChange={(event) => updateValue(field.name, event.target.value)} className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-[11px] outline-none focus:border-amber-400">
+                <option value="">{field.placeholder || "Chọn một giá trị"}</option>
+                {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            ) : field.name === "question_text" || field.input_type === "textarea" ? (
+              <textarea required={field.required} placeholder={field.placeholder} value={values[field.name] || ""} onChange={(event) => updateValue(field.name, event.target.value)} className="min-h-24 w-full resize-y rounded-lg border border-border bg-background px-2.5 py-2 text-[11px] outline-none focus:border-amber-400" />
+            ) : (
+              <input type={field.input_type} required={field.required} placeholder={field.placeholder} value={values[field.name] || ""} onChange={(event) => updateValue(field.name, event.target.value)} className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-[11px] outline-none focus:border-amber-400" />
+            )}
+          </label>
+        ))}
+
+        {needsOptions && (
+          <div className="rounded-xl border border-border bg-muted/20 p-2.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold">Đáp án</p>
+                <p className="text-[9px] text-muted-foreground">{singleCorrect ? "Chọn 1 đáp án đúng." : "Có thể chọn nhiều đáp án đúng."}</p>
+              </div>
+              <button type="button" onClick={() => setOptions((current) => [...current, { text: "", correct: false }])} className="rounded-lg border border-border px-2 py-1 text-[9px] font-bold hover:bg-muted">+ Thêm đáp án</button>
+            </div>
+            <div className="space-y-2">
+              {options.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type={singleCorrect ? "radio" : "checkbox"}
+                    name={singleCorrect ? `${block.id}-correct` : `${block.id}-correct-${index}`}
+                    checked={option.correct}
+                    onChange={() => markCorrect(index)}
+                    aria-label={`Đánh dấu đáp án ${index + 1} là đúng`}
+                    className="size-4 accent-amber-500"
+                  />
+                  <input
+                    type="text"
+                    value={option.text}
+                    onChange={(event) => updateOption(index, { text: event.target.value })}
+                    placeholder={`Đáp án ${index + 1}`}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-[11px] outline-none focus:border-amber-400"
+                  />
+                  {options.length > 2 && <button type="button" onClick={() => setOptions((current) => current.filter((_, optionIndex) => optionIndex !== index))} className="rounded-lg px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-red-600" aria-label={`Xóa đáp án ${index + 1}`}>×</button>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {formError && <p role="alert" className="text-[10px] font-semibold text-red-600">{formError}</p>}
         <button type="submit" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#FDD239] px-3 text-[11px] font-bold text-slate-950 hover:bg-[#f5c923]">{block.submit_label}<ArrowUp className="size-3.5" /></button>
       </div>
     </form>

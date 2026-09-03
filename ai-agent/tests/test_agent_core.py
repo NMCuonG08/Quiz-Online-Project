@@ -2,6 +2,7 @@ import asyncio
 import unittest
 import httpx
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import ANY, AsyncMock
 from langchain_core.messages import AIMessage
 from zoneinfo import ZoneInfo
@@ -189,6 +190,15 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("BACKEND_HTTP", message)
 
+    def test_database_errors_do_not_expose_prisma_details(self):
+        message = self.core._safe_tool_error(RuntimeError(
+            'Invalid `prisma.quiz.create()` invocation: PostgresError invalid input value for enum "QuizType": "SINGLE_CHOICE"'
+        ))
+        self.assertEqual(
+            message,
+            "BACKEND_SCHEMA_MISMATCH: Backend và database chưa đồng bộ loại dữ liệu.",
+        )
+
     async def test_legacy_pending_approval_is_normalized_before_execution(self):
         await self.core.state_store.create_approval("legacy-token", {
             "name": "create_quiz",
@@ -331,6 +341,21 @@ class ScopeContractTests(unittest.TestCase):
         self.assertIn("03/02/2030", prompt)
         self.assertIn("Không tự nêu ngày hoặc giờ", prompt)
 
+    def test_runtime_prompt_preserves_vietnamese_diacritics_for_generated_content(self):
+        prompt = runtime_system_prompt(locale="vi")
+        self.assertIn("đầy đủ dấu Unicode", prompt)
+        self.assertIn("question_text", prompt)
+
+    def test_generated_ascii_transliteration_is_rejected_for_vietnamese(self):
+        with self.assertRaisesRegex(ValueError, "QUESTION_LANGUAGE_INVALID"):
+            AIAgentCore._assert_vietnamese_generated_content({
+                "question_text": "Day la cau hoi tieng Viet khong dau",
+                "options": [
+                    {"option_text": "Dap an dung", "is_correct": True},
+                    {"option_text": "Dap an sai", "is_correct": False},
+                ],
+            })
+
 
 class UiPolicyContractTests(unittest.TestCase):
     def setUp(self):
@@ -342,7 +367,8 @@ class UiPolicyContractTests(unittest.TestCase):
             "creator",
             {"route": "/user/quizzes"},
         )
-        self.assertEqual(surface.actions[0].value, "/user/quizzes/add")
+        self.assertEqual(surface.actions[0].id, "auto_generate_quiz")
+        self.assertEqual(surface.actions[1].value, "/user/quizzes/add")
         self.assertEqual(surface.blocks[0].type, "form")
 
     def test_completed_quiz_form_does_not_render_again(self):
@@ -450,6 +476,17 @@ class UiPolicyContractTests(unittest.TestCase):
 
 
 class LangGraphContractTests(unittest.TestCase):
+    def test_agent_first_is_default_with_legacy_rollback(self):
+        self.assertEqual(AIAgentCore({}).orchestration_mode, "agent_first")
+        self.assertEqual(
+            AIAgentCore({"orchestration_mode": "planner_legacy"}).orchestration_mode,
+            "planner_legacy",
+        )
+
+    def test_unknown_orchestration_mode_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "AI_ORCHESTRATION_MODE"):
+            AIAgentCore({"orchestration_mode": "unknown"})
+
     def test_taxonomy_domains_partition_every_leaf_intent(self):
         members = [intent for intents in INTENT_DOMAINS.values() for intent in intents]
         self.assertEqual(set(members), set(ALL_INTENTS))
@@ -711,6 +748,282 @@ class PlannerModelRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result["intent"], "quiz_recommend")
         self.assertEqual(runner._plan_once.await_count, 1)
+
+
+class AgentFirstOrchestrationTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.core = AIAgentCore({
+            "openai_api_key": "test-key",
+            "orchestration_mode": "agent_first",
+        })
+        self.core.memory = SimpleNamespace(
+            search=AsyncMock(return_value=[]),
+            close=AsyncMock(return_value=None),
+        )
+        self.core.graph_runner.plan = AsyncMock(
+            side_effect=AssertionError("agent-first must not call planner")
+        )
+        self.core.graph_runner.invoke = AsyncMock(
+            return_value=AIMessage(content="Xin chào từ agent.")
+        )
+
+    async def asyncTearDown(self):
+        await self.core.close()
+
+    async def test_live_path_skips_planner_and_exposes_scope_tools_to_agent(self):
+        events = [event async for event in self.core._stream_message_events(
+            "Xin chào", "user-1", None, "session-1", scope="learner",
+        )]
+
+        self.core.graph_runner.plan.assert_not_awaited()
+        self.core.graph_runner.invoke.assert_awaited_once()
+        call = self.core.graph_runner.invoke.await_args
+        self.assertIn("plan_interaction", call.args[3])
+        self.assertTrue(call.kwargs["agent_first"])
+        self.assertIsNone(call.kwargs["interaction_plan"])
+        self.assertEqual(
+            next(event for event in events if event["type"] == "done")["intent"],
+            "model_routed",
+        )
+
+    async def test_destructive_tool_requires_confirmation_from_current_message(self):
+        async def invoke_with_unsafe_delete(*args, **_kwargs):
+            dispatch = args[4]
+            result = await dispatch(
+                "delete_quiz", {"quiz_id": "quiz-1", "confirmed": True}
+            )
+            self.assertIn("DELETE_CONFIRMATION_REQUIRED", result)
+            return AIMessage(content="Bạn cần xác nhận xóa rõ ràng.")
+
+        self.core.graph_runner.invoke = AsyncMock(side_effect=invoke_with_unsafe_delete)
+        events = [event async for event in self.core._stream_message_events(
+            "Xóa quiz quiz-1", "user-1", "Bearer token", "session-2",
+            scope="creator",
+        )]
+
+        self.assertFalse(any(event["type"] == "ui" for event in events))
+        trace_events = [event for event in events if event["type"] == "trace"]
+        self.assertTrue(any(
+            event.get("event") == "confirmation_required" for event in trace_events
+        ))
+
+    async def test_agent_first_general_response_uses_one_model_call(self):
+        class FakeModel:
+            model_name = "fake-model"
+
+            def __init__(self):
+                self.calls = 0
+                self.bind_options = {}
+
+            def bind_tools(self, _tools, **kwargs):
+                self.bind_options = kwargs
+                return self
+
+            async def ainvoke(self, _messages, config=None):
+                self.calls += 1
+                return AIMessage(content="Một model call.")
+
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+        )
+        fake_model = FakeModel()
+        runner.llm = fake_model
+        runner._get_checkpointer = AsyncMock(return_value=None)
+
+        async def dispatch(_name, _args):
+            return "{}"
+
+        result = await runner.invoke(
+            "system", [], "Xin chào", set(), dispatch, lambda: False,
+            {"metadata": {"local_trace_id": "trace-1", "scope": "learner"}},
+            "model_routed", agent_first=True,
+        )
+
+        self.assertEqual(result.content, "Một model call.")
+        self.assertEqual(fake_model.calls, 1)
+        self.assertFalse(fake_model.bind_options["parallel_tool_calls"])
+
+    async def test_agent_first_runs_one_react_tool_loop(self):
+        class FakeToolModel:
+            model_name = "fake-model"
+
+            def __init__(self):
+                self.calls = 0
+
+            def bind_tools(self, _tools, **_kwargs):
+                return self
+
+            async def ainvoke(self, _messages, config=None):
+                self.calls += 1
+                if self.calls == 1:
+                    return AIMessage(content="", tool_calls=[{
+                        "name": "get_current_time",
+                        "args": {},
+                        "id": "call-1",
+                        "type": "tool_call",
+                    }])
+                return AIMessage(content="Đây là thời gian từ server.")
+
+        runner = LangGraphQuizRunner(
+            "executor", "test-key", "https://example.test/v1",
+        )
+        fake_model = FakeToolModel()
+        runner.llm = fake_model
+        runner._get_checkpointer = AsyncMock(return_value=None)
+        dispatch = AsyncMock(return_value='{"ok":true}')
+
+        result = await runner.invoke(
+            "system", [], "Mấy giờ rồi?", {"get_current_time"},
+            dispatch, lambda: False,
+            {"metadata": {"local_trace_id": "trace-2", "scope": "learner"}},
+            "model_routed", agent_first=True,
+        )
+
+        self.assertEqual(result.content, "Đây là thời gian từ server.")
+        self.assertEqual(fake_model.calls, 2)
+        dispatch.assert_awaited_once_with("get_current_time", {})
+
+
+class StructuredFormExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.core = AIAgentCore({
+            "orchestration_mode": "agent_first",
+        })
+        self.core.graph_runner = SimpleNamespace(
+            plan=AsyncMock(side_effect=AssertionError("structured form must not call planner")),
+            invoke=AsyncMock(side_effect=AssertionError("structured form must not call executor")),
+            close=AsyncMock(return_value=None),
+        )
+
+    async def asyncTearDown(self):
+        await self.core.close()
+
+    async def test_complete_quiz_form_creates_proposal_without_model(self):
+        self.core._execute_tool = AsyncMock(side_effect=[
+            ({"items": [{"id": "cat-1", "name": "Lập trình"}]}, None, []),
+            ({"id": "quiz-1", "title": "Python cơ bản", "slug": "python-co-ban"}, None, []),
+        ])
+
+        events = [event async for event in self.core._stream_message_events(
+            "Thông tin tạo quiz từ form",
+            "user-1",
+            "Bearer token",
+            "session-form",
+            scope="creator",
+            context={
+                "route": "/user/quizzes",
+                "_form_submission": {
+                    "form_id": "quiz-create-form",
+                    "values": {
+                        "title": "Python cơ bản",
+                        "category": "Lập trình",
+                        "difficulty": "EASY",
+                        "time_limit": "300",
+                        "quiz_type": "MULTIPLE_CHOICE",
+                        "description": "Quiz nhập từ form",
+                        "instructions": "Làm bài",
+                    },
+                },
+            },
+        )]
+
+        self.core.graph_runner.plan.assert_not_awaited()
+        self.core.graph_runner.invoke.assert_not_awaited()
+        self.assertEqual(
+            [call.args[0] for call in self.core._execute_tool.await_args_list],
+            ["list_categories", "create_quiz"],
+        )
+        create_args = self.core._execute_tool.await_args_list[1].args[1]
+        self.assertEqual(create_args["category_id"], "cat-1")
+        self.assertEqual(create_args["description"], "Quiz nhập từ form")
+        self.assertEqual(create_args["instructions"], "Làm bài")
+        create_call = self.core._execute_tool.await_args_list[1]
+        self.assertEqual(create_call.kwargs["phase"], "execute")
+        self.assertTrue(create_call.kwargs["approval_verified"])
+        self.assertTrue(create_call.kwargs["idempotency_key"].startswith("form-"))
+        done = next(event for event in events if event["type"] == "done")
+        self.assertEqual(done["model_calls"], 0)
+        self.assertEqual(done["run_status"], "completed")
+
+    async def test_question_form_creates_proposal_without_prompt_or_model(self):
+        self.core._execute_tool = AsyncMock(return_value=(
+            {"id": "question-1", "question_text": "AI là gì?"},
+            None,
+            [],
+        ))
+
+        events = [event async for event in self.core._stream_message_events(
+            "Thông tin câu hỏi từ form",
+            "user-1",
+            "Bearer token",
+            "session-question-form",
+            scope="creator",
+            context={
+                "route": "/user/quizzes/questions/quiz-1",
+                "selected_quiz_id": "quiz-1",
+                "_form_submission": {
+                    "form_id": "create_questions_form",
+                    "values": {
+                        "question_text": "AI là gì?",
+                        "question_type": "SINGLE_CHOICE",
+                        "options": "* Là trí tuệ nhân tạo\nLà một trình duyệt",
+                        "points": "1",
+                        "sort_order": "1",
+                    },
+                },
+            },
+        )]
+
+        self.core.graph_runner.plan.assert_not_awaited()
+        self.core.graph_runner.invoke.assert_not_awaited()
+        self.core._execute_tool.assert_awaited_once()
+        call = self.core._execute_tool.await_args
+        self.assertEqual(call.args[0], "create_question")
+        payload = call.args[1]
+        self.assertEqual(payload["quiz_id"], "quiz-1")
+        self.assertEqual(payload["question_type"], "SINGLE_CHOICE")
+        self.assertTrue(payload["options"][0]["is_correct"])
+        self.assertFalse(payload["options"][1]["is_correct"])
+        self.assertEqual(call.kwargs["phase"], "execute")
+        self.assertTrue(call.kwargs["approval_verified"])
+        done = next(event for event in events if event["type"] == "done")
+        self.assertEqual(done["model_calls"], 0)
+        self.assertEqual(done["run_status"], "completed")
+
+    async def test_question_form_rejects_one_unmarked_option_without_model(self):
+        self.core._execute_tool = AsyncMock(
+            side_effect=AssertionError("invalid question form must not call a tool")
+        )
+
+        events = [event async for event in self.core._stream_message_events(
+            "Thông tin câu hỏi từ form",
+            "user-1",
+            "Bearer token",
+            "session-question-invalid",
+            scope="creator",
+            context={
+                "route": "/user/quizzes/questions/quiz-1",
+                "selected_quiz_id": "quiz-1",
+                "_form_submission": {
+                    "form_id": "create_questions_form",
+                    "values": {
+                        "question_text": "AI là gì?",
+                        "question_type": "SINGLE_CHOICE",
+                        "options": "aaa",
+                    },
+                },
+            },
+        )]
+
+        self.core._execute_tool.assert_not_awaited()
+        self.assertIn("ít nhất 2 đáp án", next(
+            event["delta"] for event in events if event["type"] == "token"
+        ))
+        surface = next(event["surface"] for event in events if event["type"] == "ui")
+        options_field = next(
+            field for field in surface["blocks"][0]["fields"] if field["name"] == "options"
+        )
+        self.assertTrue(options_field["required"])
 
 
 class WebSearchContractTests(unittest.IsolatedAsyncioTestCase):

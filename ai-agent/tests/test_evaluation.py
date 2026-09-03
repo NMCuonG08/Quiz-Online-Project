@@ -73,6 +73,33 @@ class AgentScenarioEvaluationTests(unittest.TestCase):
         })
         self.assertEqual(report["pass_rate"], 1.0)
 
+    def test_evaluator_enforces_agent_first_model_call_budget(self):
+        scenarios = [{
+            "id": "general-fast-path",
+            "category": "general",
+            "expected_intent": "conversation_general",
+            "expected_tools": [],
+            "forbidden_tools": ["search_quizzes"],
+            "max_model_calls": 1,
+        }]
+        passing = evaluate(scenarios, {
+            "general-fast-path": {
+                "intent": "conversation_general",
+                "tools": [],
+                "usage": {"model_calls": 1},
+            },
+        })
+        failing = evaluate(scenarios, {
+            "general-fast-path": {
+                "intent": "conversation_general",
+                "tools": [],
+                "usage": {"model_calls": 2},
+            },
+        })
+
+        self.assertEqual(passing["pass_rate"], 1.0)
+        self.assertIn("model_calls", failing["failures"][0]["failed"])
+
     def test_scenario_validation_rejects_duplicate_ids(self):
         scenario = {
             "id": "same",

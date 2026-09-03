@@ -84,6 +84,7 @@ agent = AIAgentCore(
         "planner_escalate_writes": os.getenv("AI_PLANNER_ESCALATE_WRITES", "true").lower() == "true",
         "llm_api_mode": os.getenv("LLM_API_MODE", "responses"),
         "agent_orchestrator": os.getenv("AGENT_ORCHESTRATOR", "langgraph"),
+        "orchestration_mode": os.getenv("AI_ORCHESTRATION_MODE", "agent_first"),
         "max_graph_steps": int(os.getenv("AGENT_MAX_GRAPH_STEPS", "12")),
         "graph_timeout_seconds": int(os.getenv("AGENT_GRAPH_TIMEOUT_SECONDS", "90")),
         "max_empty_tool_streak": int(os.getenv("AGENT_MAX_EMPTY_TOOL_STREAK", "2")),
@@ -175,6 +176,17 @@ def encode_sse(event: str, payload: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
+def build_request_context(
+    request: ChatRequest, authorization: str | None,
+) -> dict[str, object]:
+    context: dict[str, object] = request.context.model_dump()
+    context["is_authenticated"] = bool(authorization)
+    context["locale"] = request.locale
+    if request.form_submission is not None:
+        context["_form_submission"] = request.form_submission.model_dump()
+    return context
+
+
 @app.get("/")
 async def root():
     return {
@@ -184,6 +196,7 @@ async def root():
         "model": agent.model,
         "api_mode": agent.api_mode,
         "orchestrator": agent.orchestrator,
+        "orchestration_mode": agent.orchestration_mode,
         "model_configured": agent.client is not None,
     }
 
@@ -236,8 +249,7 @@ async def enqueue_run(
     session_id = request.session_id or str(uuid.uuid4())
     if not await agent.allow_request(user_id, session_id):
         raise HTTPException(status_code=429, detail="Quá nhiều yêu cầu AI. Hãy thử lại sau một phút.")
-    context = request.context.model_dump()
-    context["is_authenticated"] = bool(authorization)
+    context = build_request_context(request, authorization)
     try:
         return await agent.enqueue_background_run(
             request.message,
@@ -338,8 +350,7 @@ async def chat_endpoint(
         user_id, scope = await resolve_identity(request, authorization)
         if not await agent.allow_request(user_id, session_id):
             raise HTTPException(status_code=429, detail="Quá nhiều yêu cầu AI. Hãy thử lại sau một phút.")
-        context = request.context.model_dump()
-        context["is_authenticated"] = bool(authorization)
+        context = build_request_context(request, authorization)
         response = await agent.process_message(
             request.message,
             user_id,
@@ -376,8 +387,7 @@ async def chat_stream_endpoint(
         user_id, scope = await resolve_identity(request, authorization)
         if not await agent.allow_request(user_id, session_id):
             raise HTTPException(status_code=429, detail="Quá nhiều yêu cầu AI. Hãy thử lại sau một phút.")
-        context = request.context.model_dump()
-        context["is_authenticated"] = bool(authorization)
+        context = build_request_context(request, authorization)
     except HTTPException:
         metrics.record_chat(request.scope, "rejected", time.perf_counter() - started_at)
         raise
