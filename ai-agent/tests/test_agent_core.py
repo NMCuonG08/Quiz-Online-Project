@@ -341,6 +341,11 @@ class ScopeContractTests(unittest.TestCase):
         self.assertIn("03/02/2030", prompt)
         self.assertIn("Không tự nêu ngày hoặc giờ", prompt)
 
+    def test_runtime_prompt_preserves_vietnamese_diacritics_for_generated_content(self):
+        prompt = runtime_system_prompt(locale="vi")
+        self.assertIn("đầy đủ dấu Unicode", prompt)
+        self.assertIn("question_text", prompt)
+
 
 class UiPolicyContractTests(unittest.TestCase):
     def setUp(self):

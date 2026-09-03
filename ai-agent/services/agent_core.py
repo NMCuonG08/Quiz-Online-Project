@@ -86,7 +86,7 @@ Nguyên tắc bắt buộc:
 """
 
 
-def runtime_system_prompt(now: Optional[datetime] = None) -> str:
+def runtime_system_prompt(now: Optional[datetime] = None, locale: str = "vi") -> str:
     """Ground temporal answers in server time, never the model training cutoff."""
     timezone_name = os.getenv("AI_TIMEZONE", "Asia/Ho_Chi_Minh")
     try:
@@ -99,7 +99,17 @@ def runtime_system_prompt(now: Optional[datetime] = None) -> str:
         instant = instant.replace(tzinfo=zone)
     else:
         instant = instant.astimezone(zone)
+    locale = (locale or "vi").lower()
+    language_policy = (
+        "Người dùng đang dùng tiếng Việt. Mọi nội dung tự sinh cho người dùng, "
+        "bao gồm question_text, options, explanation, description và instructions, "
+        "phải viết bằng tiếng Việt có đầy đủ dấu Unicode; tuyệt đối không chuyển "
+        "sang tiếng Việt không dấu. Chỉ slug, ID và enum theo schema mới dùng ASCII."
+        if locale.startswith("vi")
+        else f"Ngôn ngữ ưu tiên của người dùng là locale={locale}; giữ nguyên Unicode và dùng đúng ngôn ngữ này cho nội dung tự sinh."
+    )
     return SYSTEM_PROMPT + (
+        "\n\nLANGUAGE POLICY: " + language_policy +
         "\n\nTHỜI GIAN TIN CẬY TỪ SERVER: "
         f"Hôm nay là {instant.strftime('%d/%m/%Y')}, "
         f"{instant.strftime('%H:%M')} ({timezone_name}). "
@@ -651,7 +661,9 @@ class AIAgentCore:
             for _ in range(12):
                 stream = await self.client.responses.create(
                     model=self.model,
-                    instructions=runtime_system_prompt(),
+                    instructions=runtime_system_prompt(
+                        locale=str((context or {}).get("locale") or locale)
+                    ),
                     input=next_input,
                     tools=[tool for tool in TOOLS if tool.get("name") in allowed_tools],
                     previous_response_id=previous_response_id,
@@ -2203,7 +2215,9 @@ class AIAgentCore:
             try:
                 return await asyncio.wait_for(
                 self.graph_runner.invoke(
-                    runtime_system_prompt(),
+                    runtime_system_prompt(
+                        locale=str((context or {}).get("locale") or "vi")
+                    ),
                     state.chat_messages,
                     user_input,
                     allowed_tools if agent_first else allowed_tools - {"plan_interaction"},
@@ -2960,7 +2974,7 @@ class AIAgentCore:
         if persisted_history:
             state.chat_messages = persisted_history
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": runtime_system_prompt()},
+            {"role": "system", "content": runtime_system_prompt(locale=locale)},
             *state.chat_messages[-20:],
             {"role": "user", "content": user_input},
         ]

@@ -181,6 +181,7 @@ def build_request_context(
 ) -> dict[str, object]:
     context: dict[str, object] = request.context.model_dump()
     context["is_authenticated"] = bool(authorization)
+    context["locale"] = request.locale
     if request.form_submission is not None:
         context["_form_submission"] = request.form_submission.model_dump()
     return context
