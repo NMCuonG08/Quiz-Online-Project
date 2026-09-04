@@ -67,6 +67,7 @@ class QuestionDraftInput(BaseModel):
     question_text: str = Field(min_length=1)
     question_type: QuestionType
     options: list[QuestionOptionInput]
+    media_url: str = ""
     points: NonNegativeNumber = 1
     time_limit: NonNegativeNumber = 0
     explanation: str = ""
@@ -275,6 +276,39 @@ class LangGraphQuizRunner:
     async def close(self) -> None:
         await self._checkpointer_stack.aclose()
 
+    async def invoke_worker(
+        self,
+        role: str,
+        system_prompt: str,
+        payload: dict[str, Any],
+        *,
+        config: dict[str, Any],
+        record_model: Optional[ModelObserver] = None,
+        before_model_call: Optional[BeforeModelCall] = None,
+        trace_observer: Optional[TraceObserver] = None,
+    ) -> dict[str, Any]:
+        """Run one isolated structured worker through the model router."""
+        if before_model_call:
+            before_model_call()
+        worker_config = dict(config)
+        metadata = dict(config.get("metadata") or {})
+        metadata["agent_role"] = role
+        worker_config["metadata"] = metadata
+        message, _ = await self.executor_router.ainvoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=json.dumps(payload, ensure_ascii=False, default=str)),
+            ],
+            config=worker_config,
+            operation=f"worker_{role}",
+            record_model=record_model,
+            trace_observer=trace_observer,
+        )
+        result = self._extract_json_object(message)
+        if result is None:
+            raise ValueError(f"WORKER_OUTPUT_INVALID: {role} không trả JSON object hợp lệ.")
+        return result
+
     async def invoke(
         self,
         system_prompt: str,
@@ -443,7 +477,7 @@ Classify two independent axes:
 - dialogue_act is request, correction, continuation, confirmation, rejection, selection, clarification_answer, cancel, or help.
 Set refers_to_previous_turn and reference_mode when the message depends on recent history. Corrections such as "à", "ý tôi là", or "không phải" replace the previous interpretation; never search their whole sentence as a keyword. Set selection_strategy for choice requests.
 
-Return plan_interaction exactly once. Extract entities and secondary intents. Set confidence honestly. If more context is required, set needs_clarification and provide one concise clarification question. Risk describes the requested effect, not the user's claimed role. Never infer authorization from the message."""
+Return plan_interaction exactly once. Extract entities and secondary intents. For quiz authoring, extract question_count and content_language when the user states them; use content_language='auto' when the output language is not explicit. Set confidence honestly. If more context is required, set needs_clarification and provide one concise clarification question. Risk describes the requested effect, not the user's claimed role. Never infer authorization from the message."""
         base_prompt += "\n\nLeaf intent taxonomy:\n" + "\n".join(taxonomy_lines)
         base_prompt += (
             "\nOnly use secondary_intents for an independently requested second goal. "
@@ -606,6 +640,34 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
         return None
 
     @staticmethod
+    def _extract_json_object(message: AIMessage) -> Optional[dict[str, Any]]:
+        content = message.content
+        if isinstance(content, list):
+            content = "\n".join(
+                str(item.get("text") or item.get("content") or "")
+                for item in content
+                if isinstance(item, dict)
+            )
+        if not isinstance(content, str) or not content.strip():
+            return None
+        raw = content.strip()
+        candidates = [raw]
+        unfenced = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+        if unfenced != raw:
+            candidates.append(unfenced)
+        match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+        if match:
+            candidates.append(match.group(0))
+        for candidate in candidates:
+            try:
+                value = json.loads(candidate)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if isinstance(value, dict):
+                return value
+        return None
+
+    @staticmethod
     def _fallback_plan() -> dict[str, Any]:
         return InteractionPlan(
             intent="unsupported",
@@ -691,12 +753,13 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
             @tool
             async def create_category(
                 name: str, description: str, slug: str, is_active: bool,
-                parent_id: str = "",
+                parent_id: str = "", icon_url: str = "",
             ) -> str:
                 """Admin only: propose creating a category; execution requires Accept."""
                 return await dispatch("create_category", {
                     "name": name, "description": description, "slug": slug,
                     "is_active": is_active, "parent_id": parent_id,
+                    "icon_url": icon_url,
                 })
             tools.append(create_category)
 
@@ -816,7 +879,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                 title: str, slug: str, category_id: str, difficulty_level: DifficultyLevel,
                 time_limit: PositiveNumber, quiz_type: QuizType, description: str = "",
                 max_attempts: NonNegativeNumber = 0, passing_score: Percentage = 0,
-                is_active: bool = False, instructions: str = "",
+                is_active: bool = False, instructions: str = "", thumbnail_url: str = "",
             ) -> str:
                 """Propose creating a quiz; execution still requires Accept."""
                 return await dispatch("create_quiz", {
@@ -825,6 +888,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                     "quiz_type": quiz_type, "description": description,
                     "max_attempts": max_attempts, "passing_score": passing_score,
                     "is_active": is_active, "instructions": instructions,
+                    "thumbnail_url": thumbnail_url,
                 })
             tools.append(create_quiz)
 
@@ -835,7 +899,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                 time_limit: PositiveNumber, quiz_type: QuizType,
                 questions: Annotated[list[QuestionDraftInput], Field(min_length=1)],
                 description: str = "", max_attempts: NonNegativeNumber = 0,
-                passing_score: Percentage = 0, instructions: str = "",
+                passing_score: Percentage = 0, instructions: str = "", thumbnail_url: str = "",
             ) -> str:
                 """Propose one inactive quiz draft plus all questions/options; preserve the user's language and Unicode diacritics, and execution requires Accept."""
                 return await dispatch("create_quiz_with_questions", {
@@ -845,6 +909,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                     "questions": [question.model_dump(exclude_none=True) for question in questions],
                     "description": description, "max_attempts": max_attempts,
                     "passing_score": passing_score, "instructions": instructions,
+                    "thumbnail_url": thumbnail_url,
                 })
             tools.append(create_quiz_with_questions)
 
@@ -903,7 +968,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                 options: list[QuestionOptionInput], points: NonNegativeNumber = 1,
                 time_limit: NonNegativeNumber = 0, explanation: str = "",
                 difficulty_level: Optional[DifficultyLevel] = None, sort_order: NonNegativeInteger = 0,
-                is_required: bool = True, slug: str = "",
+                is_required: bool = True, slug: str = "", media_url: str = "",
             ) -> str:
                 """Propose creating a question; preserve the user's language and Unicode diacritics, and execution still requires Accept."""
                 return await dispatch("create_question", {
@@ -912,7 +977,7 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                     "options": [option.model_dump() for option in options], "points": points,
                     "time_limit": time_limit, "explanation": explanation,
                     "difficulty_level": difficulty_level, "sort_order": sort_order,
-                    "is_required": is_required, "slug": slug,
+                    "is_required": is_required, "slug": slug, "media_url": media_url,
                 })
             tools.append(create_question)
 

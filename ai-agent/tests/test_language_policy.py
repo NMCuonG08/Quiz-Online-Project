@@ -17,7 +17,14 @@ class LanguagePolicyTests(unittest.TestCase):
     def test_vietnamese_request_keeps_vietnamese_content_guard(self):
         self.assertTrue(
             AIAgentCore._should_enforce_vietnamese_content(
-                "Hãy tạo câu hỏi về lịch sử Mỹ", "vi"
+                "Hãy tạo câu hỏi bằng tiếng Việt về lịch sử Mỹ", "vi"
+            )
+        )
+
+    def test_vietnamese_request_does_not_force_quiz_content_language(self):
+        self.assertFalse(
+            AIAgentCore._should_enforce_vietnamese_content(
+                "Hãy tạo quiz về lịch sử Mỹ", "vi"
             )
         )
 

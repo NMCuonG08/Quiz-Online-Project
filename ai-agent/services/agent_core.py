@@ -53,6 +53,7 @@ from .capabilities import (
     QuestionSemanticReviewer,
     build_openai_semantic_judge,
 )
+from .orchestration.authoring_graph import AuthoringSupervisorGraph
 from .memory import MemoryStore
 
 
@@ -103,6 +104,27 @@ def _request_prefers_english(user_input: str) -> bool:
     return bool(words.intersection(markers))
 
 
+def _explicitly_requests_vietnamese_content(user_input: str) -> bool:
+    """Only enable Vietnamese content validation when explicitly requested."""
+    decomposed = unicodedata.normalize("NFD", str(user_input or ""))
+    without_marks = "".join(
+        character for character in decomposed
+        if unicodedata.category(character) != "Mn"
+    ).upper()
+    normalized = re.sub(r"[^A-Z0-9]+", " ", without_marks).strip()
+    return any(
+        marker in normalized
+        for marker in (
+            "TIENG VIET",
+            "BANG TIENG VIET",
+            "VIETNAMESE",
+            "CO DAU",
+            "DAY DU DAU",
+            "FULL DIACRITICS",
+        )
+    )
+
+
 def runtime_system_prompt(
     now: Optional[datetime] = None,
     locale: str = "vi",
@@ -123,14 +145,27 @@ def runtime_system_prompt(
     locale = (locale or "vi").lower()
     if locale.startswith("vi") and _request_prefers_english(user_input):
         locale = "en"
-    language_policy = (
-        "Người dùng đang dùng tiếng Việt. Mọi nội dung tự sinh cho người dùng, "
-        "bao gồm question_text, options, explanation, description và instructions, "
-        "phải viết bằng tiếng Việt có đầy đủ dấu Unicode; tuyệt đối không chuyển "
-        "sang tiếng Việt không dấu. Chỉ slug, ID và enum theo schema mới dùng ASCII."
-        if locale.startswith("vi")
-        else f"Ngôn ngữ ưu tiên của người dùng là locale={locale}; giữ nguyên Unicode và dùng đúng ngôn ngữ này cho nội dung tự sinh."
-    )
+    if locale.startswith("vi") and _explicitly_requests_vietnamese_content(user_input):
+        language_policy = (
+            "Người dùng yêu cầu nội dung bằng tiếng Việt. Mọi nội dung tự sinh cho "
+            "người dùng, bao gồm question_text, options, explanation, description "
+            "và instructions, phải viết bằng tiếng Việt có đầy đủ dấu Unicode; "
+            "tuyệt đối không chuyển sang tiếng Việt không dấu. Chỉ slug, ID và "
+            "enum theo schema mới dùng ASCII."
+        )
+    elif locale.startswith("vi"):
+        language_policy = (
+            "Không suy ra ngôn ngữ nội dung quiz chỉ từ locale của giao diện hoặc "
+            "ngôn ngữ dùng để viết yêu cầu. Nếu người dùng nêu rõ ngôn ngữ đầu ra "
+            "thì dùng ngôn ngữ đó; nếu không, chọn ngôn ngữ tự nhiên phù hợp với "
+            "chủ đề và yêu cầu, đồng thời giữ nguyên Unicode. Nếu chọn tiếng Việt "
+            "thì phải dùng đầy đủ dấu Unicode."
+        )
+    else:
+        language_policy = (
+            f"Ngôn ngữ ưu tiên của người dùng là locale={locale}; giữ nguyên Unicode "
+            "và dùng đúng ngôn ngữ này cho nội dung tự sinh."
+        )
     return SYSTEM_PROMPT + (
         "\n\nLANGUAGE POLICY: " + language_policy +
         "\n\nTHỜI GIAN TIN CẬY TỪ SERVER: "
@@ -293,15 +328,39 @@ class AIAgentCore:
             self.config.get("orchestration_mode")
             or os.getenv("AI_ORCHESTRATION_MODE", "agent_first")
         ).strip().lower()
-        if self.orchestration_mode not in {"agent_first", "planner_legacy"}:
+        if self.orchestration_mode not in {"agent_first", "planner_legacy", "supervisor_v1"}:
             raise ValueError(
-                "AI_ORCHESTRATION_MODE must be agent_first or planner_legacy"
+                "AI_ORCHESTRATION_MODE must be agent_first, planner_legacy or supervisor_v1"
             )
         self.max_graph_steps = int(
             self.config.get("max_graph_steps") or os.getenv("AGENT_MAX_GRAPH_STEPS", "12")
         )
         self.graph_timeout_seconds = int(
             self.config.get("graph_timeout_seconds") or os.getenv("AGENT_GRAPH_TIMEOUT_SECONDS", "90")
+        )
+        self.auto_image_timeout_seconds = float(
+            self.config.get("auto_image_timeout_seconds")
+            or os.getenv("AI_AUTO_IMAGE_TIMEOUT_SECONDS", "8")
+        )
+        self.supervisor_max_questions_per_worker = int(
+            self.config.get("supervisor_max_questions_per_worker")
+            or os.getenv("AI_SUPERVISOR_MAX_QUESTIONS_PER_WORKER", "4")
+        )
+        self.supervisor_media_concurrency = int(
+            self.config.get("supervisor_media_concurrency")
+            or os.getenv("AI_SUPERVISOR_MEDIA_CONCURRENCY", "4")
+        )
+        self.supervisor_media_timeout_seconds = float(
+            self.config.get("supervisor_media_timeout_seconds")
+            or os.getenv("AI_SUPERVISOR_MEDIA_TIMEOUT_SECONDS", "6")
+        )
+        self.supervisor_default_question_count = int(
+            self.config.get("supervisor_default_question_count")
+            or os.getenv("AI_SUPERVISOR_DEFAULT_QUESTION_COUNT", "8")
+        )
+        self.supervisor_max_revisions = int(
+            self.config.get("supervisor_max_revisions")
+            or os.getenv("AI_SUPERVISOR_MAX_REVISIONS", "2")
         )
         self.max_empty_tool_streak = int(
             self.config.get("max_empty_tool_streak") or os.getenv("AGENT_MAX_EMPTY_TOOL_STREAK", "2")
@@ -643,6 +702,10 @@ class AIAgentCore:
         # the human-readable text for chat history, while routing execution
         # through the fast path instead of asking the planner to reclassify it.
         execution_context = dict(context or {})
+        execution_context.setdefault(
+            "_content_language",
+            "vi" if _explicitly_requests_vietnamese_content(user_input) else "auto",
+        )
         execution_context.setdefault(
             "_request_language",
             "en" if _request_prefers_english(user_input) else locale,
@@ -1956,6 +2019,87 @@ class AIAgentCore:
             yield await emit_persisted("done", done_payload(
                 intent=intent, agent=self.model,
                 tool="plan_interaction", tools=["plan_interaction"],
+            ))
+            return
+        if (
+            self.orchestration_mode == "supervisor_v1"
+            and intent == "quiz_create"
+            and scope in {"creator", "admin"}
+            and self._quiz_create_fields_complete(plan)
+        ):
+            final_text = ""
+            try:
+                async def invoke_worker(
+                    role: str, prompt: str, payload: dict[str, Any],
+                ) -> dict[str, Any]:
+                    return await self.graph_runner.invoke_worker(
+                        role,
+                        prompt,
+                        payload,
+                        config=graph_config,
+                        record_model=record_model,
+                        before_model_call=before_model_call,
+                        trace_observer=record_trace,
+                    )
+
+                supervisor = AuthoringSupervisorGraph(
+                    invoke_worker=invoke_worker,
+                    dispatch=dispatch,
+                    search_images=self.web_search.search_images,
+                    build_base_payload=lambda categories: self._build_quiz_create_proposal(
+                        plan, {"list_categories": categories},
+                    ),
+                    trace=record_trace,
+                    max_questions_per_worker=self.supervisor_max_questions_per_worker,
+                    media_concurrency=self.supervisor_media_concurrency,
+                    media_timeout_seconds=self.supervisor_media_timeout_seconds,
+                    default_question_count=self.supervisor_default_question_count,
+                    max_revisions=self.supervisor_max_revisions,
+                )
+                await asyncio.wait_for(
+                    supervisor.run(user_input=user_input, plan=plan),
+                    timeout=self.graph_timeout_seconds,
+                )
+                final_text = (
+                    "Đề xuất tạo quiz hoàn chỉnh đã sẵn sàng. "
+                    "Hệ thống chỉ tạo sau khi bạn bấm Accept."
+                )
+                await record_trace("supervisor", "proposal_ready", "create_quiz_with_questions")
+            except asyncio.TimeoutError:
+                final_text = (
+                    f"GRAPH_TIMEOUT: Supervisor chưa hoàn tất trong {self.graph_timeout_seconds}s. "
+                    "Bạn có thể chạy lại request; tiến độ worker đã được ghi vào trace."
+                )
+                await record_trace("supervisor", "deadline_exceeded", "authoring")
+            except Exception as exc:
+                final_text = f"Không thể chuẩn bị đề xuất tạo quiz: {self._safe_tool_error(exc)}"
+                await record_trace("supervisor", "proposal_error", "create_quiz_with_questions")
+            while not live_events.empty():
+                yield await live_events.get()
+            if approval_requested:
+                move_run("waiting_for_approval", "supervisor proposal is waiting for approval")
+            else:
+                move_run("verifying", "supervisor authoring response verified")
+                move_run("responding", "supervisor authoring response delivered")
+            yield await emit_persisted("token", {"delta": final_text})
+            if rendered_surface is not None:
+                yield await emit_persisted("ui", {"surface": rendered_surface.model_dump()})
+            if citations:
+                yield await emit_persisted("citations", {"items": citations})
+            state.chat_messages.extend([
+                {"role": "user", "content": user_input},
+                {"role": "assistant", "content": final_text},
+            ])
+            state.chat_messages = state.chat_messages[-20:]
+            await self.state_store.set_chat_messages(user_id, session_id, state.chat_messages)
+            if not approval_requested:
+                move_run("completed", "supervisor authoring response delivered")
+            await persist_run_context()
+            yield await emit_persisted("done", done_payload(
+                intent=intent,
+                agent="supervisor",
+                tool="create_quiz_with_questions" if approval_requested else None,
+                tools=["planner", "category_retriever", "curriculum", "quiz_builder", "quality_reviewer", "media_retriever", "finalizer"],
             ))
             return
         if intent == "quiz_delete" and self._has_explicit_confirmation(user_input):
@@ -3428,14 +3572,23 @@ class AIAgentCore:
 
         async def runtime_handler(normalized: Dict[str, Any]) -> ToolHandlerResult:
             if phase == "propose" and name in AUTO_IMAGE_TOOLS:
-                normalized = await self._attach_auto_images(name, normalized)
+                try:
+                    normalized = await asyncio.wait_for(
+                        self._attach_auto_images(name, normalized),
+                        timeout=self.auto_image_timeout_seconds,
+                    )
+                except asyncio.TimeoutError:
+                    # Image retrieval is enrichment, not a prerequisite for a
+                    # valid quiz proposal. Do not let a slow third-party image
+                    # provider consume the graph's hard deadline.
+                    logger.warning(
+                        "auto_image_search_timeout tool=%s timeout_seconds=%.1f",
+                        name,
+                        self.auto_image_timeout_seconds,
+                    )
             if (
                 name in {"create_question", "create_quiz_with_questions"}
-                and str(
-                    (context or {}).get("_request_language")
-                    or (context or {}).get("locale")
-                    or "vi"
-                ).lower().startswith("vi")
+                and (context or {}).get("_content_language") == "vi"
                 and not (context or {}).get("_form_submission")
             ):
                 self._assert_vietnamese_generated_content(normalized)
@@ -4172,32 +4325,11 @@ class AIAgentCore:
 
     @staticmethod
     def _should_enforce_vietnamese_content(user_input: str, locale: str) -> bool:
-        """Use request language, not only the UI locale, for content policy."""
-        if not str(locale or "").lower().startswith("vi"):
-            return False
-        vietnamese_marks = set(
-            "ăâđêôơưĂÂĐÊÔƠƯáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễíìỉĩị"
-            "óòỏõọốồổỗộớờởỡúùủũụứừửữựýỳỷỹỵ"
+        """Use an explicit output-language request, never UI locale alone."""
+        return (
+            str(locale or "").lower().startswith("vi")
+            and _explicitly_requests_vietnamese_content(user_input)
         )
-        if any(character in vietnamese_marks for character in user_input):
-            return True
-        normalized = AIAgentCore._enum_key(user_input)
-        vietnamese_words = {
-            "TAO", "Tao", "VE", "VA", "CHO", "HOI", "DUNG", "DAP", "AN",
-            "NOI", "DUNG", "DE", "HAY", "GIUP", "TOI", "BAN", "DANH", "MUC",
-            "KHONG", "CO", "THEM", "MOT", "NHIEU", "BANG", "TIENG", "VIET",
-        }
-        english_words = {
-            "CREATE", "GENERATE", "WRITE", "QUESTION", "QUESTIONS", "ANSWER",
-            "OPTION", "OPTIONS", "ABOUT", "PLEASE", "ENGLISH", "HISTORY",
-            "SCIENCE", "TECHNOLOGY", "MULTIPLE", "CHOICE",
-        }
-        words = set(normalized.split())
-        if words.intersection(vietnamese_words):
-            return True
-        # English text on a Vietnamese UI is valid; do not reject its generated
-        # content merely because the selected navigation locale is vi.
-        return not bool(words.intersection(english_words))
 
     @staticmethod
     def _normalize_question_option(option: Any) -> Dict[str, Any]:
