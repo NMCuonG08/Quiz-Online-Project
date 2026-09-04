@@ -104,6 +104,71 @@ export class CloudinaryService {
     }
   }
 
+  async uploadImageFromUrl(url: string): Promise<Image | null> {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new InvalidFileTypeException(['public image URL']);
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    const privateHost =
+      hostname === 'localhost' ||
+      hostname === '::1' ||
+      hostname === '0.0.0.0' ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('169.254.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.local');
+    if (!['http:', 'https:'].includes(parsed.protocol) || privateHost) {
+      throw new InvalidFileTypeException(['public image URL']);
+    }
+
+    const folder =
+      this.configService.get<string>('CLOUDINARY_FOLDER') ?? 'error';
+    let uploadApiResponse: UploadApiResponse;
+    try {
+      uploadApiResponse = await cloudinary.uploader.upload(url, {
+        folder,
+        resource_type: 'image',
+        use_filename: false,
+        unique_filename: true,
+        overwrite: false,
+      });
+    } catch (error) {
+      this.logger.error('Cloudinary remote image upload failed', error as Error);
+      throw new ExternalServiceException(
+        'Cloudinary',
+        'upload remote image',
+        error as Error,
+      );
+    }
+
+    try {
+      return await this.prismaService.image.create({
+        data: {
+          url: uploadApiResponse.secure_url,
+          publicId: uploadApiResponse.public_id,
+          createdAt: new Date(uploadApiResponse.created_at),
+        },
+      });
+    } catch (error) {
+      try {
+        await cloudinary.uploader.destroy(uploadApiResponse.public_id);
+      } catch (rollbackError) {
+        this.logger.warn(
+          `Failed to rollback remote Cloudinary asset ${uploadApiResponse.public_id}: ${String(rollbackError)}`,
+        );
+      }
+      throw new ExternalServiceException(
+        'Database',
+        'save remote image record',
+        error as Error,
+      );
+    }
+  }
+
   async deleteImage(imageId: string): Promise<void> {
     const image = await this.prismaService.image.findUnique({
       where: { id: imageId },

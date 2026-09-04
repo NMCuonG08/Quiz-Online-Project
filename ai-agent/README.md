@@ -101,6 +101,31 @@ AI_PLANNER_CONFIDENCE_THRESHOLD=0.82
 AI_PLANNER_ESCALATE_WRITES=true
 ```
 
+Executor failover is configured independently from the planner tiers. Each
+executor attempt is bounded and the router moves to the fallback route instead
+of retrying the same provider. Configure a fallback only when it supports the
+same tool-calling contract:
+
+```env
+AI_EXECUTOR_FALLBACK_MODEL=gpt-4.1-mini
+AI_EXECUTOR_FALLBACK_API_KEY=...
+AI_EXECUTOR_FALLBACK_BASE_URL=https://api.openai.com/v1
+AI_EXECUTOR_FALLBACK_PROVIDER=openai
+AI_EXECUTOR_ATTEMPT_TIMEOUT_SECONDS=60
+AI_EXECUTOR_FALLBACK_TIMEOUT_SECONDS=60
+AI_MODEL_FAILURE_THRESHOLD=2
+AI_MODEL_COOLDOWN_SECONDS=30
+```
+
+The fallback is attempted before any model-generated write can cross the
+runtime approval boundary. A completed read result can be returned through a
+degraded response when the final model call is unavailable.
+
+For cross-provider failover, set `AI_EXECUTOR_FALLBACK_PROVIDER=anthropic`,
+provide an explicit Claude model and `AI_EXECUTOR_FALLBACK_API_KEY`. The
+Anthropic route uses the same LangChain tool-calling interface; it is not
+selected automatically merely because an Anthropic key exists.
+
 Trong `planner_legacy`, fast planner xử lý read intent rõ ràng. Request ambiguous,
 multi-intent, confidence thấp, write/destructive/admin được strong planner kiểm tra lại.
 Mỗi tier có thể dùng OpenAI-compatible base URL/key riêng; nếu không đặt thì

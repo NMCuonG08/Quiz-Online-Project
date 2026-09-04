@@ -4,12 +4,13 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 import time
 import uuid
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
@@ -52,9 +53,26 @@ app.add_middleware(
 )
 
 metrics = AgentMetrics()
-executor_api_key = os.getenv("AI_EXECUTOR_API_KEY") or os.getenv("OPENAI_API_KEY")
+executor_provider = os.getenv("AI_EXECUTOR_PROVIDER", "openai").strip().lower()
+executor_api_key = (
+    os.getenv("AI_EXECUTOR_API_KEY")
+    or (os.getenv("ANTHROPIC_API_KEY") if executor_provider in {"anthropic", "claude"} else os.getenv("OPENAI_API_KEY"))
+)
 executor_base_url = normalize_openai_base_url(
     os.getenv("AI_EXECUTOR_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+)
+fallback_provider = os.getenv("AI_EXECUTOR_FALLBACK_PROVIDER", "openai").strip().lower()
+fallback_model = os.getenv("AI_EXECUTOR_FALLBACK_MODEL") or (
+    os.getenv("OPENAI_MODEL") if fallback_provider not in {"anthropic", "claude"} else ""
+)
+fallback_api_key = os.getenv("AI_EXECUTOR_FALLBACK_API_KEY") or (
+    os.getenv("ANTHROPIC_API_KEY")
+    if fallback_provider in {"anthropic", "claude"}
+    else executor_api_key
+)
+fallback_base_url = normalize_openai_base_url(
+    os.getenv("AI_EXECUTOR_FALLBACK_BASE_URL")
+    or (os.getenv("OPENAI_BASE_URL") if fallback_provider not in {"anthropic", "claude"} else None)
 )
 agent = AIAgentCore(
     {
@@ -73,12 +91,25 @@ agent = AIAgentCore(
             os.getenv("AI_PLANNER_STRONG_BASE_URL") or executor_base_url
         ),
         "executor_reasoning_effort": os.getenv("AI_EXECUTOR_REASONING_EFFORT"),
+        "executor_provider": executor_provider,
+        "executor_fallback_model": fallback_model,
+        "executor_fallback_provider": fallback_provider,
+        "executor_fallback_api_key": fallback_api_key,
+        "executor_fallback_base_url": fallback_base_url,
+        "executor_attempt_timeout_seconds": float(
+            os.getenv("AI_EXECUTOR_ATTEMPT_TIMEOUT_SECONDS", "60")
+        ),
+        "executor_fallback_timeout_seconds": float(
+            os.getenv("AI_EXECUTOR_FALLBACK_TIMEOUT_SECONDS", "60")
+        ),
+        "model_failure_threshold": int(os.getenv("AI_MODEL_FAILURE_THRESHOLD", "2")),
+        "model_cooldown_seconds": float(os.getenv("AI_MODEL_COOLDOWN_SECONDS", "30")),
         "planner_fast_reasoning_effort": os.getenv("AI_PLANNER_FAST_REASONING_EFFORT"),
         "planner_strong_reasoning_effort": os.getenv("AI_PLANNER_STRONG_REASONING_EFFORT"),
         "executor_timeout_seconds": float(os.getenv("AI_EXECUTOR_TIMEOUT_SECONDS", "60")),
         "planner_fast_timeout_seconds": float(os.getenv("AI_PLANNER_FAST_TIMEOUT_SECONDS", "8")),
         "planner_strong_timeout_seconds": float(os.getenv("AI_PLANNER_STRONG_TIMEOUT_SECONDS", "25")),
-        "model_max_retries": int(os.getenv("AI_MODEL_MAX_RETRIES", "1")),
+        "model_max_retries": int(os.getenv("AI_MODEL_MAX_RETRIES", "0")),
         "langgraph_use_responses_api": os.getenv("AI_LANGGRAPH_USE_RESPONSES_API", "false").lower() == "true",
         "planner_confidence_threshold": float(os.getenv("AI_PLANNER_CONFIDENCE_THRESHOLD", "0.82")),
         "planner_escalate_writes": os.getenv("AI_PLANNER_ESCALATE_WRITES", "true").lower() == "true",
@@ -187,22 +218,32 @@ def build_request_context(
     return context
 
 
+def require_ops_access(request: Request) -> None:
+    """Protect operational metadata while keeping a minimal health probe public."""
+    if os.getenv("NODE_ENV", "development").lower() != "production":
+        return
+    expected = os.getenv("AI_OPS_TOKEN", "")
+    provided = request.headers.get("X-AI-Ops-Token", "")
+    if not expected or not secrets.compare_digest(provided, expected):
+        raise HTTPException(status_code=404, detail="Not found")
+
+
 @app.get("/")
 async def root():
     return {
         "status": "ok",
         "service": "quiz-ai-agent",
-        "stream": "/chat/stream",
-        "model": agent.model,
-        "api_mode": agent.api_mode,
-        "orchestrator": agent.orchestrator,
-        "orchestration_mode": agent.orchestration_mode,
-        "model_configured": agent.client is not None,
     }
 
 
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
+
 @app.get("/tools")
-async def tools():
+async def tools(request: Request):
+    require_ops_access(request)
     return {
         "tools": [
             {"name": tool["name"], "description": tool["description"]}
@@ -212,7 +253,8 @@ async def tools():
 
 
 @app.get("/ready")
-async def ready():
+async def ready(request: Request):
+    require_ops_access(request)
     status = await agent.readiness()
     hardening = evaluate_production_hardening()
     status["hardening_ready"] = hardening.ready
@@ -224,7 +266,8 @@ async def ready():
 
 
 @app.get("/metrics", response_class=PlainTextResponse)
-async def get_metrics() -> str:
+async def get_metrics(request: Request) -> str:
+    require_ops_access(request)
     return metrics.prometheus()
 
 

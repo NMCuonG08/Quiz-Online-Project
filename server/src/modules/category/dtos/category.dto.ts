@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsUUID,
   ValidateIf,
+  IsUrl,
 } from 'class-validator';
 import { IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -27,6 +28,11 @@ export class CreateCategoryDto {
   })
   @IsOptional()
   iconFile?: Express.Multer.File;
+
+  @ApiPropertyOptional({ description: 'Public image URL used as category icon' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  icon_url?: string;
 
   @ApiProperty({ example: 'category-1' })
   @IsString()
@@ -99,4 +105,9 @@ export class UpdateCategoryDto {
   })
   @IsOptional()
   iconFile?: Express.Multer.File;
+
+  @ApiPropertyOptional({ description: 'Public image URL used as category icon' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  icon_url?: string;
 }

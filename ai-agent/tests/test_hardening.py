@@ -17,6 +17,7 @@ def production_env():
         "AGENT_MAX_MODEL_CALLS": "24",
         "AGENT_MAX_TOOL_CALLS": "32",
         "AGENT_MAX_TOTAL_TOKENS": "100000",
+        "AI_OPS_TOKEN": "ops-token-for-tests",
     }
 
 
@@ -68,4 +69,3 @@ class ProductionHardeningTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

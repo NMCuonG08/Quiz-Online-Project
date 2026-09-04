@@ -15,7 +15,7 @@ interface StreamChatOptions {
 }
 
 const AGENT_URL = (process.env.NEXT_PUBLIC_AI_AGENT_URL || "/api/ai").replace(/\/$/, "");
-const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333").replace(/\/$/, "");
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3333").replace(/\/$/, "");
 let refreshPromise: Promise<string | null> | null = null;
 
 export class AgentStreamError extends Error {

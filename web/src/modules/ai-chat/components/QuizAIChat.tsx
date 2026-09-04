@@ -6,8 +6,10 @@ import {
   ArrowUp,
   BarChart3,
   Bot,
+  Check,
   CheckCircle2,
   ChevronRight,
+  Copy,
   Info,
   List,
   MessageCircle,
@@ -29,8 +31,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAppDispatch, useAppSelector } from "@/hooks/useRedux";
 import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
+import { useCopyToClipboard } from "@/modules/client/room-quiz/hooks/useCopyToClipboard";
 import { forceLogout, tokenRefreshed } from "@/modules/auth/common/slices/authSlice";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/api";
 import { AgentStreamError, streamAgentChat } from "../services/agent-stream.service";
 import {
   cancelAgentRun,
@@ -110,6 +114,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_quiz_result: "Đọc kết quả quiz",
   search_knowledge: "Tìm nguồn kiến thức",
   web_search: "Tìm kiếm trên web",
+  search_images: "Tìm ảnh minh họa",
   create_quiz: "Tạo quiz",
   create_quiz_with_questions: "Tạo quiz hoàn chỉnh",
   update_quiz: "Cập nhật quiz",
@@ -187,7 +192,13 @@ function isUISurface(value: unknown): value is UISurface {
       && typeof block.tone === "string"
       && validTones.has(block.tone)
       && Array.isArray(block.items)
-      && block.items.every((entry) => typeof asRecord(entry).label === "string")
+      && block.items.every((entry) => {
+        const item = asRecord(entry);
+        const imageUrl = item.image_url;
+        return typeof item.label === "string"
+          && (imageUrl === undefined || imageUrl === null || (typeof imageUrl === "string" && /^(https?:\/\/|\/)/i.test(imageUrl)))
+          && (item.image_alt === undefined || item.image_alt === null || typeof item.image_alt === "string");
+      })
       && Array.isArray(block.columns)
       && block.columns.every((entry) => typeof entry === "string")
       && Array.isArray(block.rows)
@@ -295,6 +306,7 @@ export default function QuizAIChat() {
   const [sessionId, setSessionId] = useState<string>();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Array<{ session_id: string; title: string; updated_at: string }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [backgroundRun, setBackgroundRun] = useState<BackgroundRun | null>(null);
   const [backgroundStatus, setBackgroundStatus] = useState<string | null>(null);
@@ -356,30 +368,60 @@ export default function QuizAIChat() {
     setSessionId(storedSessionId);
     setMessages([WELCOME_MESSAGE]);
     setHistoryOpen(false);
-    if (!user?.id || !storedSessionId) return;
     const token = localStorage.getItem("auth_token");
-    if (!token) return;
-    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333").replace(/\/$/, "");
+    if (!user?.id || !token) return;
     const controller = new AbortController();
-    void fetch(`${baseUrl}/api/ai-chat/conversations/${storedSessionId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    }).then(async (response) => {
-      setHistoryUnavailable(false);
-      if (!response.ok) {
-        if (response.status === 404) {
-          localStorage.removeItem(sessionStorageKey);
-          setSessionId(undefined);
+    setHistoryLoading(true);
+    void (async () => {
+      try {
+        let targetSessionId = storedSessionId;
+        let conversationResponse: { status: number; data: unknown } | null = null;
+        if (targetSessionId) {
+          conversationResponse = await apiClient.get(
+            `/api/ai-chat/conversations/${targetSessionId}`,
+            { signal: controller.signal, validateStatus: (status) => status < 500 },
+          );
         }
-        return;
+
+        // A new login, cleared storage, or an expired session should recover
+        // the latest conversation instead of leaving the chat at welcome.
+        if (!conversationResponse || conversationResponse.status === 404) {
+          const listResponse = await apiClient.get(
+            "/api/ai-chat/conversations",
+            { signal: controller.signal },
+          );
+          const listEnvelope = asRecord(listResponse.data);
+          const conversations = Array.isArray(listEnvelope.data)
+            ? listEnvelope.data as Array<{ session_id: string; title: string; updated_at: string }>
+            : [];
+          if (!conversations.length) return;
+          setHistory(conversations);
+          targetSessionId = conversations[0].session_id;
+          conversationResponse = await apiClient.get(
+            `/api/ai-chat/conversations/${targetSessionId}`,
+            { signal: controller.signal },
+          );
+        }
+
+        const envelope = asRecord(conversationResponse.data);
+        const conversation = asRecord(envelope.data);
+        const restoredMessages = hydrateHistoryMessages(
+          Array.isArray(conversation.messages) ? conversation.messages as PersistedMessage[] : [],
+        );
+        if (!controller.signal.aborted && targetSessionId && restoredMessages.length) {
+          localStorage.setItem(sessionStorageKey, targetSessionId);
+          setSessionId(targetSessionId);
+          setMessages(restoredMessages);
+        }
+        setHistoryUnavailable(false);
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setHistoryUnavailable(true);
+        }
+      } finally {
+        if (!controller.signal.aborted) setHistoryLoading(false);
       }
-      const payload = await response.json();
-      setMessages(hydrateHistoryMessages(payload.data?.messages || []));
-    }).catch((error: unknown) => {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        setHistoryUnavailable(true);
-      }
-    });
+    })();
     return () => controller.abort();
   }, [sessionStorageKey, user?.id]);
 
@@ -397,12 +439,13 @@ export default function QuizAIChat() {
   const loadHistory = useCallback(async () => {
     const token = localStorage.getItem("auth_token");
     if (!token) return setHistory([]);
-    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333").replace(/\/$/, "");
     try {
-      const response = await fetch(`${baseUrl}/api/ai-chat/conversations`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) return;
-      const payload = await response.json();
-      setHistory(payload.data || []);
+      const response = await apiClient.get("/api/ai-chat/conversations");
+      const payload = asRecord(response.data);
+      const conversations = Array.isArray(payload.data)
+        ? payload.data as Array<{ session_id: string; title: string; updated_at: string }>
+        : [];
+      setHistory(conversations);
       setHistoryUnavailable(false);
     } catch {
       setHistoryUnavailable(true);
@@ -412,14 +455,15 @@ export default function QuizAIChat() {
   const openHistoryConversation = async (targetSessionId: string) => {
     const token = localStorage.getItem("auth_token");
     if (!token) return;
-    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333").replace(/\/$/, "");
     try {
-      const response = await fetch(`${baseUrl}/api/ai-chat/conversations/${targetSessionId}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) return;
-      const payload = await response.json();
+      const response = await apiClient.get(`/api/ai-chat/conversations/${targetSessionId}`);
+      const payload = asRecord(response.data);
+      const conversation = asRecord(payload.data);
       setSessionId(targetSessionId);
       localStorage.setItem(sessionStorageKey, targetSessionId);
-      setMessages(hydrateHistoryMessages(payload.data?.messages || []));
+      setMessages(hydrateHistoryMessages(
+        Array.isArray(conversation.messages) ? conversation.messages as PersistedMessage[] : [],
+      ));
       setHistoryOpen(false);
       setHistoryUnavailable(false);
     } catch {
@@ -430,13 +474,8 @@ export default function QuizAIChat() {
   const deleteHistoryConversation = async (targetSessionId: string) => {
     const token = localStorage.getItem("auth_token");
     if (!token) return;
-    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333").replace(/\/$/, "");
     try {
-      const response = await fetch(
-        `${baseUrl}/api/ai-chat/conversations/${targetSessionId}`,
-        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!response.ok) return;
+      await apiClient.delete(`/api/ai-chat/conversations/${targetSessionId}`);
       setHistory((current) => current.filter((item) => item.session_id !== targetSessionId));
       if (targetSessionId === sessionId) {
         abortRef.current?.abort();
@@ -755,7 +794,14 @@ export default function QuizAIChat() {
           </header>
           {historyOpen && (
             <div className="max-h-44 overflow-y-auto border-b border-border bg-background p-2">
-              {historyUnavailable ? <p className="px-2 py-3 text-xs text-amber-600">Backend đang offline; lịch sử chat sẽ tải lại khi kết nối.</p> : history.length ? history.map((item) => (
+              {historyUnavailable ? (
+                <div className="px-2 py-3 text-xs text-amber-600">
+                  <p>Không tải được lịch sử chat. Có thể do kết nối, phiên đăng nhập hoặc địa chỉ API.</p>
+                  <button type="button" onClick={() => void loadHistory()} className="mt-1 font-semibold underline underline-offset-2 hover:no-underline">
+                    Thử tải lại
+                  </button>
+                </div>
+              ) : history.length ? history.map((item) => (
                 <div key={item.session_id} className="group flex items-center gap-1 rounded-lg hover:bg-muted">
                   <button onClick={() => void openHistoryConversation(item.session_id)} className="min-w-0 flex-1 px-2.5 py-2 text-left text-xs">
                     <span className="block truncate font-medium">{item.title}</span>
@@ -782,9 +828,22 @@ export default function QuizAIChat() {
           />
 
           <div ref={scrollRef} className="flex-1 space-y-5 overflow-y-auto bg-muted/20 px-4 py-5" aria-live="polite">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} onAction={handleAction} onFormSubmit={submitStructuredForm} />
-            ))}
+            {historyLoading && <p className="text-center text-[10px] text-muted-foreground">Đang tải lịch sử cuộc trò chuyện...</p>}
+            {messages.map((message, index) => {
+              const retryPrompt = message.error
+                ? [...messages.slice(0, index)].reverse().find((item) => item.role === "user")?.content
+                : undefined;
+              return (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  retryPrompt={retryPrompt}
+                  onRetry={retryPrompt ? (prompt) => void sendMessage(prompt) : undefined}
+                  onAction={handleAction}
+                  onFormSubmit={submitStructuredForm}
+                />
+              );
+            })}
           </div>
 
           <div className="border-t border-border/70 bg-background px-3 pb-3 pt-2.5">
@@ -848,14 +907,19 @@ export default function QuizAIChat() {
 
 function MessageBubble({
   message,
+  retryPrompt,
+  onRetry,
   onAction,
   onFormSubmit,
 }: {
   message: ChatMessage;
+  retryPrompt?: string;
+  onRetry?: (prompt: string) => void;
   onAction: (action: ChatAction) => void;
   onFormSubmit: (block: UIBlock, values: Record<string, string>) => void;
 }) {
   const assistant = message.role === "assistant";
+  const { copied, copyToClipboard } = useCopyToClipboard();
   return (
     <div className={cn("flex gap-2.5", !assistant && "justify-end")}>
       {assistant && (
@@ -880,6 +944,28 @@ function MessageBubble({
           )}
           {message.content && message.isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-amber-500 align-middle" />}
         </div>
+        {assistant && message.error && retryPrompt && !message.isStreaming && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => void copyToClipboard(retryPrompt)}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Sao chép prompt lỗi"
+            >
+              {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+              {copied ? "Đã copy prompt" : "Copy prompt"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onRetry?.(retryPrompt)}
+              className="inline-flex items-center gap-1 rounded-lg bg-amber-400/20 px-2 py-1 text-[10px] font-semibold text-amber-800 hover:bg-amber-400/35 dark:text-amber-200"
+              title="Chạy lại prompt lỗi"
+            >
+              <RefreshCw className="size-3" />
+              Chạy lại
+            </button>
+          </div>
+        )}
         {message.surface && <DynamicSurface surface={message.surface} onAction={onAction} onFormSubmit={onFormSubmit} />}
         {!!message.citations?.length && (
           <div className="mt-3 border-t border-border pt-2">
@@ -1034,7 +1120,7 @@ function DynamicBlock({
   }
 
   if (block.type === "list") {
-    return <div><BlockHeading icon={<List className="size-4" />} block={block} /><div className="divide-y divide-border">{block.items.map((item, index) => <div key={`${item.label}-${index}`} className="flex items-start justify-between gap-3 px-3.5 py-2.5"><div className="min-w-0"><p className="text-[10px] font-bold">{item.label}</p>{item.description && <p className="mt-0.5 text-[9px] text-muted-foreground">{item.description}</p>}</div><div className="shrink-0 text-right">{item.value && <p className="text-[10px] font-semibold">{item.value}</p>}{item.badge && <span className="rounded-md bg-muted px-1.5 py-0.5 text-[8px] font-bold">{item.badge}</span>}</div></div>)}</div></div>;
+    return <div><BlockHeading icon={<List className="size-4" />} block={block} /><div className="divide-y divide-border">{block.items.map((item, index) => <div key={`${item.label}-${index}`} className="flex items-start justify-between gap-3 px-3.5 py-2.5"><div className="flex min-w-0 items-start gap-2"><div className="min-w-0">{item.image_url && <img src={item.image_url} alt={item.image_alt || item.label} className="mb-1.5 h-20 w-20 rounded-lg object-cover" loading="lazy" referrerPolicy="no-referrer" />}<p className="text-[10px] font-bold">{item.label}</p>{item.description && <p className="mt-0.5 text-[9px] text-muted-foreground">{item.description}</p>}</div></div><div className="shrink-0 text-right">{item.value && <p className="text-[10px] font-semibold">{item.value}</p>}{item.badge && <span className="rounded-md bg-muted px-1.5 py-0.5 text-[8px] font-bold">{item.badge}</span>}</div></div>)}</div></div>;
   }
 
   if (block.type === "table") {

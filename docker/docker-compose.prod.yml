@@ -75,9 +75,11 @@ services:
       - path: ../ai-agent/config/.env
         required: false
     environment:
+      NODE_ENV: production
       BACKEND_URL: http://app:5000
       REDIS_URL: ${AI_REDIS_URL:-redis://redis-cache:6379/0}
       AI_REQUIRE_REDIS: "true"
+      AI_OPS_TOKEN: ${AI_OPS_TOKEN:-}
       AI_ORCHESTRATION_MODE: ${AI_ORCHESTRATION_MODE:-agent_first}
       AI_EXECUTOR_MODEL: ${AI_EXECUTOR_MODEL:-}
       AI_EXECUTOR_API_KEY: ${AI_EXECUTOR_API_KEY:-}
@@ -104,12 +106,12 @@ services:
       KNOWLEDGE_EMBEDDING_MODEL: ${KNOWLEDGE_EMBEDDING_MODEL:-text-embedding-3-small}
       KNOWLEDGE_EMBEDDING_API_KEY: ${KNOWLEDGE_EMBEDDING_API_KEY:-}
       KNOWLEDGE_EMBEDDING_BASE_URL: ${KNOWLEDGE_EMBEDDING_BASE_URL:-https://api.openai.com/v1}
-      CORS_ORIGINS: ${AI_AGENT_CORS_ORIGINS:-https://localhost}
+      CORS_ORIGINS: ${AI_AGENT_CORS_ORIGINS:-}
       PORT: 8000
     expose:
       - "8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -135,6 +137,7 @@ services:
       - path: ../ai-agent/config/.env
         required: false
     environment:
+      NODE_ENV: production
       BACKEND_URL: http://app:5000
       REDIS_URL: ${AI_REDIS_URL:-redis://redis-cache:6379/0}
       AI_REQUIRE_REDIS: "true"

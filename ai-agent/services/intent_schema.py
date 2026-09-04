@@ -35,6 +35,7 @@ InteractionIntent = Literal[
     "category_update",
     "category_delete",
     "knowledge_search",
+    "image_search",
     "knowledge_import",
     "knowledge_list",
     "knowledge_submit_review",
@@ -66,7 +67,7 @@ ReferenceMode = Literal["standalone", "previous_turn", "pending_workflow", "expl
 SelectionStrategy = Literal["none", "exact", "best_match", "only_option", "first_available", "user_choice"]
 IntentResource = Literal[
     "conversation", "quiz", "attempt", "question", "category", "knowledge",
-    "account", "admin", "time", "system",
+    "account", "admin", "media", "time", "system",
 ]
 IntentOperation = Literal[
     "respond", "help", "search", "recommend", "detail", "list", "create",
@@ -120,7 +121,7 @@ READ_ONLY_INTENTS: frozenset[str] = frozenset({
     "conversation_general", "capability_help", "quiz_search", "quiz_recommend",
     "quiz_detail", "quiz_resume", "quiz_result", "quiz_history", "quiz_owned", "quiz_attempts", "quiz_in_progress", "question_list",
     "category_list", "category_recommend", "knowledge_search", "knowledge_list", "account_identity",
-    "account_permissions", "admin_dashboard", "admin_audit", "temporal",
+    "account_permissions", "admin_dashboard", "admin_audit", "image_search", "temporal",
     "auth_required", "no_evidence", "unsupported",
 })
 
@@ -162,6 +163,7 @@ INTENT_ALLOWED_TOOLS: dict[str, frozenset[str]] = {
     "category_update": frozenset({"list_categories", "update_category", "render_ui"}),
     "category_delete": frozenset({"list_categories", "delete_category", "render_ui"}),
     "knowledge_search": frozenset({"search_knowledge", "web_search", "render_ui"}),
+    "image_search": frozenset({"search_images", "render_ui"}),
     "knowledge_import": frozenset({"import_knowledge_url", "list_knowledge_sources", "render_ui"}),
     "knowledge_list": frozenset({"list_knowledge_sources", "render_ui"}),
     "knowledge_submit_review": frozenset({"list_knowledge_sources", "submit_knowledge_review", "render_ui"}),
@@ -202,6 +204,7 @@ INTENT_DOMAINS: dict[str, frozenset[str]] = {
         "knowledge_search", "knowledge_import", "knowledge_list",
         "knowledge_submit_review", "knowledge_review",
     }),
+    "media": frozenset({"image_search"}),
     "account": frozenset({"account_identity", "account_permissions"}),
     "admin": frozenset({"admin_dashboard", "admin_audit"}),
     "system": frozenset({"temporal", "auth_required", "no_evidence", "unsupported"}),
@@ -237,6 +240,7 @@ INTENT_METADATA: dict[str, dict[str, Any]] = {
     "category_update": {"resource": "category", "operation": "update", "scopes": {"admin"}, "example": "Đổi tên category"},
     "category_delete": {"resource": "category", "operation": "delete", "scopes": {"admin"}, "example": "Xác nhận xóa category"},
     "knowledge_search": {"resource": "knowledge", "operation": "search", "scopes": {"learner", "creator", "admin"}, "example": "Theo tài liệu, RAG là gì?"},
+    "image_search": {"resource": "media", "operation": "search", "scopes": {"learner", "creator", "admin"}, "example": "Tìm ảnh minh họa cho lịch sử Mỹ"},
     "knowledge_import": {"resource": "knowledge", "operation": "create", "scopes": {"creator", "admin"}, "example": "Nhập tài liệu từ URL"},
     "knowledge_list": {"resource": "knowledge", "operation": "list", "scopes": {"creator", "admin"}, "example": "Liệt kê nguồn kiến thức"},
     "knowledge_submit_review": {"resource": "knowledge", "operation": "submit_review", "scopes": {"creator", "admin"}, "example": "Gửi nguồn sang chờ duyệt"},

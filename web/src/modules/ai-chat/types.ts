@@ -28,6 +28,8 @@ export interface UIItem {
   value: string;
   description: string;
   badge: string;
+  image_url?: string | null;
+  image_alt?: string | null;
 }
 
 export interface UIStat {

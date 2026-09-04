@@ -8,6 +8,7 @@ import {
   IsEnum,
   IsBoolean,
   Min,
+  IsUrl,
 } from 'class-validator';
 import {
   QuestionTypeEnum,
@@ -108,6 +109,11 @@ export class CreateQuestionDto {
   })
   @IsOptional()
   media?: any;
+
+  @ApiPropertyOptional({ description: 'Public image URL used as question media' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  media_url?: string;
 
   @ApiPropertyOptional({
     type: 'array',

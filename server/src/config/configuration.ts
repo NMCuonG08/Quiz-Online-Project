@@ -15,7 +15,10 @@ export default () => ({
   cors: {
     origin:
       process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL || false
+        ? (process.env.FRONTEND_URL || '')
+            .split(',')
+            .map((origin) => origin.trim())
+            .filter(Boolean)
         : [
             'http://localhost:5173',
             'http://localhost:3000',

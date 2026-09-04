@@ -84,6 +84,17 @@ class UIItem(BaseModel):
     value: str = ""
     description: str = ""
     badge: str = ""
+    image_url: Optional[str] = None
+    image_alt: Optional[str] = None
+
+    @field_validator("image_url")
+    @classmethod
+    def safe_image_url(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not value.strip():
+            return None
+        if not value.startswith(("https://", "http://", "/")):
+            raise ValueError("image_url chỉ được là URL http(s) hoặc đường dẫn nội bộ")
+        return value
 
 
 class UIStat(BaseModel):

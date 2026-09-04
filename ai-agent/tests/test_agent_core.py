@@ -632,7 +632,7 @@ class LangGraphContractTests(unittest.TestCase):
 
     def test_only_retrieval_tools_are_guarded_against_empty_retries(self):
         self.assertEqual(RETRY_GUARDED_TOOLS, {
-            "search_quizzes", "get_quiz", "search_knowledge", "web_search",
+            "search_quizzes", "get_quiz", "search_knowledge", "web_search", "search_images",
         })
 
     def test_write_or_ambiguous_plan_escalates_to_strong_model(self):

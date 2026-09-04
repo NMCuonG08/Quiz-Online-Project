@@ -8,6 +8,7 @@ import {
   IsEnum,
   IsBoolean,
   IsDateString,
+  IsUrl,
   Max,
   Min,
 } from 'class-validator';
@@ -91,6 +92,11 @@ export class CreateQuizDto {
   })
   @IsOptional()
   thumbnail?: Express.Multer.File;
+
+  @ApiPropertyOptional({ description: 'Public image URL used as quiz thumbnail' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  thumbnail_url?: string;
 
   @ApiProperty({
     example: '2024-01-15T10:30:00.000Z',

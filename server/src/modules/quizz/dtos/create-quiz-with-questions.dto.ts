@@ -9,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -39,6 +40,10 @@ class CreateQuizQuestionDto {
   @IsString()
   @IsNotEmpty()
   question_text: string;
+
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  media_url?: string;
 
   @IsEnum(QuestionTypeEnum)
   question_type: QuestionTypeEnum;

@@ -18,6 +18,19 @@ import { WebSocketAdapter } from '@/common/middlewares/websocket.adapter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const configuredFrontendOrigins = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const corsOrigins =
+    process.env.NODE_ENV === 'production'
+      ? configuredFrontendOrigins
+      : [
+          'http://localhost:5173',
+          'http://localhost:3000',
+          'http://127.0.0.1:5173',
+        ];
+
   // Add cookie parser middleware
   app.use(cookieParser());
 
@@ -145,14 +158,7 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL || false
-        : [
-            'http://localhost:5173',
-            'http://localhost:3000',
-            'http://127.0.0.1:5173',
-          ],
+    origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

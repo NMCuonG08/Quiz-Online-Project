@@ -11,6 +11,10 @@ from langchain_core._api.deprecation import suppress_langchain_deprecation_warni
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+try:
+    from langchain_anthropic import ChatAnthropic
+except ImportError:  # pragma: no cover - optional provider
+    ChatAnthropic = None  # type: ignore[assignment,misc]
 from pydantic import BaseModel, Field
 from .protocol import UIAction, UIBlock
 from .intent_schema import (
@@ -20,6 +24,7 @@ from .intent_schema import (
     InteractionPlan,
 )
 from .harness.context import ContextBuilder
+from .model_router import ModelRoute, ModelRouter, TraceObserver
 try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 except ImportError:  # pragma: no cover - optional in minimal local installs
@@ -110,10 +115,59 @@ class LangGraphQuizRunner:
         use_responses_api: bool = False,
         planner_confidence_threshold: float = 0.82,
         planner_escalate_writes: bool = True,
+        executor_provider: str = "openai",
+        executor_fallback_model: Optional[str] = None,
+        executor_fallback_provider: str = "openai",
+        executor_fallback_api_key: Optional[str] = None,
+        executor_fallback_base_url: Optional[str] = None,
+        executor_attempt_timeout_seconds: float = 60.0,
+        executor_fallback_timeout_seconds: float = 60.0,
+        model_failure_threshold: int = 2,
+        model_cooldown_seconds: float = 30.0,
     ) -> None:
-        self.llm = self._make_llm(
+        self.executor_provider = executor_provider
+        self.llm = self._make_provider_client(
+            executor_provider,
             model, api_key, base_url, 0.2, executor_reasoning_effort,
-            executor_timeout_seconds, model_max_retries, use_responses_api,
+            executor_timeout_seconds, 0, use_responses_api,
+        )
+        executor_routes = [ModelRoute(
+            name="primary",
+            provider=executor_provider,
+            model=model,
+            client=self.llm,
+            timeout_seconds=max(1.0, executor_attempt_timeout_seconds),
+        )]
+        fallback_key = executor_fallback_api_key or api_key
+        fallback_base_url = executor_fallback_base_url or base_url
+        has_distinct_fallback = (
+            executor_fallback_provider != executor_provider
+            or executor_fallback_model != model
+            or fallback_base_url != base_url
+        )
+        if executor_fallback_model and fallback_key and has_distinct_fallback:
+            fallback_client = self._make_provider_client(
+                executor_fallback_provider,
+                executor_fallback_model,
+                fallback_key,
+                fallback_base_url,
+                0.2,
+                executor_reasoning_effort,
+                executor_timeout_seconds,
+                0,
+                use_responses_api,
+            )
+            executor_routes.append(ModelRoute(
+                name="fallback",
+                provider=executor_fallback_provider,
+                model=executor_fallback_model,
+                client=fallback_client,
+                timeout_seconds=max(1.0, executor_fallback_timeout_seconds),
+            ))
+        self.executor_router = ModelRouter(
+            executor_routes,
+            failure_threshold=model_failure_threshold,
+            cooldown_seconds=model_cooldown_seconds,
         )
         self.planner_fast = self._make_llm(
             planner_fast_model or model,
@@ -122,7 +176,7 @@ class LangGraphQuizRunner:
             0,
             planner_fast_reasoning_effort,
             planner_fast_timeout_seconds,
-            model_max_retries,
+            0,
             use_responses_api,
         )
         self.planner_strong = self._make_llm(
@@ -132,7 +186,7 @@ class LangGraphQuizRunner:
             0,
             planner_strong_reasoning_effort,
             planner_strong_timeout_seconds,
-            model_max_retries,
+            0,
             use_responses_api,
         )
         self.planner_confidence_threshold = max(0.0, min(planner_confidence_threshold, 1.0))
@@ -166,6 +220,36 @@ class LangGraphQuizRunner:
         if reasoning_effort:
             options["reasoning_effort"] = reasoning_effort
         return ChatOpenAI(**options)
+
+    @staticmethod
+    def _make_provider_client(
+        provider: str,
+        model: str,
+        api_key: str,
+        base_url: Optional[str],
+        temperature: float,
+        reasoning_effort: Optional[str],
+        timeout_seconds: float,
+        max_retries: int,
+        use_responses_api: bool,
+    ) -> Any:
+        normalized = (provider or "openai").strip().lower()
+        if normalized in {"anthropic", "claude"}:
+            if ChatAnthropic is None:
+                raise RuntimeError(
+                    "Anthropic provider requested but langchain-anthropic is not installed."
+                )
+            return ChatAnthropic(
+                model=model,
+                anthropic_api_key=api_key,
+                temperature=temperature,
+                timeout=max(1.0, timeout_seconds),
+                max_retries=max(0, max_retries),
+            )
+        return LangGraphQuizRunner._make_llm(
+            model, api_key, base_url, temperature, reasoning_effort,
+            timeout_seconds, max_retries, use_responses_api,
+        )
 
     async def _get_checkpointer(self) -> Optional[Any]:
         if not self.postgres_url or AsyncPostgresSaver is None:
@@ -209,40 +293,54 @@ class LangGraphQuizRunner:
         memory: Optional[list[Any]] = None,
         evidence: Optional[list[Any]] = None,
         agent_first: bool = False,
+        trace_observer: Optional[TraceObserver] = None,
     ) -> AIMessage:
+        # Keep the primary route replaceable for tests and controlled runtime
+        # overrides without rebuilding the whole runner.
+        primary_route = self.executor_router.routes[0]
+        if primary_route.client is not self.llm:
+            self.executor_router.routes[0] = ModelRoute(
+                name=primary_route.name,
+                provider=self.executor_provider,
+                model=getattr(self.llm, "model_name", primary_route.model),
+                client=self.llm,
+                timeout_seconds=primary_route.timeout_seconds,
+            )
         tools = self._build_tools(allowed_tools, dispatch)
-        model = self.llm.bind_tools(
-            tools,
-            **({"parallel_tool_calls": False} if agent_first else {}),
-        )
 
         async def assistant(state: AgentGraphState) -> dict[str, list[AIMessage]]:
-            started = time.perf_counter()
             try:
                 if before_model_call:
                     before_model_call()
-                message = await model.ainvoke(state["messages"], config=config)
+                message, _ = await self.executor_router.ainvoke(
+                    state["messages"],
+                    config=config,
+                    operation="executor",
+                    tools=tools,
+                    bind_kwargs={
+                        "parallel_tool_calls": False,
+                    } if agent_first else {},
+                    record_model=record_model,
+                    trace_observer=trace_observer,
+                )
             except Exception:
-                if record_model:
-                    record_model(self.llm.model_name, "error", time.perf_counter() - started, {})
                 raise
-            if record_model:
-                record_model(self.llm.model_name, "success", time.perf_counter() - started, message.usage_metadata or {})
             return {"messages": [message]}
 
         async def general_response(state: AgentGraphState) -> dict[str, list[AIMessage]]:
             """Fast path: general chat never receives tool schemas or ToolNode."""
-            started = time.perf_counter()
             try:
                 if before_model_call:
                     before_model_call()
-                message = await self.llm.ainvoke(state["messages"], config=config)
+                message, _ = await self.executor_router.ainvoke(
+                    state["messages"],
+                    config=config,
+                    operation="executor_general",
+                    record_model=record_model,
+                    trace_observer=trace_observer,
+                )
             except Exception:
-                if record_model:
-                    record_model(self.llm.model_name, "error", time.perf_counter() - started, {})
                 raise
-            if record_model:
-                record_model(self.llm.model_name, "success", time.perf_counter() - started, message.usage_metadata or {})
             return {"messages": [message]}
 
         async def router(_state: AgentGraphState) -> Command[Literal["general_response", "assistant"]]:
@@ -331,7 +429,7 @@ Critical distinction:
 - quiz_search means the user asks to find/show/list quizzes matching an explicit query or topic. Example: 'Tìm quiz Python cơ bản cho người mới' → quiz_search.
 - quiz_recommend means the user asks the assistant to rank, choose, suggest, personalize, or tell them which quiz is best. Example: 'Bạn recommend quiz Python nào cho tôi?' → quiz_recommend.
 
-Intent families cover conversation/help; quiz search/recommend/detail/create/update/delete/publish/unpublish/start/resume/result/history/owned/attempts/in-progress; question list/create/update/delete/duplicate/reorder; category list/recommend/create/update/delete; knowledge search/import/list/submit-review/review; account identity/permissions; admin dashboard/audit; temporal/auth/no-evidence/unsupported.
+Intent families cover conversation/help; quiz search/recommend/detail/create/update/delete/publish/unpublish/start/resume/result/history/owned/attempts/in-progress; question list/create/update/delete/duplicate/reorder; category list/recommend/create/update/delete; knowledge search/import/list/submit-review/review; image search; account identity/permissions; admin dashboard/audit; temporal/auth/no-evidence/unsupported.
 
 Personal-data distinctions:
 - "lịch sử làm quiz" means completed learning history → quiz_history.
@@ -679,6 +777,13 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Se
                 """Search web only after internal sources are insufficient."""
                 return await dispatch("web_search", {"query": query, "limit": limit})
             tools.append(web_search)
+
+        if include("search_images"):
+            @tool
+            async def search_images(query: str, limit: Limit10 = 8) -> str:
+                """Retrieve public image URLs; do not generate or upload images."""
+                return await dispatch("search_images", {"query": query, "limit": limit})
+            tools.append(search_images)
 
         if include("list_knowledge_sources"):
             @tool

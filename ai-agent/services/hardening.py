@@ -140,6 +140,15 @@ def evaluate_production_hardening(
         "Set positive model, tool and token budgets.",
     )
 
+    add(
+        "ops_endpoint_auth",
+        not production or _configured(values.get("AI_OPS_TOKEN")),
+        "Operational endpoints require an ops token."
+        if _configured(values.get("AI_OPS_TOKEN"))
+        else "Operational endpoint token is missing.",
+        "Set AI_OPS_TOKEN and keep /healthz as the only public health probe.",
+    )
+
     placeholders = ("your_", "replace_me", "changeme", "example.com")
     sensitive_keys = (
         "OPENAI_API_KEY",

@@ -55,7 +55,10 @@ UI_BLOCK = {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"label": STRING, "value": STRING, "description": STRING, "badge": STRING},
+                "properties": {
+                    "label": STRING, "value": STRING, "description": STRING, "badge": STRING,
+                    "image_url": STRING, "image_alt": STRING,
+                },
                 "required": ["label"],
                 "additionalProperties": False,
             },
@@ -167,7 +170,7 @@ TOOLS = [
     function_tool(
         "create_category",
         "Admin only: create a quiz category. Requires confirmation.",
-        {"name": STRING, "description": STRING, "slug": STRING, "is_active": BOOLEAN, "parent_id": STRING},
+        {"name": STRING, "description": STRING, "slug": STRING, "is_active": BOOLEAN, "parent_id": STRING, "icon_url": STRING},
         ["name", "description", "slug", "is_active"],
     ),
     function_tool(
@@ -197,6 +200,7 @@ TOOLS = [
             "is_active": BOOLEAN,
             "quiz_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]},
             "instructions": STRING,
+            "thumbnail_url": STRING,
         },
         ["title", "slug", "category_id", "difficulty_level", "time_limit", "quiz_type"],
     ),
@@ -206,6 +210,7 @@ TOOLS = [
         {
             "title": STRING, "slug": STRING, "category_id": STRING,
             "description": STRING,
+            "thumbnail_url": STRING,
             "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
             "time_limit": POSITIVE_NUMBER, "max_attempts": NON_NEGATIVE_NUMBER, "passing_score": PERCENTAGE,
             "quiz_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_IN_THE_BLANK", "ESSAY"]},
@@ -216,6 +221,7 @@ TOOLS = [
                     "type": "object",
                     "properties": {
                         "question_text": NON_EMPTY_STRING,
+                        "media_url": STRING,
                         "question_type": {"type": "string", "enum": ["SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "ESSAY", "MATCHING"]},
                         "points": NON_NEGATIVE_NUMBER, "time_limit": NON_NEGATIVE_NUMBER, "explanation": STRING,
                         "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
@@ -300,6 +306,7 @@ TOOLS = [
             "points": NON_NEGATIVE_NUMBER,
             "time_limit": NON_NEGATIVE_NUMBER,
             "explanation": STRING,
+            "media_url": STRING,
             "difficulty_level": {"type": "string", "enum": ["EASY", "MEDIUM", "HARD"]},
             "sort_order": NON_NEGATIVE_INTEGER,
             "is_required": BOOLEAN,
@@ -433,6 +440,12 @@ TOOLS = [
     function_tool(
         "web_search",
         "Search the public web only when internal backend data cannot answer the question. Return cited sources; never use web results for writes.",
+        {"query": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 10}},
+        ["query"],
+    ),
+    function_tool(
+        "search_images",
+        "Retrieve public image URLs and descriptions from the web when the user explicitly needs an image. Do not generate, download, upload, or claim ownership of images.",
         {"query": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 10}},
         ["query"],
     ),

@@ -22,6 +22,7 @@
     "test:int": "jest --testPathPatterns=integration-spec.ts",
     "test:api": "jest --testPathPatterns=e2e-spec.ts",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "admin:create": "ts-node scripts/create-admin.ts",
     "heroku-postbuild": "npm run build && npx prisma generate && echo 'Build and Prisma generation completed successfully'",
     "postinstall": "echo 'Skipping Prisma generate during install'",
     "heroku-test": "node scripts/heroku-test.js",

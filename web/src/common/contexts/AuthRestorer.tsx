@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/hooks/useRedux";
 import {
   restoreAuth,
-  forceLogout,
+  getUserProfile,
 } from "@/modules/auth/common/slices/authSlice";
 
 /**
@@ -17,21 +17,25 @@ export default function AuthRestorer({
   children: React.ReactNode;
 }) {
   const dispatch = useAppDispatch();
-  const { token, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { token, isAuthenticated, user } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
-    // Always try to restore auth state on mount
-    // This ensures we have the latest state from sessionStorage
+    // Restore the access token first. The profile effect below then restores
+    // the user object, which is required by user-scoped features such as AI
+    // chat history.
     dispatch(restoreAuth());
   }, [dispatch]);
 
-  // Force logout if isAuthenticated but no token
   useEffect(() => {
-    if (isAuthenticated && !token) {
-      console.log("🚫 Authenticated but no token, forcing logout...");
-      dispatch(forceLogout());
-    }
-  }, [dispatch, isAuthenticated, token]);
+    if (!isAuthenticated || !token || user) return;
+    void dispatch(getUserProfile())
+      .unwrap()
+      .catch(() => {
+        // The Axios interceptor handles 401 → refresh → logout. Keep the
+        // token untouched for transient network failures.
+        console.warn("Could not restore authenticated user profile.");
+      });
+  }, [dispatch, isAuthenticated, token, user]);
 
   return <>{children}</>;
 }

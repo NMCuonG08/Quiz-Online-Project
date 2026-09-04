@@ -226,6 +226,11 @@ export class QuestionService extends BaseService {
     if (media) {
       const uploadResult = await this.cloudinaryService.uploadImage(media);
       mediaId = uploadResult?.id;
+    } else if (question.media_url) {
+      const uploadResult = await this.cloudinaryService.uploadImageFromUrl(
+        question.media_url,
+      );
+      mediaId = uploadResult?.id;
     }
 
     // Parse options if provided
@@ -233,11 +238,13 @@ export class QuestionService extends BaseService {
     validateQuestionOptions(question.question_type, optionsData);
 
     // Prepare question data without options
-    const restOfQuestion = { ...question };
+    const { media_url: _mediaUrl, ...restOfQuestion } = question;
     delete restOfQuestion.options;
+    void _mediaUrl;
     const questionData: Record<string, any> = {
       ...restOfQuestion,
       media_id: mediaId || null,
+      media_type: mediaId ? 'IMAGE' : null,
     };
 
     const created = await this.questionRepository.createWithOptions(

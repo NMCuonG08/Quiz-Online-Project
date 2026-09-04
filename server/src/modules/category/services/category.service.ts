@@ -21,15 +21,16 @@ export class CategoryService extends BaseService {
       throw new BadRequestException('Category already exists');
     }
 
-    let iconUrl: string | undefined;
+    let iconUrl: string | undefined = createCategoryDto.icon_url;
     if (iconFile) {
       const uploaded = await this.cloudinaryService.uploadImage(iconFile);
       iconUrl = uploaded?.url;
     }
 
-    const { iconFile: _iconFile, ...rest } =
+    const { iconFile: _iconFile, icon_url: _iconUrl, ...rest } =
       createCategoryDto as unknown as Record<string, unknown>;
     void _iconFile;
+    void _iconUrl;
 
     const newCategory = await this.categoryRepository.create({
       ...rest,

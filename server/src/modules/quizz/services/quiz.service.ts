@@ -205,9 +205,15 @@ export class QuizService extends BaseService {
     if (thumbnail) {
       const uploadResult = await this.cloudinaryService.uploadImage(thumbnail);
       thumbnailId = uploadResult?.id;
+    } else if (quiz.thumbnail_url) {
+      const uploadResult = await this.cloudinaryService.uploadImageFromUrl(
+        quiz.thumbnail_url,
+      );
+      thumbnailId = uploadResult?.id;
     }
-    const { thumbnail: _thumbnail, ...quizWithoutThumbnail } = quiz;
+    const { thumbnail: _thumbnail, thumbnail_url: _thumbnailUrl, ...quizWithoutThumbnail } = quiz;
     void _thumbnail;
+    void _thumbnailUrl;
     const quizData = {
       ...quizWithoutThumbnail,
       ...(creatorId ? { creator_id: creatorId } : {}),
@@ -235,15 +241,31 @@ export class QuizService extends BaseService {
     const requestHash = createHash('sha256')
       .update(JSON.stringify(hashablePayload))
       .digest('hex');
-    const preparedQuestions = dto.questions.map((question, index) => {
+    const uploadedImageIds: string[] = [];
+    let thumbnailId: string | undefined;
+    if (dto.thumbnail_url) {
+      const uploaded = await this.cloudinaryService.uploadImageFromUrl(dto.thumbnail_url);
+      thumbnailId = uploaded?.id;
+      if (thumbnailId) uploadedImageIds.push(thumbnailId);
+    }
+    const preparedQuestions = await Promise.all(dto.questions.map(async (question, index) => {
       const options = parseQuestionOptions(question.options);
       validateQuestionOptions(question.question_type, options);
+      let mediaId: string | undefined;
+      if (question.media_url) {
+        const uploaded = await this.cloudinaryService.uploadImageFromUrl(question.media_url);
+        mediaId = uploaded?.id;
+        if (mediaId) uploadedImageIds.push(mediaId);
+      }
+      const { media_url: _mediaUrl, ...questionWithoutMediaUrl } = question;
+      void _mediaUrl;
       return {
-        ...question,
+        ...questionWithoutMediaUrl,
+        media_id: mediaId,
         options,
         sort_order: question.sort_order ?? index,
       };
-    });
+    }));
 
     const run = (): Promise<CreateQuizWithQuestionsResult> => this.prisma.$transaction(async (tx) => {
       const existing = await tx.aiWriteIdempotency.findUnique({
@@ -290,6 +312,7 @@ export class QuizService extends BaseService {
           is_active: false,
           quiz_type: dto.quiz_type,
           instructions: dto.instructions || null,
+          thumbnail_id: thumbnailId || null,
           published_at: null,
         },
       });
@@ -311,6 +334,8 @@ export class QuizService extends BaseService {
             points: question.points ?? 1,
             time_limit: question.time_limit ?? null,
             explanation: question.explanation || null,
+            media_id: question.media_id || null,
+            media_type: question.media_id ? 'IMAGE' : null,
             difficulty_level: question.difficulty_level || dto.difficulty_level,
             sort_order: question.sort_order,
             is_required: question.is_required ?? true,
@@ -367,6 +392,7 @@ export class QuizService extends BaseService {
           return existing.response as CreateQuizWithQuestionsResult;
         }
       }
+      await Promise.allSettled(uploadedImageIds.map((imageId) => this.cloudinaryService.deleteImage(imageId)));
       throw error;
     }
   }

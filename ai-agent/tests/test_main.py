@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -87,6 +88,15 @@ class ChatApiContractTests(unittest.TestCase):
         response = self.client.get("/metrics")
         self.assertEqual(response.status_code, 200)
         self.assertIn("quiz_ai_tool_calls_total", response.text)
+
+    def test_operational_endpoints_fail_closed_in_production(self):
+        with patch.dict(os.environ, {"NODE_ENV": "production", "AI_OPS_TOKEN": "ops-secret"}):
+            self.assertEqual(self.client.get("/metrics").status_code, 404)
+            self.assertEqual(self.client.get("/healthz").status_code, 200)
+            self.assertEqual(
+                self.client.get("/metrics", headers={"X-AI-Ops-Token": "ops-secret"}).status_code,
+                200,
+            )
 
     def test_concrete_chat_completions_url_is_normalized_to_api_root(self):
         self.assertEqual(

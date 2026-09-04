@@ -13,6 +13,7 @@ from .errors import HarnessError, ToolTimeout, ValidationFailed
 from .tool_specs import ToolPhase, ToolSpec
 from ..policies.approval_policy import assert_approval_contract
 from ..policies.tool_policy import assert_tool_allowed
+from ..policies.policy_engine import PolicyEngine, PolicyInput
 
 
 ToolHandler = Callable[[dict[str, Any]], Awaitable[Any] | Any]
@@ -42,9 +43,11 @@ class ToolRuntime:
         specs: Optional[dict[str, ToolSpec]] = None,
         *,
         audit_writer: Optional[AuditWriter] = None,
+        policy_engine: Optional[PolicyEngine] = None,
     ) -> None:
         self.specs = specs or {}
         self.audit_writer = audit_writer
+        self.policy_engine = policy_engine or PolicyEngine()
 
     async def execute(
         self,
@@ -59,6 +62,9 @@ class ToolRuntime:
         normalize: Optional[ArgumentNormalizer] = None,
         handler: ToolHandler,
         audit_subject: Optional[str] = None,
+        actor_id: str = "",
+        tenant_id: Optional[str] = None,
+        resource: Optional[dict[str, Any]] = None,
     ) -> RuntimeToolResult:
         spec = self.specs.get(name)
         if spec is None:
@@ -67,6 +73,17 @@ class ToolRuntime:
                 safe_message="Công cụ chưa được đăng ký trong agent runtime.",
             )
 
+        self.policy_engine.enforce(PolicyInput(
+            tool=spec,
+            phase=phase,
+            scope=scope,
+            allowed_tools=allowed_tools,
+            approval_verified=approval_verified,
+            idempotency_key=idempotency_key,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            resource=resource,
+        ))
         assert_tool_allowed(spec, allowed_tools=allowed_tools, scope=scope)
         assert_approval_contract(
             spec,
