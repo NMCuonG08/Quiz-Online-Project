@@ -330,7 +330,7 @@ class LangGraphQuizRunner:
                 record_model=record_model,
                 trace_observer=trace_observer,
             )
-        result = self._extract_json_object(message)
+        result = self._extract_json_object(message, role)
         if result is None:
             raise ValueError(f"WORKER_OUTPUT_INVALID: {role} không trả JSON object hợp lệ.")
         return result
@@ -666,31 +666,76 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Fo
         return None
 
     @staticmethod
-    def _extract_json_object(message: AIMessage) -> Optional[dict[str, Any]]:
+    def _extract_json_object(
+        message: AIMessage,
+        role: str = "",
+    ) -> Optional[dict[str, Any]]:
+        """Normalize text, structured content, tool-call and array outputs."""
+        def normalize(value: Any) -> Optional[dict[str, Any]]:
+            if isinstance(value, dict):
+                nested = value.get("payload") or value.get("result")
+                if isinstance(nested, dict):
+                    return nested
+                return value
+            if isinstance(value, list):
+                if role == "curriculum":
+                    return {"blueprint": value}
+                if role in {"quiz_builder", "quality_reviewer"}:
+                    return {"questions": value} if role == "quiz_builder" else {"findings": value}
+            return None
+
+        for call in list(message.tool_calls or []):
+            result = normalize(call.get("args") if isinstance(call, dict) else None)
+            if result is not None:
+                return result
+        for raw_call in (message.additional_kwargs or {}).get("tool_calls", []):
+            function = raw_call.get("function") if isinstance(raw_call, dict) else None
+            if not isinstance(function, dict):
+                continue
+            arguments = function.get("arguments") or "{}"
+            try:
+                result = normalize(json.loads(arguments) if isinstance(arguments, str) else arguments)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                result = None
+            if result is not None:
+                return result
+
         content = message.content
         if isinstance(content, list):
             content = "\n".join(
-                str(item.get("text") or item.get("content") or "")
+                str(
+                    item.get("text")
+                    or item.get("content")
+                    or item.get("output_text")
+                    or ""
+                )
                 for item in content
                 if isinstance(item, dict)
             )
         if not isinstance(content, str) or not content.strip():
+            content = str(
+                (message.additional_kwargs or {}).get("output_text")
+                or (message.additional_kwargs or {}).get("content")
+                or ""
+            )
+        if not content.strip():
             return None
         raw = content.strip()
         candidates = [raw]
         unfenced = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
         if unfenced != raw:
             candidates.append(unfenced)
-        match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
-        if match:
-            candidates.append(match.group(0))
+        for pattern in (r"\{.*\}", r"\[.*\]"):
+            match = re.search(pattern, raw, flags=re.DOTALL)
+            if match:
+                candidates.append(match.group(0))
         for candidate in candidates:
             try:
-                value = json.loads(candidate)
+                result = normalize(json.loads(candidate))
             except (TypeError, ValueError, json.JSONDecodeError):
                 continue
-            if isinstance(value, dict):
-                return value
+            if result is not None:
+                return result
         return None
 
     @staticmethod

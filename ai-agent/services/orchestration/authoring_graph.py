@@ -246,8 +246,25 @@ class AuthoringSupervisorGraph:
                     },
                 )
             except Exception as exc:
-                await self._task(task_id, "quiz_builder", "retryable_failed", error=str(exc))
-                raise
+                if "WORKER_OUTPUT_INVALID" in str(exc):
+                    await self._task(task_id, "quiz_builder", "retrying", error="structured_output_recovery")
+                    try:
+                        result = await self.invoke_worker(
+                            "quiz_builder",
+                            self._generator_prompt(execution_plan)
+                            + " Return a JSON object with a top-level questions array. Do not return an array, markdown or prose.",
+                            {
+                                "user_request": state["user_input"],
+                                "task": task,
+                                "content_language": execution_plan.content_language,
+                            },
+                        )
+                    except Exception as retry_exc:
+                        await self._task(task_id, "quiz_builder", "retryable_failed", error=str(retry_exc))
+                        raise
+                else:
+                    await self._task(task_id, "quiz_builder", "retryable_failed", error=str(exc))
+                    raise
             questions = result.get("questions")
             if not isinstance(questions, list) or not questions:
                 await self._task(task_id, "quiz_builder", "retryable_failed", error="GENERATOR_INVALID")
