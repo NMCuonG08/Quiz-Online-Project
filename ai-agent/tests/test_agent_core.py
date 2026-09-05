@@ -1,9 +1,10 @@
 import asyncio
+import os
 import unittest
 import httpx
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import ANY, AsyncMock
+from unittest.mock import ANY, AsyncMock, patch
 from langchain_core.messages import AIMessage
 from zoneinfo import ZoneInfo
 
@@ -477,7 +478,8 @@ class UiPolicyContractTests(unittest.TestCase):
 
 class LangGraphContractTests(unittest.TestCase):
     def test_agent_first_is_default_with_legacy_rollback(self):
-        self.assertEqual(AIAgentCore({}).orchestration_mode, "agent_first")
+        with patch.dict(os.environ, {"AI_ORCHESTRATION_MODE": "agent_first"}):
+            self.assertEqual(AIAgentCore({}).orchestration_mode, "agent_first")
         self.assertEqual(
             AIAgentCore({"orchestration_mode": "planner_legacy"}).orchestration_mode,
             "planner_legacy",

@@ -9,6 +9,7 @@ from services.orchestration.authoring_graph import (
     _merge_repaired_questions,
     _normalize_generated_question,
 )
+from services.agent_core import AIAgentCore
 
 
 class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
@@ -61,6 +62,7 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
         calls: list[str] = []
         task_events: list[tuple[str, str, str]] = []
         artifacts: list[tuple[str, str]] = []
+        finalized: list[dict] = []
 
         async def invoke(role, _prompt, payload):
             nonlocal active, peak
@@ -75,6 +77,7 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
             active -= 1
             calls.append(payload["task"]["task_id"])
             return {"questions": [{
+                "question_id": f"internal-{payload['task']['slots'][0]}",
                 "question_text": f"Question {payload['task']['slots'][0]}",
                 "question_type": "SINGLE_CHOICE",
                 "options": [
@@ -89,6 +92,7 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
         async def dispatch(name, _args):
             if name == "list_categories":
                 return json.dumps({"ok": True, "result": {"items": [{"id": "cat-1", "name": "History"}]}})
+            finalized.append(_args)
             return json.dumps({"ok": True, "result": {"approval_required": True}})
 
         async def images(_query, _limit):
@@ -112,11 +116,15 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
                 "title": "History", "slug": "history", "category_id": "cat-1",
                 "difficulty_level": "EASY", "time_limit": 600,
                 "quiz_type": "SINGLE_CHOICE", "description": "", "instructions": "",
+                "is_active": False,
             },
             trace=trace,
             max_questions_per_worker=1,
             task_event=task_event,
             artifact_store=artifact_store,
+            prepare_final_payload=lambda payload: AIAgentCore._sanitize_tool_payload(
+                "create_quiz_with_questions", payload,
+            ),
         )
         payload = await graph.run(user_input="Create a history quiz", plan=self._plan())
 
@@ -126,6 +134,8 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(("question-shard-1", "quiz_builder", "completed"), task_events)
         self.assertIn(("question-shard-2", "quiz_builder", "completed"), task_events)
         self.assertIn(("finalizer", "quiz_proposal"), artifacts)
+        self.assertNotIn("is_active", finalized[0])
+        self.assertNotIn("question_id", finalized[0]["questions"][0])
 
     async def test_invalid_output_is_repaired_before_finalizer(self):
         repair_seen = False

@@ -2148,6 +2148,9 @@ class AIAgentCore:
                     task_event=task_event,
                     artifact_store=artifact_store,
                     quality_reviewer=quality_reviewer,
+                    prepare_final_payload=lambda payload: self._sanitize_tool_payload(
+                        "create_quiz_with_questions", payload,
+                    ),
                 )
                 await asyncio.wait_for(
                     supervisor.run(
@@ -4530,6 +4533,32 @@ class AIAgentCore:
         error = errors[0]
         path = ".".join(str(part) for part in error.absolute_path) or "arguments"
         raise ValueError(f"TOOL_ARGUMENT_INVALID: {name}.{path}: {error.message}")
+
+    @staticmethod
+    def _sanitize_tool_payload(name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Keep generated payload fields defined by the canonical tool schema."""
+        schema = TOOL_PARAMETER_SCHEMAS.get(name)
+        if not isinstance(schema, dict):
+            raise ValueError(f"TOOL_NOT_FOUND: {name}")
+
+        def sanitize(value: Any, current_schema: Dict[str, Any]) -> Any:
+            schema_type = current_schema.get("type")
+            if schema_type == "object" and isinstance(value, dict):
+                properties = current_schema.get("properties")
+                if not isinstance(properties, dict):
+                    return dict(value)
+                return {
+                    key: sanitize(item, properties[key])
+                    for key, item in value.items()
+                    if key in properties and isinstance(properties[key], dict)
+                }
+            if schema_type == "array" and isinstance(value, list):
+                item_schema = current_schema.get("items")
+                if isinstance(item_schema, dict):
+                    return [sanitize(item, item_schema) for item in value]
+            return value
+
+        return sanitize(payload, schema)
 
     @staticmethod
     def _validate_tool_semantics(name: str, args: Dict[str, Any]) -> None:

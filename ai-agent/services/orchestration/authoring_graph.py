@@ -25,6 +25,7 @@ Trace = Callable[[str, str, str], Awaitable[None]]
 TaskEvent = Callable[[str, str, str, dict[str, Any]], Awaitable[None]]
 ArtifactStore = Callable[[str, str, dict[str, Any]], Awaitable[Optional[str]]]
 QualityReviewer = Callable[[list[dict[str, Any]]], Awaitable[dict[str, Any]]]
+PayloadPreparer = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 class AuthoringState(TypedDict, total=False):
@@ -73,6 +74,7 @@ class AuthoringSupervisorGraph:
         task_event: Optional[TaskEvent] = None,
         artifact_store: Optional[ArtifactStore] = None,
         quality_reviewer: Optional[QualityReviewer] = None,
+        prepare_final_payload: Optional[PayloadPreparer] = None,
     ) -> None:
         self.invoke_worker = invoke_worker
         self.dispatch = dispatch
@@ -87,6 +89,7 @@ class AuthoringSupervisorGraph:
         self.task_event = task_event
         self.artifact_store = artifact_store
         self.quality_reviewer = quality_reviewer
+        self.prepare_final_payload = prepare_final_payload
 
     async def _task(self, task_id: str, role: str, status: str, **metadata: Any) -> None:
         if self.task_event is not None:
@@ -418,6 +421,8 @@ class AuthoringSupervisorGraph:
             payload = {**base, "questions": questions}
             if media_payload.get("thumbnail_url"):
                 payload["thumbnail_url"] = media_payload["thumbnail_url"]
+            if self.prepare_final_payload is not None:
+                payload = self.prepare_final_payload(payload)
             await self.trace("finalizer", "start", "create_quiz_with_questions")
             try:
                 raw = await self.dispatch("create_quiz_with_questions", payload)
