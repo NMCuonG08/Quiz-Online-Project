@@ -16,7 +16,7 @@ from services.agent_core import AIAgentCore
 class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
     def test_generated_vietnamese_enums_are_normalized_before_quality_gate(self):
         normalized = _normalize_generated_question({
-            "question_type": "nhiều đáp án",
+            "question_type": "MULTIPLE_ANSWER",
             "difficulty_level": "trung bình",
             "options": [{"option_text": "Đúng", "is_correct": True}],
         })
