@@ -543,6 +543,7 @@ def _normalize_generated_question(question: dict[str, Any]) -> dict[str, Any]:
         "MULTIPLE": "MULTIPLE_CHOICE",
         "MULTIPLE_CHOICE": "MULTIPLE_CHOICE",
         "MULTIPLE_ANSWER": "MULTIPLE_CHOICE",
+        "MULTIPLE_ANSWERS": "MULTIPLE_CHOICE",
         "NHIEU_DAP_AN": "MULTIPLE_CHOICE",
         "TRUE_FALSE": "TRUE_FALSE",
         "DUNG_SAI": "TRUE_FALSE",
