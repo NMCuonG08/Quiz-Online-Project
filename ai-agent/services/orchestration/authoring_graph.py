@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import re
+import unicodedata
 from operator import add
 from typing import Annotated, Any, Awaitable, Callable, Optional, TypedDict
 
@@ -286,7 +287,7 @@ class AuthoringSupervisorGraph:
             for batch in state.get("question_batches", []):
                 for question in batch.get("questions", []) if isinstance(batch, dict) else []:
                     if isinstance(question, dict):
-                        questions.append(question)
+                        questions.append(_normalize_generated_question(question))
             questions.sort(key=lambda item: int(item.get("sort_order") or 0))
             return {"questions": questions}
 
@@ -337,7 +338,10 @@ class AuthoringSupervisorGraph:
             await self._artifact(task_id, "repaired_questions", {"questions": questions})
             await self._task(task_id, "quiz_builder", "completed", artifact_type="repaired_questions")
             await self.trace("quality_reviewer", "repair_completed", f"revision-{next_revision}")
-            return {"questions": [item for item in questions if isinstance(item, dict)], "revision_count": next_revision}
+            return {
+                "questions": [_normalize_generated_question(item) for item in questions if isinstance(item, dict)],
+                "revision_count": next_revision,
+            }
 
         async def media(state: AuthoringState) -> dict[str, Any]:
             await self._task("media", "media_retriever", "running")
@@ -493,3 +497,50 @@ def _decode_dispatch_result(raw: str) -> Any:
     if isinstance(payload, dict) and payload.get("ok") is False:
         raise AuthoringGraphError(str(payload.get("error") or "TOOL_FAILED"))
     return payload.get("result") if isinstance(payload, dict) and "result" in payload else payload
+
+
+def _enum_key(value: Any) -> str:
+    source = str(value or "").replace("Đ", "D").replace("đ", "d")
+    ascii_value = unicodedata.normalize("NFKD", source).encode("ascii", "ignore").decode("ascii")
+    return "_".join("".join(character if character.isalnum() else " " for character in ascii_value).upper().split())
+
+
+def _normalize_generated_question(question: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(question)
+    question_type_aliases = {
+        "SINGLE": "SINGLE_CHOICE",
+        "SINGLE_CHOICE": "SINGLE_CHOICE",
+        "MOT_DAP_AN": "SINGLE_CHOICE",
+        "MULTIPLE": "MULTIPLE_CHOICE",
+        "MULTIPLE_CHOICE": "MULTIPLE_CHOICE",
+        "NHIEU_DAP_AN": "MULTIPLE_CHOICE",
+        "TRUE_FALSE": "TRUE_FALSE",
+        "DUNG_SAI": "TRUE_FALSE",
+        "FILL_BLANK": "FILL_BLANK",
+        "FILL_IN_THE_BLANK": "FILL_BLANK",
+        "DIEN_VAO_CHO_TRONG": "FILL_BLANK",
+        "ESSAY": "ESSAY",
+        "TU_LUAN": "ESSAY",
+        "MATCHING": "MATCHING",
+    }
+    difficulty_aliases = {
+        "EASY": "EASY", "BEGINNER": "EASY", "DE": "EASY", "CO_BAN": "EASY",
+        "MEDIUM": "MEDIUM", "INTERMEDIATE": "MEDIUM", "TRUNG_BINH": "MEDIUM",
+        "HARD": "HARD", "ADVANCED": "HARD", "KHO": "HARD", "NANG_CAO": "HARD",
+    }
+    if normalized.get("question_type"):
+        raw = _enum_key(normalized["question_type"])
+        normalized["question_type"] = question_type_aliases.get(raw, raw)
+    if normalized.get("difficulty_level"):
+        raw = _enum_key(normalized["difficulty_level"])
+        normalized["difficulty_level"] = difficulty_aliases.get(raw, raw)
+    normalized["options"] = [
+        {
+            **option,
+            "option_text": str(option.get("option_text") or option.get("text") or "").strip(),
+            "is_correct": option.get("is_correct") is True or str(option.get("is_correct")).lower() == "true",
+        }
+        for option in normalized.get("options") or []
+        if isinstance(option, dict)
+    ]
+    return normalized

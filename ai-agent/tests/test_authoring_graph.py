@@ -4,10 +4,19 @@ import asyncio
 import json
 import unittest
 
-from services.orchestration.authoring_graph import AuthoringSupervisorGraph
+from services.orchestration.authoring_graph import AuthoringSupervisorGraph, _normalize_generated_question
 
 
 class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
+    def test_generated_vietnamese_enums_are_normalized_before_quality_gate(self):
+        normalized = _normalize_generated_question({
+            "question_type": "nhiều đáp án",
+            "difficulty_level": "trung bình",
+            "options": [{"option_text": "Đúng", "is_correct": True}],
+        })
+        self.assertEqual(normalized["question_type"], "MULTIPLE_CHOICE")
+        self.assertEqual(normalized["difficulty_level"], "MEDIUM")
+
     def _plan(self) -> dict:
         return {
             "intent": "quiz_create",
