@@ -25,6 +25,8 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
         active = 0
         peak = 0
         calls: list[str] = []
+        task_events: list[tuple[str, str, str]] = []
+        artifacts: list[tuple[str, str]] = []
 
         async def invoke(role, _prompt, payload):
             nonlocal active, peak
@@ -61,6 +63,13 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
         async def trace(_node, _event, _tool):
             return None
 
+        async def task_event(task_id, role, status, _metadata):
+            task_events.append((task_id, role, status))
+
+        async def artifact_store(task_id, artifact_type, _payload):
+            artifacts.append((task_id, artifact_type))
+            return f"artifact:{task_id}"
+
         graph = AuthoringSupervisorGraph(
             invoke_worker=invoke,
             dispatch=dispatch,
@@ -72,12 +81,17 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
             },
             trace=trace,
             max_questions_per_worker=1,
+            task_event=task_event,
+            artifact_store=artifact_store,
         )
         payload = await graph.run(user_input="Create a history quiz", plan=self._plan())
 
         self.assertEqual(peak, 2)
         self.assertEqual(set(calls), {"question-shard-1", "question-shard-2"})
         self.assertEqual([item["sort_order"] for item in payload["questions"]], [1, 2])
+        self.assertIn(("question-shard-1", "quiz_builder", "completed"), task_events)
+        self.assertIn(("question-shard-2", "quiz_builder", "completed"), task_events)
+        self.assertIn(("finalizer", "quiz_proposal"), artifacts)
 
     async def test_invalid_output_is_repaired_before_finalizer(self):
         repair_seen = False
@@ -127,6 +141,79 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(repair_seen)
         self.assertEqual(payload["questions"][0]["question_text"], "Repaired question")
+
+    async def test_resume_retries_one_question_shard_and_keeps_completed_artifacts(self):
+        generated: list[str] = []
+
+        async def invoke(role, _prompt, payload):
+            if role == "curriculum":
+                raise AssertionError("curriculum should be loaded from durable state")
+            generated.append(payload["task"]["task_id"])
+            return {"questions": [{
+                "question_text": "Regenerated question",
+                "question_type": "SINGLE_CHOICE",
+                "options": [
+                    {"option_text": "Correct", "is_correct": True, "sort_order": 1},
+                    {"option_text": "Wrong", "is_correct": False, "sort_order": 2},
+                ],
+                "points": 1, "explanation": "Reason", "sort_order": payload["task"]["slots"][0],
+            }]}
+
+        async def dispatch(name, _args):
+            if name == "list_categories":
+                raise AssertionError("categories should be loaded from durable state")
+            return json.dumps({"ok": True, "result": {"approval_required": True}})
+
+        async def trace(_node, _event, _tool):
+            return None
+
+        graph = AuthoringSupervisorGraph(
+            invoke_worker=invoke,
+            dispatch=dispatch,
+            search_images=lambda _query, _limit: asyncio.sleep(0, result=[]),
+            build_base_payload=lambda _categories: {
+                "title": "History", "slug": "history", "category_id": "cat-1",
+                "difficulty_level": "EASY", "time_limit": 600,
+                "quiz_type": "SINGLE_CHOICE", "description": "", "instructions": "",
+            },
+            trace=trace,
+            max_questions_per_worker=1,
+        )
+        payload = await graph.run(
+            user_input="Create a history quiz",
+            plan=self._plan(),
+            retry_task_id="question-shard-1",
+            resume_state={
+                "categories": {"items": [{"id": "cat-1", "name": "History"}]},
+                "base_payload": {
+                    "title": "History", "slug": "history", "category_id": "cat-1",
+                    "difficulty_level": "EASY", "time_limit": 600,
+                    "quiz_type": "SINGLE_CHOICE", "description": "", "instructions": "",
+                },
+                "curriculum": {"blueprint": [
+                    {"slot": 1, "objective": "A", "difficulty_level": "EASY", "question_type": "SINGLE_CHOICE"},
+                    {"slot": 2, "objective": "B", "difficulty_level": "EASY", "question_type": "SINGLE_CHOICE"},
+                ]},
+                "question_batches": [{
+                    "task_id": "question-shard-2",
+                    "questions": [{
+                        "question_text": "Completed question",
+                        "question_type": "SINGLE_CHOICE",
+                        "options": [
+                            {"option_text": "Correct", "is_correct": True, "sort_order": 1},
+                            {"option_text": "Wrong", "is_correct": False, "sort_order": 2},
+                        ],
+                        "points": 1, "explanation": "Reason", "sort_order": 2,
+                    }],
+                }],
+            },
+        )
+
+        self.assertEqual(generated, ["question-shard-1"])
+        self.assertEqual(
+            {question["question_text"] for question in payload["questions"]},
+            {"Regenerated question", "Completed question"},
+        )
 
 
 if __name__ == "__main__":

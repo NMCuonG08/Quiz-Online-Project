@@ -339,3 +339,34 @@ memory, deterministic/optional semantic question review, durable human-review
 records, draft-only question pipeline và queue/worker contract. Worker entrypoint
 để chạy agent thật trong background cùng checkpoint reconciliation vẫn cần
 wiring ở deployment slice tiếp theo.
+
+## Supervisor v1 verification
+
+Local development can enable the controlled authoring graph with:
+
+```env
+AI_ORCHESTRATION_MODE=supervisor_v1
+```
+
+Use prompts from `evals/supervisor_scenarios.json`. A real multi-agent run must
+produce task events for `categories`, `curriculum`, one or more
+`question-shard-*` tasks, `quality-review`, `media` and `finalizer`. Inspect the
+run timeline at `GET /runs/{run_id}/events`; the final assistant message alone
+is not evidence that multiple workers ran.
+
+The run should also contain `artifact` events with checksums. Question shards
+must overlap in time in the trace for the parallel case, and the approval
+proposal must appear only after the `finalizer` task completes. Unit coverage
+for fan-out, repair, task events and artifacts is in
+`tests/test_authoring_graph.py`.
+
+Failed background runs can be requeued with:
+
+```text
+POST /runs/{run_id}/retry
+POST /runs/{run_id}/retry?task_id=question-shard-2
+```
+
+When a question shard is specified, completed category, curriculum, base
+payload and other question-batch artifacts are loaded from the durable run and
+only that shard is regenerated.

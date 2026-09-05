@@ -1,0 +1,26 @@
+[
+  {
+    "id": "supervisor-quiz-vietnamese",
+    "prompt": "Tạo quiz hoàn chỉnh 8 câu về lịch sử Việt Nam, category History, độ khó trung bình, thời gian 10 phút, loại nhiều đáp án, nội dung bằng tiếng Việt.",
+    "expected_workflow": "quiz_authoring",
+    "required_roles": ["curriculum", "quiz_builder", "quality_reviewer", "media_retriever", "finalizer"],
+    "required_task_events": ["categories", "curriculum", "question-shard-1", "quality-review", "media", "finalizer"],
+    "approval_required": true
+  },
+  {
+    "id": "supervisor-quiz-english",
+    "prompt": "Create a complete 8-question English science quiz in the Science category, medium difficulty, 10 minutes, multiple choice.",
+    "expected_workflow": "quiz_authoring",
+    "required_roles": ["curriculum", "quiz_builder", "quality_reviewer", "media_retriever", "finalizer"],
+    "required_task_events": ["categories", "curriculum", "question-shard-1", "quality-review", "media", "finalizer"],
+    "approval_required": true
+  },
+  {
+    "id": "supervisor-parallel-shards",
+    "prompt": "Tạo quiz hoàn chỉnh 12 câu về công nghệ, category Technology, độ khó khó, 15 phút, nhiều đáp án.",
+    "expected_workflow": "quiz_authoring",
+    "minimum_question_shards": 3,
+    "required_task_events": ["question-shard-1", "question-shard-2", "question-shard-3"],
+    "approval_required": true
+  }
+]

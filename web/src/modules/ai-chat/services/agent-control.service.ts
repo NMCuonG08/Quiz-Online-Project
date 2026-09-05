@@ -93,6 +93,19 @@ export async function cancelAgentRun(runId: string): Promise<{ cancel_requested:
   return parseJson(response);
 }
 
+export async function retryAgentRun(runId: string, taskId?: string): Promise<BackgroundRun> {
+  const query = taskId ? "?task_id=" + encodeURIComponent(taskId) : "";
+  const response = await fetch(
+    "/api/ai/runs/" + encodeURIComponent(runId) + "/retry" + query,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      credentials: "include",
+    },
+  );
+  return parseJson<BackgroundRun>(response);
+}
+
 export async function getAgentReview(reviewId: string): Promise<{ review: AgentReview }> {
   const response = await fetch(
     "/api/ai/reviews/" + encodeURIComponent(reviewId),

@@ -44,6 +44,10 @@ ToolErrorKind = Literal[
     "fatal",
 ]
 
+ChildTaskStatus = Literal[
+    "pending", "running", "completed", "retryable_failed", "blocked", "cancelled"
+]
+
 SourceKind = Literal["backend", "knowledge", "web", "user", "model", "unknown"]
 
 
@@ -134,6 +138,17 @@ class ArtifactRef(HarnessModel):
     content_type: str = Field(default="", max_length=256)
     size_bytes: Optional[int] = Field(default=None, ge=0)
     checksum: Optional[str] = Field(default=None, max_length=256)
+
+
+class ChildTaskRecord(HarnessModel):
+    task_id: str = Field(min_length=1, max_length=128)
+    role: str = Field(min_length=1, max_length=128)
+    status: ChildTaskStatus
+    task_fingerprint: str = Field(default="", max_length=256)
+    attempts: int = Field(default=0, ge=0, le=20)
+    artifact_id: Optional[str] = Field(default=None, max_length=256)
+    error: Optional[str] = Field(default=None, max_length=2000)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class ToolExecutionResult(HarnessModel):

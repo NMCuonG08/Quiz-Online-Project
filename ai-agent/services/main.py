@@ -326,6 +326,23 @@ async def cancel_run(
     return {"run_id": run_id, "cancel_requested": True}
 
 
+@app.post("/runs/{run_id}/retry", status_code=202)
+async def retry_run(
+    run_id: str,
+    task_id: str | None = Query(default=None, min_length=1, max_length=128),
+    authorization: str | None = Header(default=None),
+):
+    user_id, _ = await resolve_run_identity(authorization)
+    try:
+        return await agent.retry_background_run(run_id, user_id, authorization, task_id)
+    except ValueError as exc:
+        code = str(exc)
+        status = 404 if code == "RUN_NOT_FOUND_OR_FORBIDDEN" else 409
+        raise HTTPException(status_code=status, detail=code) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Background agent hiện chưa sẵn sàng.") from exc
+
+
 @app.get("/runs/{run_id}/events")
 async def replay_run_events(
     run_id: str,

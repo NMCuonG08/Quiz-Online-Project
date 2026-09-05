@@ -21,6 +21,9 @@ Dispatch = Callable[[str, dict[str, Any]], Awaitable[str]]
 WorkerInvoker = Callable[[str, str, dict[str, Any]], Awaitable[dict[str, Any]]]
 ImageSearcher = Callable[[str, int], Awaitable[list[dict[str, str]]]]
 Trace = Callable[[str, str, str], Awaitable[None]]
+TaskEvent = Callable[[str, str, str, dict[str, Any]], Awaitable[None]]
+ArtifactStore = Callable[[str, str, dict[str, Any]], Awaitable[Optional[str]]]
+QualityReviewer = Callable[[list[dict[str, Any]]], Awaitable[dict[str, Any]]]
 
 
 class AuthoringState(TypedDict, total=False):
@@ -30,10 +33,12 @@ class AuthoringState(TypedDict, total=False):
     base_payload: dict[str, Any]
     curriculum: dict[str, Any]
     question_tasks: list[dict[str, Any]]
+    retry_task_id: str
     current_task: dict[str, Any]
     question_batches: Annotated[list[dict[str, Any]], add]
     questions: list[dict[str, Any]]
     quality: dict[str, Any]
+    semantic_review: dict[str, Any]
     revision_count: int
     media: dict[str, Any]
     final_payload: dict[str, Any]
@@ -64,6 +69,9 @@ class AuthoringSupervisorGraph:
         media_timeout_seconds: float = 6.0,
         default_question_count: int = 8,
         max_revisions: int = 2,
+        task_event: Optional[TaskEvent] = None,
+        artifact_store: Optional[ArtifactStore] = None,
+        quality_reviewer: Optional[QualityReviewer] = None,
     ) -> None:
         self.invoke_worker = invoke_worker
         self.dispatch = dispatch
@@ -75,22 +83,42 @@ class AuthoringSupervisorGraph:
         self.media_timeout_seconds = max(1.0, min(media_timeout_seconds, 30.0))
         self.default_question_count = max(1, min(default_question_count, 100))
         self.max_revisions = max(0, min(max_revisions, 5))
+        self.task_event = task_event
+        self.artifact_store = artifact_store
+        self.quality_reviewer = quality_reviewer
+
+    async def _task(self, task_id: str, role: str, status: str, **metadata: Any) -> None:
+        if self.task_event is not None:
+            await self.task_event(task_id, role, status, metadata)
+
+    async def _artifact(self, task_id: str, artifact_type: str, payload: dict[str, Any]) -> None:
+        if self.artifact_store is not None:
+            await self.artifact_store(task_id, artifact_type, payload)
 
     async def run(
         self,
         *,
         user_input: str,
         plan: dict[str, Any],
+        resume_state: Optional[dict[str, Any]] = None,
+        retry_task_id: Optional[str] = None,
     ) -> dict[str, Any]:
         execution_plan = self._execution_plan(plan)
         graph = self._build_graph(execution_plan)
-        state = await graph.ainvoke({
+        initial_state: AuthoringState = {
             "user_input": user_input,
             "plan": plan,
             "question_batches": [],
             "errors": [],
             "revision_count": 0,
-        })
+        }
+        if isinstance(resume_state, dict):
+            for key in ("categories", "base_payload", "curriculum", "question_batches"):
+                if key in resume_state:
+                    initial_state[key] = resume_state[key]
+        if retry_task_id:
+            initial_state["retry_task_id"] = retry_task_id  # type: ignore[typeddict-item]
+        state = await graph.ainvoke(initial_state)
         if state.get("errors"):
             raise AuthoringGraphError(str(state["errors"][0]))
         payload = state.get("final_payload")
@@ -120,34 +148,56 @@ class AuthoringSupervisorGraph:
         builder = StateGraph(AuthoringState)
 
         async def retrieve_categories(state: AuthoringState) -> dict[str, Any]:
+            if state.get("categories") is not None:
+                return {}
+            await self._task("categories", "category_retriever", "running")
             await self.trace("category_retriever", "start", "list_categories")
-            raw = await self.dispatch("list_categories", {})
-            result = _decode_dispatch_result(raw)
+            try:
+                raw = await self.dispatch("list_categories", {})
+                result = _decode_dispatch_result(raw)
+            except Exception as exc:
+                await self._task("categories", "category_retriever", "retryable_failed", error=str(exc))
+                raise
+            await self._artifact("categories", "category_list", result if isinstance(result, dict) else {"items": result})
+            await self._task("categories", "category_retriever", "completed")
             await self.trace("category_retriever", "completed", "list_categories")
             return {"categories": result}
 
         async def build_payload(state: AuthoringState) -> dict[str, Any]:
+            if state.get("base_payload"):
+                return {}
             payload = self.build_base_payload(state.get("categories"))
             if payload is None:
                 return {"errors": ["CATEGORY_NOT_FOUND: Không tìm thấy category phù hợp trong database."]}
+            await self._artifact("base-payload", "quiz_base_payload", payload)
             await self.trace("supervisor", "base_payload_ready", "category")
             return {"base_payload": payload}
 
         async def curriculum(state: AuthoringState) -> dict[str, Any]:
+            if state.get("curriculum"):
+                return {}
+            await self._task("curriculum", "curriculum", "running")
             await self.trace("curriculum", "start", "curriculum")
-            result = await self.invoke_worker(
-                "curriculum",
-                self._curriculum_prompt(execution_plan),
-                {
-                    "user_request": state["user_input"],
-                    "interaction_plan": state["plan"],
-                    "question_count": execution_plan.question_count,
-                    "content_language": execution_plan.content_language,
-                },
-            )
+            try:
+                result = await self.invoke_worker(
+                    "curriculum",
+                    self._curriculum_prompt(execution_plan),
+                    {
+                        "user_request": state["user_input"],
+                        "interaction_plan": state["plan"],
+                        "question_count": execution_plan.question_count,
+                        "content_language": execution_plan.content_language,
+                    },
+                )
+            except Exception as exc:
+                await self._task("curriculum", "curriculum", "retryable_failed", error=str(exc))
+                raise
             blueprint = result.get("blueprint")
             if not isinstance(blueprint, list) or not blueprint:
+                await self._task("curriculum", "curriculum", "retryable_failed", error="CURRICULUM_INVALID")
                 return {"errors": ["CURRICULUM_INVALID: Curriculum worker không trả blueprint hợp lệ."]}
+            await self._artifact("curriculum", "quiz_blueprint", {"blueprint": blueprint})
+            await self._task("curriculum", "curriculum", "completed")
             await self.trace("curriculum", "completed", "curriculum")
             return {"curriculum": {"blueprint": blueprint[:execution_plan.question_count]}}
 
@@ -167,6 +217,9 @@ class AuthoringSupervisorGraph:
                     task_fingerprint=fingerprint,
                 )
                 tasks.append(task.model_dump())
+            retry_task_id = str(state.get("retry_task_id") or "")
+            if retry_task_id:
+                tasks = [task for task in tasks if task.get("task_id") == retry_task_id]
             return {"question_tasks": tasks}
 
         def fan_out(state: AuthoringState) -> list[Send]:
@@ -179,18 +232,25 @@ class AuthoringSupervisorGraph:
 
         async def generate_questions(state: AuthoringState) -> dict[str, Any]:
             task = state.get("current_task") or {}
+            task_id = str(task.get("task_id") or "unknown")
+            await self._task(task_id, "quiz_builder", "running", task_fingerprint=task.get("task_fingerprint", ""))
             await self.trace("quiz_builder", "start", str(task.get("task_id") or "unknown"))
-            result = await self.invoke_worker(
-                "quiz_builder",
-                self._generator_prompt(execution_plan),
-                {
-                    "user_request": state["user_input"],
-                    "task": task,
-                    "content_language": execution_plan.content_language,
-                },
-            )
+            try:
+                result = await self.invoke_worker(
+                    "quiz_builder",
+                    self._generator_prompt(execution_plan),
+                    {
+                        "user_request": state["user_input"],
+                        "task": task,
+                        "content_language": execution_plan.content_language,
+                    },
+                )
+            except Exception as exc:
+                await self._task(task_id, "quiz_builder", "retryable_failed", error=str(exc))
+                raise
             questions = result.get("questions")
             if not isinstance(questions, list) or not questions:
+                await self._task(task_id, "quiz_builder", "retryable_failed", error="GENERATOR_INVALID")
                 return {"errors": [f"GENERATOR_INVALID: {task.get('task_id')} không trả questions hợp lệ."]}
             normalized = []
             for question in questions:
@@ -199,6 +259,8 @@ class AuthoringSupervisorGraph:
                     if not item.get("sort_order") and task.get("slots"):
                         item["sort_order"] = task["slots"][len(normalized)] if len(normalized) < len(task["slots"]) else len(normalized) + 1
                     normalized.append(item)
+            await self._artifact(task_id, "question_batch", {"questions": normalized, "slots": task.get("slots", [])})
+            await self._task(task_id, "quiz_builder", "completed", artifact_type="question_batch")
             await self.trace("quiz_builder", "completed", str(task.get("task_id") or "unknown"))
             return {"question_batches": [{"task_id": task.get("task_id"), "questions": normalized}]}
 
@@ -216,27 +278,52 @@ class AuthoringSupervisorGraph:
             report = QuestionQualityCapability.inspect_quiz(payload)
             return {"quality": report.model_dump(mode="json")}
 
+        async def review(state: AuthoringState) -> dict[str, Any]:
+            await self._task("quality-review", "quality_reviewer", "running")
+            if self.quality_reviewer is None:
+                result = {"passed": True, "findings": [], "reviewer": "deterministic-fallback"}
+            else:
+                try:
+                    result = await self.quality_reviewer(state.get("questions", []))
+                except Exception as exc:
+                    await self._task("quality-review", "quality_reviewer", "retryable_failed", error=str(exc))
+                    return {"semantic_review": {"passed": False, "findings": [str(exc)], "retryable": True}}
+            await self._artifact("quality-review", "quality_report", result)
+            await self._task("quality-review", "quality_reviewer", "completed", reviewer=result.get("reviewer", "unknown"))
+            return {"semantic_review": result}
+
         async def repair(state: AuthoringState) -> dict[str, Any]:
             next_revision = int(state.get("revision_count") or 0) + 1
+            task_id = f"repair-{next_revision}"
+            await self._task(task_id, "quiz_builder", "running", revision=next_revision)
             await self.trace("quality_reviewer", "repair_start", f"revision-{next_revision}")
-            result = await self.invoke_worker(
-                "quiz_builder",
-                self._repair_prompt(execution_plan),
-                {
-                    "user_request": state["user_input"],
-                    "questions": state.get("questions", []),
-                    "quality_report": state.get("quality", {}),
-                    "revision": next_revision,
-                    "content_language": execution_plan.content_language,
-                },
-            )
+            try:
+                result = await self.invoke_worker(
+                    "quiz_builder",
+                    self._repair_prompt(execution_plan),
+                    {
+                        "user_request": state["user_input"],
+                        "questions": state.get("questions", []),
+                        "quality_report": state.get("quality", {}),
+                        "semantic_review": state.get("semantic_review", {}),
+                        "revision": next_revision,
+                        "content_language": execution_plan.content_language,
+                    },
+                )
+            except Exception as exc:
+                await self._task(task_id, "quiz_builder", "retryable_failed", error=str(exc))
+                raise
             questions = result.get("questions")
             if not isinstance(questions, list) or not questions:
+                await self._task(task_id, "quiz_builder", "retryable_failed", error="REPAIR_INVALID")
                 return {"revision_count": next_revision, "errors": ["REPAIR_INVALID: Repair worker không trả questions hợp lệ."]}
+            await self._artifact(task_id, "repaired_questions", {"questions": questions})
+            await self._task(task_id, "quiz_builder", "completed", artifact_type="repaired_questions")
             await self.trace("quality_reviewer", "repair_completed", f"revision-{next_revision}")
             return {"questions": [item for item in questions if isinstance(item, dict)], "revision_count": next_revision}
 
         async def media(state: AuthoringState) -> dict[str, Any]:
+            await self._task("media", "media_retriever", "running")
             questions = state.get("questions", [])
             base = dict(state.get("base_payload", {}))
             semaphore = asyncio.Semaphore(self.media_concurrency)
@@ -272,12 +359,17 @@ class AuthoringSupervisorGraph:
             media_payload = {"questions": enriched_questions}
             if thumbnail:
                 media_payload["thumbnail_url"] = thumbnail
+            await self._artifact("media", "media_manifest", media_payload)
+            await self._task("media", "media_retriever", "completed")
             await self.trace("media_retriever", "completed", "fanout")
             return {"media": media_payload}
 
         async def finalize(state: AuthoringState) -> dict[str, Any]:
+            await self._task("finalizer", "finalizer", "running")
             quality = state.get("quality") or {}
-            if not quality.get("passed"):
+            review_result = state.get("semantic_review") or {}
+            if not quality.get("passed") or not review_result.get("passed"):
+                await self._task("finalizer", "finalizer", "blocked", error="QUESTION_QUALITY_FAILED")
                 return {"errors": ["QUESTION_QUALITY_FAILED: Không thể tạo quiz sau giới hạn repair."]}
             base = dict(state.get("base_payload", {}))
             media_payload = state.get("media") or {}
@@ -286,18 +378,32 @@ class AuthoringSupervisorGraph:
             if media_payload.get("thumbnail_url"):
                 payload["thumbnail_url"] = media_payload["thumbnail_url"]
             await self.trace("finalizer", "start", "create_quiz_with_questions")
-            raw = await self.dispatch("create_quiz_with_questions", payload)
-            _decode_dispatch_result(raw)
+            try:
+                raw = await self.dispatch("create_quiz_with_questions", payload)
+                _decode_dispatch_result(raw)
+            except Exception as exc:
+                await self._task("finalizer", "finalizer", "retryable_failed", error=str(exc))
+                raise
+            await self._artifact("finalizer", "quiz_proposal", payload)
+            await self._task("finalizer", "finalizer", "completed", artifact_type="quiz_proposal")
             await self.trace("finalizer", "completed", "create_quiz_with_questions")
             return {"final_payload": payload}
 
         def after_validate(state: AuthoringState) -> str:
             quality = state.get("quality") or {}
             if quality.get("passed"):
-                return "media"
+                return "review"
             if int(state.get("revision_count") or 0) < execution_plan.max_revisions:
                 return "repair"
             return "finalize"
+
+        def after_review(state: AuthoringState) -> str:
+            review_result = state.get("semantic_review") or {}
+            if review_result.get("passed"):
+                return "media"
+            if review_result.get("retryable"):
+                return "repair" if int(state.get("revision_count") or 0) < execution_plan.max_revisions else "finalize"
+            return "repair" if int(state.get("revision_count") or 0) < execution_plan.max_revisions else "finalize"
 
         builder.add_node("retrieve_categories", retrieve_categories)
         builder.add_node("build_payload", build_payload)
@@ -306,6 +412,7 @@ class AuthoringSupervisorGraph:
         builder.add_node("generate_questions", generate_questions)
         builder.add_node("aggregate", aggregate)
         builder.add_node("validate", validate)
+        builder.add_node("review", review)
         builder.add_node("repair", repair)
         builder.add_node("media", media)
         builder.add_node("finalize", finalize)
@@ -319,6 +426,11 @@ class AuthoringSupervisorGraph:
         builder.add_conditional_edges(
             "validate",
             after_validate,
+            {"repair": "repair", "review": "review", "finalize": "finalize"},
+        )
+        builder.add_conditional_edges(
+            "review",
+            after_review,
             {"repair": "repair", "media": "media", "finalize": "finalize"},
         )
         builder.add_edge("repair", "validate")

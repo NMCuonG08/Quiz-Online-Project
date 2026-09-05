@@ -39,6 +39,7 @@ from .harness.errors import BudgetExceeded
 from .harness.errors import ToolDenied
 from .harness.tool_runtime import ToolHandlerResult, ToolRuntime
 from .harness.tool_specs import TOOL_SPECS, ToolPhase
+from .harness.contracts import ArtifactRef, ChildTaskRecord
 from .policies.policy_engine import arguments_hash
 from .policies.output_guard import OutputGuardViolation, StreamingOutputGuard
 from .capabilities import (
@@ -1945,8 +1946,12 @@ class AIAgentCore:
             # branch orchestration for immediate production rollback.
             planner_config = dict(graph_config)
             planner_config["run_name"] = "quiz_ai_planner"
+            resume_plan = (context or {}).get("_supervisor_plan")
             fast_plan = (context or {}).get("_fast_plan")
-            if isinstance(fast_plan, dict) and fast_plan.get("intent"):
+            if isinstance(resume_plan, dict) and resume_plan.get("intent"):
+                plan = dict(resume_plan)
+                logger.info("ai_graph trace=%s event=resume_plan intent=%s", trace_id, plan.get("intent"))
+            elif isinstance(fast_plan, dict) and fast_plan.get("intent"):
                 plan = dict(fast_plan)
                 logger.info("ai_graph trace=%s event=fast_plan intent=%s", trace_id, plan.get("intent"))
             else:
@@ -2042,6 +2047,91 @@ class AIAgentCore:
                         trace_observer=record_trace,
                     )
 
+                async def task_event(
+                    task_id: str, role: str, status: str, metadata: dict[str, Any],
+                ) -> None:
+                    task_ledger = run_context.state.setdefault("supervisor_tasks", {})
+                    previous = task_ledger.get(task_id) if isinstance(task_ledger, dict) else None
+                    attempts = int((previous or {}).get("attempts") or 0)
+                    if status == "running":
+                        attempts += 1
+                    record = ChildTaskRecord(
+                        task_id=task_id,
+                        role=role,
+                        status=status,
+                        task_fingerprint=str(metadata.get("task_fingerprint") or (previous or {}).get("task_fingerprint") or ""),
+                        attempts=attempts,
+                        artifact_id=(previous or {}).get("artifact_id"),
+                        error=str(metadata.get("error") or "") or None,
+                    )
+                    task_ledger[task_id] = record.model_dump(mode="json")
+                    await persist_run_context()
+                    await emit_persisted("task", {
+                        "task_id": task_id,
+                        "role": role,
+                        "status": status,
+                        "attempts": attempts,
+                        **metadata,
+                    })
+
+                async def artifact_store(
+                    task_id: str, artifact_type: str, payload: dict[str, Any],
+                ) -> Optional[str]:
+                    raw = json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True)
+                    checksum = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+                    artifact_id = f"{trace_id}:{task_id}:{checksum[:12]}"
+                    reference = ArtifactRef(
+                        artifact_id=artifact_id,
+                        artifact_type=artifact_type,
+                        owner_id=user_id or "anonymous",
+                        content_type="application/json",
+                        size_bytes=len(raw.encode("utf-8")),
+                        checksum=checksum,
+                    )
+                    await self.run_store.put_artifact(
+                        reference,
+                        run_id=trace_id,
+                        owner_id=user_id or "anonymous",
+                        tenant_id=tenant_id,
+                        content=raw,
+                    )
+                    if not any(item.artifact_id == artifact_id for item in run_context.artifacts):
+                        run_context.artifacts.append(reference)
+                    task_ledger = run_context.state.setdefault("supervisor_tasks", {})
+                    if task_id in task_ledger:
+                        task_ledger[task_id]["artifact_id"] = artifact_id
+                    await persist_run_context()
+                    await emit_persisted("artifact", {
+                        "task_id": task_id,
+                        "artifact_id": artifact_id,
+                        "artifact_type": artifact_type,
+                        "checksum": checksum,
+                    })
+                    return artifact_id
+
+                async def quality_reviewer(
+                    questions: list[dict[str, Any]],
+                ) -> dict[str, Any]:
+                    reviews = await asyncio.gather(*(
+                        self.question_pipeline.reviewer.review(question)
+                        for question in questions
+                        if isinstance(question, dict)
+                    ))
+                    findings = [
+                        {
+                            "status": review.status,
+                            "reviewer": review.reviewer,
+                            "findings": [finding.model_dump(mode="json") for finding in review.findings],
+                        }
+                        for review in reviews
+                    ]
+                    return {
+                        "passed": all(review.status != "rejected" for review in reviews),
+                        "requires_human_review": any(review.status == "needs_human_review" for review in reviews),
+                        "findings": findings,
+                        "reviewer": ",".join(sorted({review.reviewer for review in reviews})) or "heuristic",
+                    }
+
                 supervisor = AuthoringSupervisorGraph(
                     invoke_worker=invoke_worker,
                     dispatch=dispatch,
@@ -2055,9 +2145,17 @@ class AIAgentCore:
                     media_timeout_seconds=self.supervisor_media_timeout_seconds,
                     default_question_count=self.supervisor_default_question_count,
                     max_revisions=self.supervisor_max_revisions,
+                    task_event=task_event,
+                    artifact_store=artifact_store,
+                    quality_reviewer=quality_reviewer,
                 )
                 await asyncio.wait_for(
-                    supervisor.run(user_input=user_input, plan=plan),
+                    supervisor.run(
+                        user_input=user_input,
+                        plan=plan,
+                        resume_state=(context or {}).get("_supervisor_resume"),
+                        retry_task_id=str((context or {}).get("_supervisor_retry_task") or "") or None,
+                    ),
                     timeout=self.graph_timeout_seconds,
                 )
                 final_text = (
@@ -3761,6 +3859,8 @@ class AIAgentCore:
             await self.state_store.create_approval(approval_token, {
                 "name": name, "args": dict(args),
                 "arguments_hash": arguments_hash(name, args),
+                "artifact_hash": arguments_hash(name, args) if name in {"create_quiz_with_questions", "create_question"} else None,
+                "artifact_version": 1 if name in {"create_quiz_with_questions", "create_question"} else None,
                 "user_id": user_id, "scope": scope,
                 "authorization_fingerprint": self.state_store.authorization_fingerprint(token),
                 "idempotency_key": uuid4().hex,
@@ -3826,6 +3926,10 @@ class AIAgentCore:
         stored_hash = str(pending.get("arguments_hash") or "")
         if stored_hash and stored_hash != arguments_hash(name, args):
             yield {"type": "error", "message": "Yêu cầu phê duyệt không còn khớp với đề xuất ban đầu."}
+            return
+        artifact_hash = str(pending.get("artifact_hash") or "")
+        if artifact_hash and artifact_hash != arguments_hash(name, args):
+            yield {"type": "error", "message": "Artifact đã thay đổi sau khi tạo đề xuất; cần tạo proposal mới."}
             return
         execution_key = str(pending.get("idempotency_key") or uuid4().hex)
         yield {"type": "status", "label": self._tool_status(name), "tool": name}
@@ -4032,7 +4136,11 @@ class AIAgentCore:
             thread_id=hashlib.sha256(f"{user_id}:{session_id}".encode("utf-8")).hexdigest(),
             request=run_request,
             agent_version=self.agent_version,
-            metadata={"background": True, **({"tenant_id": tenant_id} if tenant_id else {})},
+            metadata={
+                "background": True,
+                **({"tenant_id": tenant_id} if tenant_id else {}),
+                **({"retry_of": str(request_context.get("retry_of"))} if request_context.get("retry_of") else {}),
+            },
         )
         await self.run_store.create_run(run_context)
         reference = await self.credential_broker.put(
@@ -4065,6 +4173,65 @@ class AIAgentCore:
             )
             raise
         return {"run_id": run_id, "job_id": job.job_id, "status": "queued"}
+
+    async def retry_background_run(
+        self,
+        run_id: str,
+        user_id: str,
+        authorization: Optional[str],
+        task_id: Optional[str] = None,
+    ) -> dict[str, str]:
+        """Requeue a failed/expired run with a new id and trace lineage."""
+        run = await self.run_store.get_run(run_id, owner_id=user_id)
+        if run is None:
+            raise ValueError("RUN_NOT_FOUND_OR_FORBIDDEN")
+        if run.status not in {"failed", "expired", "cancelled"}:
+            raise ValueError("RUN_RETRY_REQUIRES_TERMINAL_FAILURE")
+        resume_state: dict[str, Any] = {}
+        question_batches: list[dict[str, Any]] = []
+        for reference in run.artifacts:
+            stored = await self.run_store.get_artifact(
+                reference.artifact_id,
+                owner_id=user_id,
+                tenant_id=str(run.metadata.get("tenant_id") or "") or None,
+            )
+            if stored is None or not stored.content:
+                continue
+            try:
+                payload = json.loads(stored.content)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if reference.artifact_type == "category_list":
+                resume_state["categories"] = payload
+            elif reference.artifact_type == "quiz_blueprint":
+                resume_state["curriculum"] = payload
+            elif reference.artifact_type == "quiz_base_payload":
+                resume_state["base_payload"] = payload
+            elif reference.artifact_type == "question_batch":
+                parts = reference.artifact_id.split(":")
+                batch_task_id = parts[1] if len(parts) > 1 else ""
+                if not task_id or batch_task_id != task_id:
+                    question_batches.append({"task_id": batch_task_id, **payload})
+        if question_batches:
+            resume_state["question_batches"] = question_batches
+        retry_context: dict[str, Any] = {
+            "route": run.request.route,
+            "selected_quiz_id": run.request.selected_quiz_id,
+            "selected_knowledge_source_id": run.request.selected_knowledge_source_id,
+            "retry_of": run_id,
+            "_supervisor_plan": run.plan,
+            "_supervisor_resume": resume_state,
+            "_supervisor_retry_task": task_id or "",
+        }
+        return await self.enqueue_background_run(
+            run.request.user_message,
+            user_id,
+            authorization,
+            run.request.session_id,
+            run.request.locale,
+            run.request.scope,
+            retry_context,
+        )
 
     async def readiness(self) -> dict[str, bool]:
         redis_ready = await self.state_store.is_available()

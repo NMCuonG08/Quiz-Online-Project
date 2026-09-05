@@ -18,6 +18,7 @@ import {
   decideAgentReview,
   getAgentRunEvents,
   listAgentReviews,
+  retryAgentRun,
   type AgentReview,
   type AgentRunEvent,
   type BackgroundRun,
@@ -51,6 +52,19 @@ function statusTone(status: string) {
   if (["failed", "rejected", "expired"].includes(status)) return "text-red-600 bg-red-500/10";
   if (["waiting_for_approval", "pending", "cancel_requested"].includes(status)) return "text-amber-700 bg-amber-500/10";
   return "text-blue-600 bg-blue-500/10";
+}
+
+function eventLabel(event: AgentRunEvent) {
+  if (event.type === "task") {
+    const taskId = String(event.task_id || "task");
+    const role = String(event.role || "worker");
+    const status = String(event.status || "");
+    return `${role} · ${taskId}${status ? ` · ${status}` : ""}`;
+  }
+  if (event.type === "artifact") {
+    return `artifact · ${String(event.artifact_type || event.task_id || "stored")}`;
+  }
+  return event.label || event.type;
 }
 
 export default function AgentControlCenter({
@@ -127,6 +141,19 @@ export default function AgentControlCenter({
     }
   };
 
+  const handleRetry = async () => {
+    if (!run?.run_id) return;
+    setLoading(true);
+    try {
+      const retried = await retryAgentRun(run.run_id);
+      setNotice(`Đã tạo lại tác vụ: ${retried.run_id}`);
+    } catch (error: unknown) {
+      setNotice(error instanceof Error ? error.message : "Không thể chạy lại tác vụ.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDecision = async (decision: "approved" | "rejected") => {
     if (!selectedReview || selectedReview.status !== "pending") return;
     setDecisionBusy(true);
@@ -182,12 +209,13 @@ export default function AgentControlCenter({
                   <p className="mt-1 truncate font-mono text-[9px] text-muted-foreground">{run.run_id}</p>
                 </div>
                 {runStatus && !TERMINAL_RUN_STATES.has(runStatus) && <button type="button" onClick={() => void handleCancel()} className="grid size-7 place-items-center rounded-lg text-red-600 hover:bg-red-500/10" aria-label="Hủy background run"><SquareX className="size-4" /></button>}
+                {runStatus && ["failed", "expired", "cancelled"].includes(runStatus) && <button type="button" onClick={() => void handleRetry()} className="grid size-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-500/10" aria-label="Chạy lại background run"><RefreshCw className="size-4" /></button>}
               </div>
               <div className="mt-3 space-y-1.5">
                 {events.length ? events.slice(-8).map((event, index) => (
                   <div key={`${event.event_id || event.sequence || index}`} className="flex items-center gap-2 text-[9px]">
                     <span className="grid size-4 shrink-0 place-items-center rounded-full bg-background text-muted-foreground">{event.type === "done" ? <Check className="size-2.5" /> : <span>{index + 1}</span>}</span>
-                    <span className="min-w-0 flex-1 truncate">{event.label || event.type}{event.tool ? ` · ${event.tool}` : ""}</span>
+                    <span className="min-w-0 flex-1 truncate">{eventLabel(event)}{event.tool ? ` · ${event.tool}` : ""}</span>
                     {event.timestamp && <span className="shrink-0 text-muted-foreground">{new Date(event.timestamp).toLocaleTimeString()}</span>}
                   </div>
                 )) : <p className="text-[10px] text-muted-foreground">Đang chờ event đầu tiên từ worker…</p>}
