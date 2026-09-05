@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 import json
 import logging
@@ -25,6 +26,7 @@ from .intent_schema import (
 )
 from .harness.context import ContextBuilder
 from .model_router import ModelRoute, ModelRouter, TraceObserver
+from .orchestration.registry import get_agent_spec
 try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 except ImportError:  # pragma: no cover - optional in minimal local installs
@@ -192,6 +194,8 @@ class LangGraphQuizRunner:
         )
         self.planner_confidence_threshold = max(0.0, min(planner_confidence_threshold, 1.0))
         self.planner_escalate_writes = planner_escalate_writes
+        self.planner_fast_timeout_seconds = max(1.0, planner_fast_timeout_seconds)
+        self.planner_strong_timeout_seconds = max(1.0, planner_strong_timeout_seconds)
         self.postgres_url = postgres_url
         self._checkpointer: Optional[Any] = None
         self._checkpointer_context: Optional[Any] = None
@@ -294,16 +298,38 @@ class LangGraphQuizRunner:
         metadata = dict(config.get("metadata") or {})
         metadata["agent_role"] = role
         worker_config["metadata"] = metadata
-        message, _ = await self.executor_router.ainvoke(
-            [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=json.dumps(payload, ensure_ascii=False, default=str)),
-            ],
-            config=worker_config,
-            operation=f"worker_{role}",
-            record_model=record_model,
-            trace_observer=trace_observer,
-        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=json.dumps(payload, ensure_ascii=False, default=str)),
+        ]
+        route_kind = get_agent_spec(role).model_route
+        if route_kind == "planner_fast":
+            route_label = f"worker:{role}:planner_fast"
+            await ModelRouter._trace(trace_observer, "worker", "start", route_label)
+            started = time.perf_counter()
+            try:
+                message = await asyncio.wait_for(
+                    self.planner_fast.ainvoke(messages, config=worker_config),
+                    timeout=self.planner_fast_timeout_seconds,
+                )
+                duration = time.perf_counter() - started
+                if record_model:
+                    record_model(self.planner_fast.model_name, "success", duration, getattr(message, "usage_metadata", None) or {})
+                await ModelRouter._trace(trace_observer, "worker", "success", route_label)
+            except Exception:
+                duration = time.perf_counter() - started
+                if record_model:
+                    record_model(self.planner_fast.model_name, "error", duration, {})
+                await ModelRouter._trace(trace_observer, "worker", "error", route_label)
+                raise
+        else:
+            message, _ = await self.executor_router.ainvoke(
+                messages,
+                config=worker_config,
+                operation=f"worker_{role}",
+                record_model=record_model,
+                trace_observer=trace_observer,
+            )
         result = self._extract_json_object(message)
         if result is None:
             raise ValueError(f"WORKER_OUTPUT_INVALID: {role} không trả JSON object hợp lệ.")
