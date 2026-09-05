@@ -406,6 +406,22 @@ class UiPolicyContractTests(unittest.TestCase):
         self.assertEqual(proposal["quiz_type"], "MULTIPLE_CHOICE")
         self.assertEqual(proposal["slug"], "python-co-ban")
 
+    def test_quiz_plan_converts_minutes_to_backend_seconds(self):
+        proposal = AIAgentCore._build_quiz_create_proposal(
+            {
+                "entities": {
+                    "title": "Lịch sử Việt Nam",
+                    "category": "History",
+                    "difficulty_level": "MEDIUM",
+                    "time_limit": 10,
+                    "time_limit_unit": "minutes",
+                    "quiz_type": "MULTIPLE_CHOICE",
+                }
+            },
+            {"list_categories": {"items": [{"id": "cat-history", "name": "History"}]}},
+        )
+        self.assertEqual(proposal["time_limit"], 600)
+
     def test_category_selection_request_is_detected_in_vietnamese(self):
         self.assertTrue(AIAgentCore._is_category_selection_request(
             "Có các catrgoy nào bạn chọn 1 cái phù hợp nhất là được"

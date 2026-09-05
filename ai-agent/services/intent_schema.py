@@ -89,10 +89,11 @@ class IntentEntities(BaseModel):
     session_id: Optional[str] = Field(default=None, max_length=128)
     title: Optional[str] = Field(default=None, max_length=300)
     category: Optional[str] = Field(default=None, max_length=300)
-    question_count: Optional[int] = Field(default=None, ge=1, le=100)
+    question_count: Optional[int] = Field(default=None, ge=1, le=100, description="Exact number of questions requested")
     content_language: Optional[str] = Field(default=None, max_length=32)
     difficulty_level: Optional[str] = Field(default=None, max_length=64)
-    time_limit: Optional[int] = Field(default=None, ge=1, le=3600)
+    time_limit: Optional[int] = Field(default=None, ge=1, le=3600, description="Numeric duration expressed in time_limit_unit")
+    time_limit_unit: Optional[Literal["seconds", "minutes"]] = None
     quiz_type: Optional[str] = Field(default=None, max_length=64)
 
 

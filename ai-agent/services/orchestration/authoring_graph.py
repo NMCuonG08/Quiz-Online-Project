@@ -273,25 +273,26 @@ class AuthoringSupervisorGraph:
             if not isinstance(questions, list) or not questions:
                 await self._task(task_id, "quiz_builder", "retryable_failed", error="GENERATOR_INVALID")
                 return {"errors": [f"GENERATOR_INVALID: {task.get('task_id')} không trả questions hợp lệ."]}
-            normalized = []
-            for question in questions:
-                if isinstance(question, dict):
-                    item = dict(question)
-                    if not item.get("sort_order") and task.get("slots"):
-                        item["sort_order"] = task["slots"][len(normalized)] if len(normalized) < len(task["slots"]) else len(normalized) + 1
-                    normalized.append(item)
+            try:
+                normalized = _normalize_question_batch(task, questions)
+            except AuthoringGraphError as exc:
+                await self._task(task_id, "quiz_builder", "retryable_failed", error=str(exc))
+                raise
             await self._artifact(task_id, "question_batch", {"questions": normalized, "slots": task.get("slots", [])})
             await self._task(task_id, "quiz_builder", "completed", artifact_type="question_batch")
             await self.trace("quiz_builder", "completed", str(task.get("task_id") or "unknown"))
             return {"question_batches": [{"task_id": task.get("task_id"), "questions": normalized}]}
 
         def aggregate(state: AuthoringState) -> dict[str, Any]:
-            questions: list[dict[str, Any]] = []
+            questions_by_slot: dict[int, dict[str, Any]] = {}
             for batch in state.get("question_batches", []):
                 for question in batch.get("questions", []) if isinstance(batch, dict) else []:
                     if isinstance(question, dict):
-                        questions.append(_normalize_generated_question(question))
-            questions.sort(key=lambda item: int(item.get("sort_order") or 0))
+                        normalized = _normalize_generated_question(question)
+                        slot = int(normalized.get("sort_order") or 0)
+                        if slot > 0:
+                            questions_by_slot[slot] = normalized
+            questions = [questions_by_slot[slot] for slot in sorted(questions_by_slot)]
             return {"questions": questions}
 
         def validate(state: AuthoringState) -> dict[str, Any]:
@@ -571,6 +572,24 @@ def _normalize_generated_question(question: dict[str, Any]) -> dict[str, Any]:
         for option in normalized.get("options") or []
         if isinstance(option, dict)
     ]
+    return normalized
+
+
+def _normalize_question_batch(
+    task: dict[str, Any],
+    questions: list[Any],
+) -> list[dict[str, Any]]:
+    slots = [int(slot) for slot in task.get("slots") or []]
+    candidates = [question for question in questions if isinstance(question, dict)]
+    if len(candidates) < len(slots):
+        raise AuthoringGraphError(
+            f"GENERATOR_COUNT_INVALID: {task.get('task_id')} cần {len(slots)} câu nhưng chỉ trả {len(candidates)}."
+        )
+    normalized: list[dict[str, Any]] = []
+    for index, slot in enumerate(slots):
+        item = _normalize_generated_question(candidates[index])
+        item["sort_order"] = slot
+        normalized.append(item)
     return normalized
 
 

@@ -7,6 +7,7 @@ import unittest
 from services.orchestration.authoring_graph import (
     AuthoringSupervisorGraph,
     _merge_repaired_questions,
+    _normalize_question_batch,
     _normalize_generated_question,
 )
 from services.agent_core import AIAgentCore
@@ -42,6 +43,18 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
             }],
         )
         self.assertEqual([option["is_correct"] for option in repaired[0]["options"]], [True, False])
+
+    def test_question_batch_discards_extra_items_and_owns_assigned_slots(self):
+        questions = [
+            {"question_text": f"Q{index}", "question_type": "MULTIPLE_CHOICE", "options": []}
+            for index in range(1, 5)
+        ]
+        normalized = _normalize_question_batch(
+            {"task_id": "question-shard-2", "slots": [5, 6]},
+            questions,
+        )
+        self.assertEqual(len(normalized), 2)
+        self.assertEqual([item["sort_order"] for item in normalized], [5, 6])
 
     def _plan(self) -> dict:
         return {

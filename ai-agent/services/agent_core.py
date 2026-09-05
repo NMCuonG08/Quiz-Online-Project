@@ -2037,6 +2037,7 @@ class AIAgentCore:
                 async def invoke_worker(
                     role: str, prompt: str, payload: dict[str, Any],
                 ) -> dict[str, Any]:
+                    budget.consume_subagent_call()
                     return await self.graph_runner.invoke_worker(
                         role,
                         prompt,
@@ -3404,7 +3405,7 @@ class AIAgentCore:
             "slug": str(entities.get("slug") or "").strip() or AIAgentCore._slugify(title),
             "category_id": category_id,
             "difficulty_level": difficulty,
-            "time_limit": int(time_limit),
+            "time_limit": int(time_limit) * (60 if entities.get("time_limit_unit") == "minutes" else 1),
             "quiz_type": quiz_type,
             "description": str(entities.get("description") or ""),
             "instructions": str(entities.get("instructions") or ""),
