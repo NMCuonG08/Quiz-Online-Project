@@ -335,6 +335,26 @@ class AuthoringSupervisorGraph:
             if not isinstance(questions, list) or not questions:
                 await self._task(task_id, "quiz_builder", "retryable_failed", error="REPAIR_INVALID")
                 return {"revision_count": next_revision, "errors": ["REPAIR_INVALID: Repair worker không trả questions hợp lệ."]}
+            if _missing_answer_flags(questions):
+                await self._task(task_id, "quiz_builder", "retrying", error="repair_missing_is_correct")
+                result = await self.invoke_worker(
+                    "quiz_builder",
+                    self._repair_prompt(execution_plan)
+                    + " The previous repair omitted answer flags. Retry now and include is_correct=true or false on EVERY option.",
+                    {
+                        "user_request": state["user_input"],
+                        "questions": state.get("questions", []),
+                        "quality_report": state.get("quality", {}),
+                        "semantic_review": state.get("semantic_review", {}),
+                        "revision": next_revision,
+                        "content_language": execution_plan.content_language,
+                    },
+                )
+                questions = result.get("questions")
+                if not isinstance(questions, list) or not questions or _missing_answer_flags(questions):
+                    await self._task(task_id, "quiz_builder", "retryable_failed", error="REPAIR_MISSING_ANSWER_FLAGS")
+                    return {"revision_count": next_revision, "errors": ["REPAIR_INVALID: Repair worker thiếu is_correct trên option."]}
+            questions = _merge_repaired_questions(state.get("questions", []), questions)
             await self._artifact(task_id, "repaired_questions", {"questions": questions})
             await self._task(task_id, "quiz_builder", "completed", artifact_type="repaired_questions")
             await self.trace("quality_reviewer", "repair_completed", f"revision-{next_revision}")
@@ -484,7 +504,10 @@ class AuthoringSupervisorGraph:
         return (
             "You are a quiz repair worker. Return JSON only: {\"questions\": [...]}. "
             "Repair the supplied questions according to the quality report. Preserve "
-            "valid fields and sort_order, do not change the requested content language "
+            "valid fields and sort_order. Every option MUST contain option_text, "
+            "is_correct (boolean) and sort_order; do not omit is_correct. Remove "
+            "duplicate option_text values and keep at least one correct option. "
+            "Do not change the requested content language "
             f"({plan.content_language}), and do not add unrelated questions."
         )
 
@@ -544,3 +567,57 @@ def _normalize_generated_question(question: dict[str, Any]) -> dict[str, Any]:
         if isinstance(option, dict)
     ]
     return normalized
+
+
+def _merge_repaired_questions(
+    previous_questions: list[dict[str, Any]],
+    repaired_questions: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Preserve required answer flags when a repair model omits them."""
+    previous_by_sort = {
+        int(question.get("sort_order") or index + 1): question
+        for index, question in enumerate(previous_questions)
+        if isinstance(question, dict)
+    }
+    merged: list[dict[str, Any]] = []
+    for index, raw_question in enumerate(repaired_questions):
+        if not isinstance(raw_question, dict):
+            continue
+        question = _normalize_generated_question(raw_question)
+        sort_order = int(question.get("sort_order") or index + 1)
+        previous = previous_by_sort.get(sort_order) or {}
+        previous_options = previous.get("options") if isinstance(previous, dict) else []
+        previous_by_text = {
+            str(option.get("option_text") or "").strip().casefold(): option
+            for option in previous_options or []
+            if isinstance(option, dict)
+        }
+        repaired_options = []
+        raw_options = raw_question.get("options") or []
+        for option_index, option in enumerate(question.get("options") or []):
+            if not isinstance(option, dict):
+                continue
+            original = previous_by_text.get(str(option.get("option_text") or "").strip().casefold())
+            if original is None and option_index < len(previous_options or []):
+                original = previous_options[option_index]
+            raw_option = raw_options[option_index] if option_index < len(raw_options) else {}
+            raw_is_correct_missing = not isinstance(raw_option, dict) or raw_option.get("is_correct") is None
+            repaired_options.append({
+                **option,
+                "is_correct": (
+                    original.get("is_correct") is True
+                    if original is not None and raw_is_correct_missing
+                    else option.get("is_correct") is True
+                ),
+            })
+        merged.append({**question, "options": repaired_options})
+    return merged
+
+
+def _missing_answer_flags(questions: list[Any]) -> bool:
+    return any(
+        not isinstance(option, dict) or option.get("is_correct") is None
+        for question in questions
+        if isinstance(question, dict)
+        for option in question.get("options") or []
+    )

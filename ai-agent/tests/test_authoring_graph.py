@@ -4,7 +4,11 @@ import asyncio
 import json
 import unittest
 
-from services.orchestration.authoring_graph import AuthoringSupervisorGraph, _normalize_generated_question
+from services.orchestration.authoring_graph import (
+    AuthoringSupervisorGraph,
+    _merge_repaired_questions,
+    _normalize_generated_question,
+)
 
 
 class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
@@ -16,6 +20,27 @@ class AuthoringSupervisorGraphTests(unittest.IsolatedAsyncioTestCase):
         })
         self.assertEqual(normalized["question_type"], "MULTIPLE_CHOICE")
         self.assertEqual(normalized["difficulty_level"], "MEDIUM")
+
+    def test_repair_keeps_answer_flags_when_model_omits_them(self):
+        repaired = _merge_repaired_questions(
+            [{
+                "sort_order": 1,
+                "question_type": "MULTIPLE_CHOICE",
+                "options": [
+                    {"option_text": "A", "is_correct": True, "sort_order": 1},
+                    {"option_text": "B", "is_correct": False, "sort_order": 2},
+                ],
+            }],
+            [{
+                "sort_order": 1,
+                "question_type": "MULTIPLE_CHOICE",
+                "options": [
+                    {"option_text": "A", "sort_order": 1},
+                    {"option_text": "B", "sort_order": 2},
+                ],
+            }],
+        )
+        self.assertEqual([option["is_correct"] for option in repaired[0]["options"]], [True, False])
 
     def _plan(self) -> dict:
         return {
