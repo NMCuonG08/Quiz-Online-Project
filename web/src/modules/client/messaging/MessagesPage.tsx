@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/common/components/ui/card";
 import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/common/components/ui/avatar";
 import { Send, Users } from "lucide-react";
 import { useAppSelector } from "@/hooks/useRedux";
 import { showError } from "@/lib/Notification";
@@ -19,6 +20,11 @@ const MessageCircleIcon = ({ className }: { className?: string }) => (
 
 function friendName(friend?: FriendUser) {
   return friend?.full_name || friend?.username || "Bạn";
+}
+
+function FriendAvatar({ friend }: { friend?: FriendUser }) {
+  const name = friendName(friend);
+  return <Avatar className="h-8 w-8"><AvatarImage src={friend?.avatar || undefined} alt={name} /><AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>;
 }
 
 export default function MessagesPage() {
@@ -136,14 +142,14 @@ export default function MessagesPage() {
         <div className="space-y-2">
           {conversations.length === 0
             ? <p className="text-sm text-muted-foreground">Chưa có cuộc trò chuyện nào.</p>
-            : conversations.map((conversation) => <Button key={conversation.id} variant={conversation.id === selectedId ? "secondary" : "ghost"} className="w-full justify-start" onClick={() => setSelectedId(conversation.id)}>{otherMember(conversation)?.user?.full_name || otherMember(conversation)?.user?.username || "Cuộc trò chuyện"}</Button>)}
+            : conversations.map((conversation) => { const member = otherMember(conversation); const friend = member?.user; return <Button key={conversation.id} variant={conversation.id === selectedId ? "secondary" : "ghost"} className="w-full justify-start gap-2" onClick={() => setSelectedId(conversation.id)}><FriendAvatar friend={friend} /><span className="truncate">{friendName(friend)}</span></Button>; })}
         </div>
         <div className="border-t pt-4">
           <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Users className="h-4 w-4 text-primary" />Bạn bè</p>
           <div className="space-y-1">
             {friends.length === 0
               ? <p className="text-sm text-muted-foreground">Hãy kết bạn để bắt đầu trò chuyện.</p>
-              : friends.map((friend) => <Button key={friend.id} variant="ghost" className="w-full justify-start" disabled={startingFriendId === friend.id} onClick={() => void startConversation(friend)}>{friendName(friend)}</Button>)}
+              : friends.map((friend) => <Button key={friend.id} variant="ghost" className="w-full justify-start gap-2" disabled={startingFriendId === friend.id} onClick={() => void startConversation(friend)}><FriendAvatar friend={friend} /><span className="truncate">{friendName(friend)}</span></Button>)}
           </div>
         </div>
       </CardContent>

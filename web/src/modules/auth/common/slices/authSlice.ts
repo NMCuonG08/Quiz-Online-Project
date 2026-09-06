@@ -7,6 +7,7 @@ interface User {
   username: string;
   email: string;
   full_name?: string | null;
+  avatar?: string | null;
   role?: string;
   avatarUrl?: string;
   isPremium?: boolean;

@@ -45,6 +45,11 @@ describe('Authentication lifecycle (e2e)', () => {
 
     const token = login.body.accessToken as string;
     const me = await request(app.getHttpServer()).get('/api/auth/me').set('Authorization', `Bearer ${token}`).expect(200);
+    const updatedProfile = await request(app.getHttpServer()).patch('/api/user/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ fullName: 'Updated Auth Flow Test' })
+      .expect(200);
+    expect(updatedProfile.body.full_name).toBe('Updated Auth Flow Test');
     await request(app.getHttpServer()).get('/api/user/search').query({ q: credentials.username }).set('Authorization', `Bearer ${token}`).expect(200);
     await request(app.getHttpServer()).get('/api/friendships/friends').set('Authorization', `Bearer ${token}`).expect(200);
     const relationship = await request(app.getHttpServer())

@@ -51,7 +51,7 @@ const Profile = () => {
       form.reset({
         username: user.username || "",
         fullName: user.full_name || "",
-        avatar: user.avatarUrl || null,
+        avatar: user.avatar || user.avatarUrl || null,
       });
     }
   }, [user, form]);
@@ -63,23 +63,27 @@ const Profile = () => {
     showLoading("Đang cập nhật...", "Xin vui lòng đợi");
 
     try {
-      // Create FormData if we have a file, otherwise normal JSON update.
-      // Wait, our backend endpoint PATCH /api/user/:id consumes JSON for standard fields 
-      // but if we upload avatar file, it usually needs multipart/form-data.
-      // Wait! Looking at the user.controller.ts and update-user.dto.ts, it expects `avatar: string` right now.
-      // Let's assume if data.avatar is a File, the frontend doesn't have an upload mechanism built into the UserService yet, 
-      // or we just send it as a base64 string or the UserService needs an upload mechanism.
-      // For now, let's process standard fields. If we integrate real file upload in the future, we'll modify it.
-
       const payload: Record<string, any> = {};
+      let avatar = user.avatar || user.avatarUrl || null;
 
       if (data.username !== user.username) payload.username = data.username;
       if (data.fullName !== user.full_name) payload.fullName = data.fullName;
 
-      // If we had a pre-signed URL or base64 converter:
-      // if (data.avatar instanceof File) { /* logic to upload and get URL */ }
+      if (data.avatar instanceof File) {
+        const uploadResult = await UserService.updateAvatar(data.avatar);
+        if (!uploadResult.success) {
+          showError(uploadResult.error || "Không thể tải ảnh đại diện lên");
+          return;
+        }
+        avatar = uploadResult.data?.avatar || avatar;
+      } else if (data.avatar === null && avatar) {
+        payload.avatar = "";
+        avatar = null;
+      }
 
-      const result = await UserService.updateProfile(user.id, payload);
+      const result = Object.keys(payload).length
+        ? await UserService.updateProfile(payload)
+        : { success: true };
 
       if (result.success) {
         showSuccess("Cập nhật thành công!");
@@ -89,12 +93,12 @@ const Profile = () => {
             data: {
               username: data.username,
               fullName: data.fullName,
-              // email, avatar
+              avatar,
             },
           })
         );
       } else {
-        showError(result.error || "Có lỗi xảy ra");
+        showError(("error" in result && result.error) || "Có lỗi xảy ra");
       }
     } catch (e) {
       console.error(e);
@@ -166,6 +170,27 @@ const Profile = () => {
                     <FormControl>
                       <Input placeholder="Nhập họ và tên đầy đủ" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="avatar"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ảnh đại diện</FormLabel>
+                    <FormControl>
+                      <UploadImage
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Chọn ảnh đại diện"
+                        maxSize={5}
+                        className="max-w-sm"
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">JPG, PNG, GIF hoặc WebP, tối đa 5MB.</p>
                     <FormMessage />
                   </FormItem>
                 )}

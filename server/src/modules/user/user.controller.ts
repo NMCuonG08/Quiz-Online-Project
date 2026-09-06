@@ -7,7 +7,11 @@ import {
   Param,
   Delete,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -16,10 +20,14 @@ import { Auth, Authenticated, AuthGuard } from '@/common/guards/auth.guard';
 import { Permission } from '@/common/enums';
 import { Query } from '@nestjs/common';
 import { AuthDto } from '@/modules/auth/dto';
+import { CloudinaryService } from '@/infrastructure/storage/cloudinary/cloudinary.service';
 
 @Controller('/api/user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
@@ -69,6 +77,27 @@ export class UserController {
   @Authenticated({ permission: false })
   getDashboard(@Auth() auth: AuthDto) {
     return this.userService.getDashboard(auth.user.id);
+  }
+
+  @Patch('me/avatar')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
+  @UseInterceptors(FileInterceptor('avatar', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  async updateMyAvatar(
+    @Auth() auth: AuthDto,
+    @UploadedFile() avatar?: Express.Multer.File,
+  ) {
+    if (!avatar) throw new BadRequestException('Avatar image is required');
+    const uploaded = await this.cloudinaryService.uploadImage(avatar);
+    if (!uploaded?.url) throw new BadRequestException('Avatar upload failed');
+    return this.userService.update(auth.user.id, { avatar: uploaded.url });
+  }
+
+  @Patch('me')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
+  updateMyProfile(@Auth() auth: AuthDto, @Body() updateUserDto: UpdateUserDto) {
+    return this.userService.update(auth.user.id, updateUserDto);
   }
 
   @Get(':id/profile')

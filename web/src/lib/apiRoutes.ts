@@ -9,6 +9,8 @@ export const apiRoutes = {
   },
   USER: {
     SEARCH: "/api/user/search",
+    ME: "/api/user/me",
+    AVATAR: "/api/user/me/avatar",
   },
   ROOMS: {
     BASE: "/api/rooms",
