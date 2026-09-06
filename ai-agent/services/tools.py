@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, Optional
 
 import httpx
@@ -177,6 +178,70 @@ class MCPToolWrapper:
     async def get_my_permissions(self, authorization: str) -> Any:
         return self.data(await self.call_backend_api(
             "GET", "/api/auth/me/permissions", authorization=authorization,
+        ))
+
+    async def search_users(self, query: str, authorization: str, limit: int = 10) -> Any:
+        response = await self.call_backend_api(
+            "GET", "/api/user/search", params={"q": query}, authorization=authorization,
+        )
+        return self.compact(response, limit)
+
+    async def get_friends(self, authorization: str, limit: int = 50) -> Any:
+        return self.compact(await self.call_backend_api(
+            "GET", "/api/friendships/friends", authorization=authorization,
+        ), limit)
+
+    async def get_friend_requests(
+        self, authorization: str, direction: str = "all", limit: int = 50,
+    ) -> Any:
+        if direction == "incoming":
+            return {"incoming": self.compact(await self.call_backend_api(
+                "GET", "/api/friendships/requests/pending", authorization=authorization,
+            ), limit), "outgoing": []}
+        if direction == "outgoing":
+            return {"incoming": [], "outgoing": self.compact(await self.call_backend_api(
+                "GET", "/api/friendships/requests/sent", authorization=authorization,
+            ), limit)}
+        incoming, outgoing = await asyncio.gather(
+            self.call_backend_api("GET", "/api/friendships/requests/pending", authorization=authorization),
+            self.call_backend_api("GET", "/api/friendships/requests/sent", authorization=authorization),
+        )
+        return {"incoming": self.compact(incoming, limit), "outgoing": self.compact(outgoing, limit)}
+
+    async def get_friendship_status(self, user_id: str, authorization: str) -> Any:
+        return self.data(await self.call_backend_api(
+            "GET", f"/api/friendships/status/{user_id}", authorization=authorization,
+        ))
+
+    async def get_friends_leaderboard(
+        self, quiz_id: str, authorization: str, limit: int = 10,
+    ) -> Any:
+        return self.compact(await self.call_backend_api(
+            "GET", f"/api/quizzes/{quiz_id}/leaderboard", params={"limit": limit}, authorization=authorization,
+        ), limit)
+
+    async def send_friend_request(
+        self, friend_id: str, authorization: str, idempotency_key: Optional[str] = None,
+    ) -> Any:
+        return self.data(await self.call_backend_api(
+            "POST", "/api/friendships/request", body={"friendId": friend_id}, authorization=authorization,
+            **self._idempotency_kwargs(idempotency_key),
+        ))
+
+    async def accept_friend_request(
+        self, friendship_id: str, authorization: str, idempotency_key: Optional[str] = None,
+    ) -> Any:
+        return self.data(await self.call_backend_api(
+            "POST", f"/api/friendships/accept/{friendship_id}", authorization=authorization,
+            **self._idempotency_kwargs(idempotency_key),
+        ))
+
+    async def remove_friendship(
+        self, friendship_id: str, authorization: str, idempotency_key: Optional[str] = None,
+    ) -> Any:
+        return self.data(await self.call_backend_api(
+            "DELETE", f"/api/friendships/{friendship_id}", authorization=authorization,
+            **self._idempotency_kwargs(idempotency_key),
         ))
 
     async def issue_agent_token(self, authorization: str) -> Any:

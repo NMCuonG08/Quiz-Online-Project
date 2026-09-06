@@ -86,6 +86,13 @@ export class QuizController {
     return this.quizService.getQuizById(id);
   }
 
+  @Get(':id/leaderboard')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
+  async getFriendsLeaderboard(@Param('id') id: string, @Auth() auth: AuthDto, @Query('limit') limit?: string) {
+    return this.quizService.getFriendsLeaderboard(id, auth.user.id, limit ? parseInt(limit, 10) : 10);
+  }
+
   @Patch(':id')
   @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.QuizUpdate })

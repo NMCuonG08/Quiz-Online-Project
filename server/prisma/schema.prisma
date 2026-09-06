@@ -49,6 +49,8 @@ model User {
   posts               Post[]             @relation("UserPosts")
   comments            Comment[]
   likes               Like[]
+  conversationMemberships ConversationMember[]
+  sentMessages        Message[]          @relation("MessageSender")
 
   // Payment & Subscription
   subscription        UserSubscription?
@@ -849,6 +851,64 @@ model Friendship {
   @@index([userId])
   @@index([friendId])
   @@map("friendships")
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  QUIZ_SHARE
+  RESULT_SHARE
+  ROOM_INVITE
+  CHALLENGE
+  SYSTEM
+}
+
+model Conversation {
+  id         String                @id @default(uuid()) @db.Uuid
+  type       ConversationType     @default(DIRECT)
+  created_at DateTime              @default(now())
+  updated_at DateTime              @updatedAt
+  members    ConversationMember[]
+  messages   Message[]
+
+  @@index([updated_at])
+  @@map("conversations")
+}
+
+model ConversationMember {
+  id              String       @id @default(uuid()) @db.Uuid
+  conversation_id String       @db.Uuid
+  user_id         String       @db.Uuid
+  last_read_at    DateTime?
+  muted           Boolean      @default(false)
+  joined_at       DateTime     @default(now())
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([conversation_id, user_id])
+  @@index([user_id, last_read_at])
+  @@map("conversation_members")
+}
+
+model Message {
+  id                String       @id @default(uuid()) @db.Uuid
+  conversation_id   String       @db.Uuid
+  sender_id         String       @db.Uuid
+  client_message_id String
+  type              MessageType  @default(TEXT)
+  body              String       @db.Text
+  data              Json         @default("{}")
+  created_at        DateTime     @default(now())
+  conversation      Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender            User         @relation("MessageSender", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@unique([sender_id, client_message_id])
+  @@index([conversation_id, created_at])
+  @@map("messages")
 }
 
 // Community System Models

@@ -14,6 +14,9 @@ describe('RoomWebSocketGateway game synchronization', () => {
         questionId: 'question-1',
         timeLimit: 30,
       }),
+      getParticipants: jest.fn().mockResolvedValue({
+        participants: [{ user_id: userId, username: 'User', status: 'ACTIVE' }],
+      }),
       persistGameSnapshot: jest.fn().mockResolvedValue(undefined),
       submitAnswer: jest.fn().mockResolvedValue({
         isCorrect: true,
@@ -25,6 +28,17 @@ describe('RoomWebSocketGateway game synchronization', () => {
     const redisService = {
       get: jest.fn().mockImplementation((key: string) => {
         if (key.includes(':answered:')) return Promise.resolve(storedAnswer);
+        if (key.endsWith(':game')) return Promise.resolve({
+          roomId,
+          status: 'QUESTION',
+          questionIndex: 0,
+          questionId: 'question-1',
+          questionStartedAt: Date.now() - 1000,
+          deadline: Date.now() + 10_000,
+          version: 1,
+          serverTime: Date.now(),
+          rosterCount: 1,
+        });
         return Promise.resolve(null);
       }),
       set: jest.fn().mockImplementation((key: string, value: unknown) => {
@@ -73,6 +87,9 @@ describe('RoomWebSocketGateway game synchronization', () => {
   it('broadcasts start state to the room and initiating owner', async () => {
     jest.useFakeTimers();
     const fixture = createFixture();
+    fixture.redisService.get.mockImplementation((key: string) =>
+      key.endsWith(':game') ? Promise.resolve(null) : Promise.resolve(null),
+    );
 
     await fixture.gateway.handleStartGame({ roomId }, fixture.client);
 

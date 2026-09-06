@@ -62,35 +62,35 @@ const NavBarLaptop = () => {
         <nav className="hidden gap-8  md:flex">
           <LocalizedLink
             href="/"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/") ? "active" : "hover:text-[#FDD239]"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/") ? "active" : "hover:text-primary"
               }`}
           >
             {tNav("home")}
           </LocalizedLink>
           <LocalizedLink
             href="/category"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/category") ? "active" : "hover:text-[#FDD239]"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/category") ? "active" : "hover:text-primary"
               }`}
           >
             {tNav("quizzes")}
           </LocalizedLink>
           <LocalizedLink
             href="/courses"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/courses") ? "active" : "hover:text-[#FDD239]"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/courses") ? "active" : "hover:text-primary"
               }`}
           >
             {tNav("courses")}
           </LocalizedLink>
           <LocalizedLink
             href="/community"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/community") ? "active" : "hover:text-[#FDD239]"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/community") ? "active" : "hover:text-primary"
               }`}
           >
             {tNav("community")}
           </LocalizedLink>
           <LocalizedLink
             href="/about"
-            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/about") ? "active" : "hover:text-[#FDD239]"
+            className={`nav-link text-sm text-muted-foreground transition-colors ${isActive("/about") ? "active" : "hover:text-primary"
               }`}
           >
             {tNav("about")}
@@ -107,7 +107,7 @@ const NavBarLaptop = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="inline-flex bg-yellow items-center justify-center w-9 h-9 p-0"
+                  className="inline-flex items-center justify-center w-9 h-9 p-0"
                 >
                   <User className="h-4 w-4" />
                 </Button>
@@ -134,7 +134,7 @@ const NavBarLaptop = () => {
             </DropdownMenu>
           ) : (
             <LocalizedLink href="/auth/login">
-              <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground text-black dark:text-white transition-colors">
+              <Button className="inline-flex items-center px-4 py-2 text-sm font-medium">
                 {tAuth("signIn")}
               </Button>
             </LocalizedLink>

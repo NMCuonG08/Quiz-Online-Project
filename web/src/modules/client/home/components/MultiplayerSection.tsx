@@ -51,7 +51,7 @@ const MultiplayerSection = () => {
               <Button
                 variant="shadowBorder"
                 size="lg"
-                className=" bg-yellow text-gray-dark border-black hover:bg-yellow font-bold"
+                className="font-semibold"
               >
                 Join now
               </Button>
@@ -65,7 +65,7 @@ const MultiplayerSection = () => {
           </div>
 
           {/* Right Column - Image Placeholder */}
-          <div className="relative w-full h-96 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden">
+          <div className="relative w-full h-96 bg-muted rounded-xl flex items-center justify-center overflow-hidden">
             <img
               src="/banners/challenges.jpg"
               alt="Multiplayer challenges"

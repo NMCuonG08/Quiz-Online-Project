@@ -161,7 +161,7 @@ const CoursesPage = () => {
                                 <CardHeader className="p-0 flex-shrink-0 gap-0">
                                     <div className="relative w-full h-44 overflow-hidden bg-gray-100 dark:bg-gray-800">
                                         <Image
-                                            src={course.thumbnail_url || "/logo.jpg"}
+                                            src={course.thumbnail_url || "/logo.png"}
                                             alt={course.title}
                                             fill
                                             className="object-cover group-hover:scale-105 transition-transform duration-300"

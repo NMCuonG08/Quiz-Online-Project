@@ -14,7 +14,7 @@ import { wsManager } from "@/lib/websocket";
 import { Home } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import type { RoomGameStatePayload } from "@/common/types/websocket-event.type";
+import type { RoomGameStatePayload, QuestionResultPayload } from "@/common/types/websocket-event.type";
 
 interface GameQuizPageProps {
   questions: Question[];
@@ -27,6 +27,7 @@ interface LeaderboardScore {
   username: string;
   score: number;
   correctAnswers: number;
+  totalTimeMs?: number;
   timestamp?: string;
 }
 
@@ -43,6 +44,11 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
 
   const [leaderboard, setLeaderboard] = useState<Map<string, LeaderboardScore>>(new Map());
   const [gameVersion, setGameVersion] = useState(0);
+  const [gamePhase, setGamePhase] = useState<RoomGameStatePayload["status"]>("WAITING");
+  const [questionResults, setQuestionResults] = useState<QuestionResultPayload[]>([]);
+  const [answeredCount, setAnsweredCount] = useState(0);
+  const [rosterCount, setRosterCount] = useState(0);
+  const [revealTimeRemaining, setRevealTimeRemaining] = useState(0);
   const gameVersionRef = useRef(0);
   const { isConnected } = useWebSocketState();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -158,6 +164,13 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
       ) return;
       gameVersionRef.current = snapshot.version;
       setGameVersion(snapshot.version);
+      setGamePhase(snapshot.status);
+      setQuestionResults(snapshot.questionResults || []);
+      setAnsweredCount(Number(snapshot.answeredCount || 0));
+      setRosterCount(Number(snapshot.rosterCount || 0));
+      if (snapshot.status === "REVEAL" && snapshot.revealEndsAt) {
+        setRevealTimeRemaining(Math.max(0, Math.ceil((snapshot.revealEndsAt - Date.now()) / 1000)));
+      }
       syncGameState(snapshot);
     };
     wsManager.on("game_state", handleGameState);
@@ -165,6 +178,33 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     wsManager.send("get_game_state", { roomId });
     return () => wsManager.off("game_state", handleGameState);
   }, [isConnected, roomId, syncGameState]);
+
+  useEffect(() => {
+    if (gamePhase !== "REVEAL") return;
+    const timer = window.setInterval(() => setRevealTimeRemaining((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [gamePhase]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    const handleProgress = (payload: { roomId: string; questionId: string; answeredCount: number; rosterCount: number }) => {
+      if (payload.roomId !== roomId) return;
+      setAnsweredCount(payload.answeredCount);
+      setRosterCount(payload.rosterCount);
+    };
+    const handleReveal = (payload: { roomId: string; questionResults: QuestionResultPayload[]; revealEndsAt: number }) => {
+      if (payload.roomId !== roomId) return;
+      setGamePhase("REVEAL");
+      setQuestionResults(payload.questionResults || []);
+      setRevealTimeRemaining(Math.max(0, Math.ceil((payload.revealEndsAt - Date.now()) / 1000)));
+    };
+    wsManager.on("answer_progress", handleProgress);
+    wsManager.on("question_reveal", handleReveal);
+    return () => {
+      wsManager.off("answer_progress", handleProgress);
+      wsManager.off("question_reveal", handleReveal);
+    };
+  }, [isConnected, roomId]);
 
   // Calculate results for QuizResults component
   const quizResultData = useMemo((): QuizResult | null => {
@@ -175,10 +215,10 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
       correct_answers: correctAnswersCount,
       total_score: score,
       percentage: totalQuestions > 0 ? Math.round((correctAnswersCount / totalQuestions) * 100) : 0,
-      time_spent: 0,
+      time_spent: Math.round((leaderboard.get(currentUserId || "")?.totalTimeMs || 0) / 1000),
       passed: true,
     };
-  }, [isGameEnded, roomId, totalQuestions, correctAnswersCount, score]);
+  }, [isGameEnded, roomId, totalQuestions, correctAnswersCount, score, leaderboard, currentUserId]);
 
   // Leaderboard entries
   const leaderboardEntries = useMemo(() => {
@@ -187,6 +227,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
       username: e.username,
       score: e.score,
       correctAnswers: e.correctAnswers,
+      totalTimeMs: e.totalTimeMs,
       isMe: e.userId === currentUserId
     }));
 
@@ -197,6 +238,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
         username: "You",
         score: score,
         correctAnswers: correctAnswersCount,
+        totalTimeMs: 0,
         isMe: true
       });
     }
@@ -274,12 +316,6 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     };
   }, []);
 
-  const handleNextQuestion = () => {
-    if (roomData?.owner_id === currentUserId) {
-      wsManager.send("advance_question", { roomId, expectedVersion: gameVersion });
-    }
-  };
-
   const handleExit = () => {
     if (onExit) {
       onExit();
@@ -299,8 +335,8 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
     >
       {/* Background Gradients */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -mr-64 -mt-64 animate-pulse" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-violet-500/10 rounded-full blur-[120px] -ml-64 -mb-64 animate-pulse duration-1000" />
+        <div className="absolute top-0 right-0 w-[480px] h-[480px] bg-primary/10 rounded-full blur-[80px] -mr-56 -mt-56" />
+        <div className="absolute bottom-0 left-0 w-[480px] h-[480px] bg-violet-500/10 rounded-full blur-[80px] -ml-56 -mb-56" />
       </div>
 
       {isGameEnded && quizResultData ? (
@@ -312,7 +348,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
 
             {/* Center Content: Quiz Results */}
             <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-10 duration-1000">
-              <div className="bg-card/40 backdrop-blur-3xl border border-border/50 rounded-[3rem] p-4 sm:p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.3)] overflow-hidden relative">
+              <div className="bg-card/60 backdrop-blur-md border border-border/50 rounded-[3rem] p-4 sm:p-10 shadow-xl overflow-hidden relative">
                 {/* Minimal Header */}
                 <div className="flex items-center gap-4 mb-8">
                   <div className="h-10 w-2 bg-primary rounded-full" />
@@ -348,6 +384,25 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
             </button>
           </div>
         </div>
+      ) : gamePhase === "REVEAL" ? (
+        <div className="flex-1 overflow-y-auto p-6 sm:p-10">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="rounded-3xl border border-primary/30 bg-card/70 p-8 text-center shadow-xl">
+              <p className="text-sm uppercase tracking-widest text-muted-foreground">Kết quả câu {currentQuestionIndex + 1}</p>
+              <h2 className="mt-2 text-4xl font-black">Bảng xếp hạng tốc độ</h2>
+              <p className="mt-3 text-muted-foreground">{answeredCount}/{rosterCount || "?"} người đã trả lời · Câu tiếp theo sau {revealTimeRemaining}s</p>
+            </div>
+            <div className="overflow-hidden rounded-3xl border border-border bg-card/80 shadow-xl">
+              {questionResults.map((entry, index) => (
+                <div key={entry.userId} className="flex items-center gap-4 border-b border-border/60 px-6 py-4 last:border-b-0">
+                  <span className="w-8 text-xl font-black text-primary">#{index + 1}</span>
+                  <div className="flex-1"><p className="font-bold">{entry.username}</p><p className="text-xs text-muted-foreground">{entry.responseTimeMs == null ? "Không trả lời" : `${(entry.responseTimeMs / 1000).toFixed(2)}s`}</p></div>
+                  <span className={entry.isCorrect ? "font-bold text-emerald-600" : "font-bold text-destructive"}>{entry.isCorrect ? `+${entry.points}` : "Sai"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           {/* Header (fullscreen override) */}
@@ -359,7 +414,7 @@ const GameQuizPage: React.FC<GameQuizPageProps> = ({
             totalScore={totalScore}
             onExit={handleExit}
             onSubmitAnswer={submitAnswer}
-            onNextQuestion={roomData?.owner_id === currentUserId ? handleNextQuestion : undefined}
+            onNextQuestion={undefined}
             isAnswered={isAnswered}
             hasSelectedAnswer={hasSelectedAnswer}
             isLastQuestion={isLastQuestion}

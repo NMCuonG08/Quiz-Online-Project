@@ -41,10 +41,10 @@ const FeatureSection = () => {
             />
           </div>
           <div className="flex-1">
-            <h3 className="text-2xl md:text-3xl font-bold mb-3 text-black dark:text-white">
+            <h3 className="text-2xl md:text-3xl font-bold mb-3 text-foreground">
               {feature.title}
             </h3>
-            <p className="text-base leading-7 text-black dark:text-white">
+            <p className="text-base leading-7 text-muted-foreground">
               {feature.subtitle}
             </p>
           </div>

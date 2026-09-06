@@ -37,6 +37,13 @@ export class FriendshipController {
     );
   }
 
+  @Get('status/:userId')
+  @Authenticated({ permission: false })
+  getRelationship(@Auth() auth: AuthDto, @Param('userId') userId: string) {
+    if (!auth.user) throw new Error('Unauthorized');
+    return this.friendshipService.getRelationship(auth.user.id, userId);
+  }
+
   @Delete(':id')
   @Authenticated()
   rejectOrRemove(@Auth() auth: AuthDto, @Param('id') friendshipId: string) {
@@ -59,5 +66,12 @@ export class FriendshipController {
   getPendingRequests(@Auth() auth: AuthDto) {
     if (!auth.user) throw new Error('Unauthorized');
     return this.friendshipService.getPendingRequests(auth.user.id);
+  }
+
+  @Get('requests/sent')
+  @Authenticated()
+  getSentRequests(@Auth() auth: AuthDto) {
+    if (!auth.user) throw new Error('Unauthorized');
+    return this.friendshipService.getSentRequests(auth.user.id);
   }
 }

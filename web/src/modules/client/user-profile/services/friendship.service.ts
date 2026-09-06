@@ -3,9 +3,17 @@ import { apiRoutes } from "@/lib/apiRoutes";
 
 export interface FriendUser {
   id: string;
-  username: string;
-  full_name: string;
-  avatar: string;
+  username?: string | null;
+  full_name?: string | null;
+  avatar?: string | null;
+  relationshipStatus?: string;
+  friendshipId?: string | null;
+}
+
+export interface FriendListItem {
+  friendshipId: string;
+  friendsSince: string;
+  friend: FriendUser;
 }
 
 export interface FriendshipRequest {
@@ -14,6 +22,7 @@ export interface FriendshipRequest {
   friendId: string;
   status: string;
   user: FriendUser;
+  friend?: FriendUser;
 }
 
 export class FriendshipService {
@@ -29,13 +38,18 @@ export class FriendshipService {
     return apiClient.delete(apiRoutes.FRIENDSHIPS.DELETE(friendshipId));
   }
 
-  static async getFriends(): Promise<{ data: FriendUser[] }> {
+  static async getFriends(): Promise<{ data: FriendListItem[] }> {
     const res = await apiClient.get(apiRoutes.FRIENDSHIPS.FRIENDS);
     return { data: res.data?.data || [] };
   }
 
   static async getPendingRequests(): Promise<{ data: FriendshipRequest[] }> {
     const res = await apiClient.get(apiRoutes.FRIENDSHIPS.PENDING);
+    return { data: res.data?.data || [] };
+  }
+
+  static async getSentRequests(): Promise<{ data: FriendshipRequest[] }> {
+    const res = await apiClient.get(apiRoutes.FRIENDSHIPS.SENT);
     return { data: res.data?.data || [] };
   }
 

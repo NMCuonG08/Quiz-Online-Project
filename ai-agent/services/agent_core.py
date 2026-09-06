@@ -190,6 +190,7 @@ WRITE_TOOLS = {
     "start_quiz", "duplicate_question", "reorder_questions",
     "import_knowledge_url", "submit_knowledge_review", "review_knowledge",
     "create_category", "update_category", "delete_category",
+    "send_friend_request", "accept_friend_request", "remove_friendship",
 }
 
 WRITE_OPERATION_LABELS = {
@@ -211,6 +212,9 @@ WRITE_OPERATION_LABELS = {
     "create_category": ("Tạo danh mục", "Xác nhận tạo danh mục", "Tạo danh mục"),
     "update_category": ("Cập nhật danh mục", "Xác nhận cập nhật danh mục", "Lưu thay đổi"),
     "delete_category": ("Xóa danh mục", "Xác nhận xóa danh mục", "Xóa danh mục"),
+    "send_friend_request": ("Gửi lời mời kết bạn", "Xác nhận gửi lời mời", "Gửi lời mời"),
+    "accept_friend_request": ("Chấp nhận lời mời kết bạn", "Xác nhận chấp nhận lời mời", "Chấp nhận"),
+    "remove_friendship": ("Xóa quan hệ bạn bè", "Xác nhận xóa quan hệ bạn bè", "Xóa"),
 }
 
 AUTO_IMAGE_TOOLS = frozenset({
@@ -249,6 +253,8 @@ APPROVAL_FIELD_LABELS = {
     "thumbnail_url": "Ảnh thumbnail",
     "media_url": "Ảnh câu hỏi",
     "icon_url": "Ảnh danh mục",
+    "friend_id": "Người nhận",
+    "friendship_id": "Quan hệ bạn bè",
 }
 
 DIFFICULTY_LABELS = {"EASY": "Dễ", "MEDIUM": "Trung bình", "HARD": "Khó"}
@@ -266,7 +272,14 @@ CREATOR_WRITE_TOOLS = WRITE_TOOLS - {
 }
 GROUNDED_RETRIEVAL_TOOLS = {"search_quizzes", "get_quiz", "search_knowledge"}
 RETRY_GUARDED_TOOLS = GROUNDED_RETRIEVAL_TOOLS | {"web_search", "search_images"}
-DESTRUCTIVE_TOOLS = {"delete_quiz", "delete_question", "delete_category"}
+DESTRUCTIVE_TOOLS = {"delete_quiz", "delete_question", "delete_category", "remove_friendship"}
+SOCIAL_READ_TOOLS = {
+    "search_users", "get_friends", "get_friend_requests", "get_friendship_status",
+    "get_friends_leaderboard",
+}
+SOCIAL_TOOLS = SOCIAL_READ_TOOLS | {
+    "send_friend_request", "accept_friend_request", "remove_friendship",
+}
 QUIZ_FORM_IDS = {"quiz-create-form", "create_quiz_form"}
 QUESTION_FORM_IDS = {"create_questions_form", "question-create-form", "create_question_form"}
 TOOL_INTENT_HINTS = {
@@ -306,13 +319,21 @@ TOOL_INTENT_HINTS = {
     "import_knowledge_url": "knowledge_import",
     "submit_knowledge_review": "knowledge_submit_review",
     "review_knowledge": "knowledge_review",
+    "search_users": "friend_search",
+    "get_friends": "friend_list",
+    "get_friend_requests": "friend_requests",
+    "get_friendship_status": "friend_relationship",
+    "get_friends_leaderboard": "friends_leaderboard",
+    "send_friend_request": "friend_request_send",
+    "accept_friend_request": "friend_request_accept",
+    "remove_friendship": "friend_remove",
     "search_images": "image_search",
 }
 TOOL_PARAMETER_SCHEMAS = {tool["name"]: tool["parameters"] for tool in TOOLS}
 SCOPE_TOOLS = {
-    "learner": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "web_search", "search_images", "render_ui", "start_quiz"},
-    "creator": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_my_quizzes", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "list_questions", "get_quiz_build_status", "list_knowledge_sources", "web_search", "search_images", "render_ui", *CREATOR_WRITE_TOOLS},
-    "admin": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_my_quizzes", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "list_questions", "get_quiz_build_status", "list_knowledge_sources", "get_admin_dashboard_stats", "list_audit_events", "web_search", "search_images", "render_ui", *WRITE_TOOLS},
+    "learner": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "web_search", "search_images", "render_ui", "start_quiz", *SOCIAL_TOOLS},
+    "creator": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_my_quizzes", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "list_questions", "get_quiz_build_status", "list_knowledge_sources", "web_search", "search_images", "render_ui", *SOCIAL_READ_TOOLS, *CREATOR_WRITE_TOOLS},
+    "admin": {"plan_interaction", "get_current_time", "get_current_user", "get_my_permissions", "search_quizzes", "recommend_quizzes", "get_quiz", "search_knowledge", "list_categories", "get_my_quizzes", "get_quiz_history", "get_in_progress_quizzes", "get_all_attempts", "get_quiz_result", "list_questions", "get_quiz_build_status", "list_knowledge_sources", "get_admin_dashboard_stats", "list_audit_events", "web_search", "search_images", "render_ui", *SOCIAL_READ_TOOLS, *WRITE_TOOLS},
 }
 
 
@@ -3851,6 +3872,20 @@ class AIAgentCore:
         if name == "get_my_permissions":
             capability_result = await self.account.permissions(capability_context)
             return capability_result.data, None, capability_result.citations
+        if name == "search_users":
+            return await self.tools.search_users(args["query"], token, args.get("limit", 10)), None, []
+        if name == "get_friends":
+            return await self.tools.get_friends(token, args.get("limit", 50)), None, []
+        if name == "get_friend_requests":
+            return await self.tools.get_friend_requests(
+                token, args.get("direction", "all"), args.get("limit", 50),
+            ), None, []
+        if name == "get_friendship_status":
+            return await self.tools.get_friendship_status(args["user_id"], token), None, []
+        if name == "get_friends_leaderboard":
+            return await self.tools.get_friends_leaderboard(
+                args["quiz_id"], token, args.get("limit", 10),
+            ), None, []
         if name == "publish_quiz":
             build_status = (
                 await self.authoring.build_status(
@@ -3866,7 +3901,7 @@ class AIAgentCore:
         if name == "create_quiz_with_questions":
             self.question_quality.validate_quiz_payload(args)
         if name in WRITE_TOOLS:
-            if name.startswith("delete_") and args.get("confirmed") is not True:
+            if name in DESTRUCTIVE_TOOLS and args.get("confirmed") is not True:
                 raise ValueError("DELETE_CONFIRMATION_REQUIRED: Cần xác nhận xóa rõ ràng trước khi đề xuất thao tác.")
             approval_token = secrets.token_urlsafe(24)
             await self.state_store.create_approval(approval_token, {
@@ -4425,6 +4460,12 @@ class AIAgentCore:
             return await self.tools.update_category(args["category_id"], changes, token, **write_options)
         if name == "delete_category":
             return await self.tools.delete_category(args["category_id"], token, **write_options)
+        if name == "send_friend_request":
+            return await self.tools.send_friend_request(args["friend_id"], token, **write_options)
+        if name == "accept_friend_request":
+            return await self.tools.accept_friend_request(args["friendship_id"], token, **write_options)
+        if name == "remove_friendship":
+            return await self.tools.remove_friendship(args["friendship_id"], token, **write_options)
         raise ValueError(f"Write tool không tồn tại: {name}")
 
     @staticmethod

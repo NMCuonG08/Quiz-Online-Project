@@ -26,16 +26,31 @@ interface RoomScoreEntry {
   score: number;
   correctAnswers: number;
   timestamp: string;
+  totalTimeMs?: number;
 }
 
 interface RoomGameState {
   roomId: string;
-  status: 'WAITING' | 'QUESTION' | 'FINISHED';
+  status: 'WAITING' | 'QUESTION' | 'REVEAL' | 'FINISHED';
   questionIndex: number;
   questionId?: string;
   deadline?: number;
+  questionStartedAt?: number;
+  revealEndsAt?: number;
+  answeredCount?: number;
+  rosterCount?: number;
+  questionResults?: RoomQuestionResult[];
   version: number;
   serverTime: number;
+}
+
+interface RoomQuestionResult {
+  userId: string;
+  username: string;
+  isCorrect: boolean;
+  points: number;
+  responseTimeMs: number | null;
+  answeredAt?: string;
 }
 
 interface StoredRoomAnswer {
@@ -44,6 +59,10 @@ interface StoredRoomAnswer {
   isCorrect: boolean;
   correctAnswer: string;
   points: number;
+  responseTimeMs: number;
+  answeredAt: string;
+  selectedOptionIds?: string[];
+  textAnswer?: string;
 }
 
 @Injectable()
@@ -298,11 +317,82 @@ export class RoomWebSocketGateway
   }
 
   private async getGameState(roomId: string): Promise<RoomGameState | null> {
-    return this.redisService.get<RoomGameState>(`room:${roomId}:game`);
+    try {
+      return await this.redisService.get<RoomGameState>(`room:${roomId}:game`);
+    } catch {
+      const room = await this.roomService.getRoom(roomId);
+      const settings = room.settings && typeof room.settings === 'object' && !Array.isArray(room.settings)
+        ? room.settings as Record<string, unknown>
+        : {};
+      return (settings.gameSnapshot as RoomGameState | undefined) || null;
+    }
+  }
+
+  private async getRoster(roomId: string): Promise<Array<{ userId: string; username: string }>> {
+    if (typeof (this.roomService as any).getGameRoster === 'function') {
+      return (this.roomService as any).getGameRoster(roomId);
+    }
+    const participants = await this.roomService.getParticipants(roomId);
+    return participants.participants
+      .filter((participant) => ['JOINED', 'ACTIVE', 'DISCONNECTED', 'FINISHED'].includes(participant.status))
+      .map((participant) => ({
+        userId: participant.user_id,
+        username: participant.full_name || participant.username || participant.user_id.slice(0, 8),
+      }));
+  }
+
+  private async getQuestionResults(roomId: string, questionId: string): Promise<RoomQuestionResult[]> {
+    const roster = await this.getRoster(roomId);
+    let persisted: Record<string, unknown>[] = [];
+    if (typeof (this.roomService as any).getPersistedRealtimeAnswers === 'function') {
+      try {
+        persisted = await (this.roomService as any).getPersistedRealtimeAnswers(roomId, questionId);
+      } catch (error) {
+        this.logger.warn(`Unable to load durable answers for room ${roomId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    const persistedByUser = new Map(persisted.map((answer: Record<string, unknown>) => [String(answer.userId), answer]));
+    const results = await Promise.all(roster.map(async (player) => {
+      let answer: StoredRoomAnswer | null = null;
+      try {
+        answer = await this.redisService.get<StoredRoomAnswer>(
+          `room:${roomId}:answered:${player.userId}:${questionId}`,
+        );
+      } catch {
+        answer = null;
+      }
+      const durable = persistedByUser.get(player.userId) as Record<string, unknown> | undefined;
+      return {
+        userId: player.userId,
+        username: player.username,
+        isCorrect: Boolean(answer?.isCorrect ?? durable?.isCorrect),
+        points: Number(answer?.points ?? durable?.points ?? 0),
+        responseTimeMs: answer ? Number(answer.responseTimeMs || 0) : durable ? Number(durable.responseTimeMs || 0) : null,
+        answeredAt: answer?.answeredAt || String(durable?.answeredAt || ''),
+      };
+    }));
+    return results.sort((a, b) => {
+      if (a.responseTimeMs === null) return 1;
+      if (b.responseTimeMs === null) return -1;
+      return a.responseTimeMs - b.responseTimeMs || b.points - a.points || a.userId.localeCompare(b.userId);
+    });
+  }
+
+  private sortLeaderboard(entries: RoomScoreEntry[]): RoomScoreEntry[] {
+    return [...entries].sort((a, b) =>
+      Number(b.score || 0) - Number(a.score || 0)
+      || Number(b.correctAnswers || 0) - Number(a.correctAnswers || 0)
+      || Number(a.totalTimeMs || 0) - Number(b.totalTimeMs || 0)
+      || a.userId.localeCompare(b.userId),
+    );
   }
 
   private async setGameState(state: RoomGameState): Promise<void> {
-    await this.redisService.set(`room:${state.roomId}:game`, state, 21600);
+    try {
+      await this.redisService.set(`room:${state.roomId}:game`, state, 21600);
+    } catch {
+      this.logger.warn(`Redis game snapshot unavailable for room ${state.roomId}; using durable snapshot`);
+    }
     await this.roomService.persistGameSnapshot(
       state.roomId,
       state as unknown as Record<string, unknown>,
@@ -310,10 +400,12 @@ export class RoomWebSocketGateway
   }
 
   private async nextGameRevision(roomId: string): Promise<number> {
-    return this.redisService.incrementWithTtl(
-      `room:${roomId}:game:revision`,
-      21600,
-    );
+    try {
+      return await this.redisService.incrementWithTtl(`room:${roomId}:game:revision`, 21600);
+    } catch {
+      const current = await this.getGameState(roomId);
+      return Number(current?.version || 0) + 1;
+    }
   }
 
   private emitGameState(
@@ -345,13 +437,19 @@ export class RoomWebSocketGateway
       playerScore: Number(player?.score || 0),
       playerCorrectAnswers: Number(player?.correctAnswers || 0),
       answeredQuestionId: answer?.questionId,
+      answeredOptionIds: answer?.selectedOptionIds,
+      answeredText: answer?.textAnswer,
+      questionResults: state.status === 'REVEAL' || state.status === 'FINISHED'
+        ? state.questionResults || (state.questionId ? await this.getQuestionResults(state.roomId, state.questionId) : [])
+        : undefined,
     });
   }
 
   private scheduleGameAdvance(state: RoomGameState): void {
     const current = this.gameTimers.get(state.roomId);
     if (current) clearTimeout(current);
-    if (state.status !== 'QUESTION' || !state.deadline) return;
+    const target = state.status === 'QUESTION' ? state.deadline : state.status === 'REVEAL' ? state.revealEndsAt : undefined;
+    if (!target) return;
     const timer = setTimeout(
       () => {
         void this.advanceGameState(state.roomId, state.version).catch(
@@ -362,7 +460,7 @@ export class RoomWebSocketGateway
           },
         );
       },
-      Math.max(0, state.deadline - Date.now()) + 25,
+      Math.max(0, target - Date.now()) + 25,
     );
     this.gameTimers.set(state.roomId, timer);
   }
@@ -374,7 +472,7 @@ export class RoomWebSocketGateway
     const state = await this.getGameState(roomId);
     if (
       !state ||
-      state.status !== 'QUESTION' ||
+      !['QUESTION', 'REVEAL'].includes(state.status) ||
       state.version !== expectedVersion
     )
       return state;
@@ -384,6 +482,31 @@ export class RoomWebSocketGateway
       300,
     );
     if (!lock) return this.getGameState(roomId);
+    if (state.status === 'QUESTION') {
+      const questionResults = state.questionId
+        ? await this.getQuestionResults(roomId, state.questionId)
+        : [];
+      const reveal: RoomGameState = {
+        ...state,
+        status: 'REVEAL',
+        questionResults,
+        revealEndsAt: Date.now() + 5000,
+        version: Math.max(await this.nextGameRevision(roomId), state.version + 1),
+        serverTime: Date.now(),
+      };
+      await this.setGameState(reveal);
+      this.server.to(`room:${roomId}`).emit('game_state', reveal);
+      this.server.to(`room:${roomId}`).emit('question_reveal', {
+        roomId,
+        questionId: reveal.questionId,
+        questionResults,
+        revealEndsAt: reveal.revealEndsAt,
+        version: reveal.version,
+      });
+      this.scheduleGameAdvance(reveal);
+      return reveal;
+    }
+
     const nextIndex = state.questionIndex + 1;
     const question = await this.roomService.getNextQuestion(roomId, nextIndex);
     const version = Math.max(
@@ -392,10 +515,11 @@ export class RoomWebSocketGateway
     );
     if (!question) {
       const room = await this.roomService.getRoom(roomId);
-      const finalLeaderboard =
+      const finalLeaderboard = this.sortLeaderboard(
         await this.redisService.hashValuesJson<RoomScoreEntry>(
           `room:${roomId}:scores`,
-        );
+        ),
+      );
       await this.roomService.persistFinalLeaderboard(roomId, finalLeaderboard);
       await this.roomService.endGame(roomId, room.owner_id);
       const finished: RoomGameState = {
@@ -414,7 +538,10 @@ export class RoomWebSocketGateway
       status: 'QUESTION',
       questionIndex: nextIndex,
       questionId: question.questionId,
+      questionStartedAt: Date.now(),
       deadline: Date.now() + Number(question.timeLimit || 30) * 1000,
+      answeredCount: 0,
+      rosterCount: state.rosterCount,
       version,
       serverTime: Date.now(),
     };
@@ -782,22 +909,9 @@ export class RoomWebSocketGateway
         return;
       }
 
-      // TODO: Implement invite friends logic
-      this.logger.log(
-        `📧 Inviting ${data.friendIds.length} friends to room ${data.roomId}`,
-      );
-
-      // Notify invited friends
-      for (const friendId of data.friendIds) {
-        this.server.to(friendId).emit('room_invitation', {
-          roomId: data.roomId,
-          message: `You've been invited to join a room`,
-        });
-      }
-
-      this.logger.log(
-        `✅ Invitations sent to ${data.friendIds.length} friends`,
-      );
+      const userId = this.extractUserIdFromToken(client);
+      const result = await this.roomService.inviteFriends(userId, data.roomId, data.friendIds);
+      client.emit('room_invitation_result', result);
     } catch (error) {
       this.logger.error(
         `❌ Failed to invite friends for client ${client.id}:`,
@@ -855,19 +969,39 @@ export class RoomWebSocketGateway
       if (room.owner_id !== userId)
         throw new Error('Only room owner can start the game');
       const existing = await this.getGameState(data.roomId);
-      if (existing?.status === 'QUESTION' || existing?.status === 'FINISHED') {
+      if (existing?.status === 'QUESTION' || existing?.status === 'REVEAL' || existing?.status === 'FINISHED') {
         await this.emitPersonalizedGameState(existing, client);
         return;
       }
       await this.roomService.startGame(data.roomId, userId);
       const question = await this.roomService.getNextQuestion(data.roomId, 0);
       if (!question) throw new Error('Quiz has no questions');
+      const roster = await this.getRoster(data.roomId);
+      for (const player of roster) {
+        await this.redisService.hashSetJson(
+          `room:${data.roomId}:scores`,
+          player.userId,
+          {
+            userId: player.userId,
+            username: player.username,
+            score: 0,
+            correctAnswers: 0,
+            totalTimeMs: 0,
+            timestamp: new Date().toISOString(),
+          } satisfies RoomScoreEntry,
+          21600,
+        );
+      }
+      const questionStartedAt = Date.now();
       const state: RoomGameState = {
         roomId: data.roomId,
         status: 'QUESTION',
         questionIndex: 0,
         questionId: question.questionId,
-        deadline: Date.now() + Number(question.timeLimit || 30) * 1000,
+        questionStartedAt,
+        deadline: questionStartedAt + Number(question.timeLimit || 30) * 1000,
+        answeredCount: 0,
+        rosterCount: roster.length,
         version: await this.nextGameRevision(data.roomId),
         serverTime: Date.now(),
       };
@@ -911,7 +1045,10 @@ export class RoomWebSocketGateway
                 status: 'QUESTION',
                 questionIndex: 0,
                 questionId: question.questionId,
+                questionStartedAt: Date.now(),
                 deadline: Date.now() + Number(question.timeLimit || 30) * 1000,
+                answeredCount: 0,
+                rosterCount: (await this.getRoster(data.roomId)).length,
                 version: await this.nextGameRevision(data.roomId),
                 serverTime: Date.now(),
               }
@@ -939,8 +1076,24 @@ export class RoomWebSocketGateway
         state.deadline <= Date.now()
       ) {
         state = await this.advanceGameState(data.roomId, state.version);
+      } else if (
+        state.status === 'REVEAL' &&
+        state.revealEndsAt &&
+        state.revealEndsAt <= Date.now()
+      ) {
+        state = await this.advanceGameState(data.roomId, state.version);
       }
       if (!state) throw new Error('Game state is unavailable');
+      if (state.questionId) {
+        try {
+          state = {
+            ...state,
+            answeredCount: Number(await this.redisService.get<number>(`room:${data.roomId}:answered-count:${state.questionId}`) || state.answeredCount || 0),
+          };
+        } catch {
+          // Durable snapshot still contains the last known count.
+        }
+      }
       this.scheduleGameAdvance(state);
       await this.emitPersonalizedGameState(state, client);
     } catch (error) {
@@ -961,6 +1114,10 @@ export class RoomWebSocketGateway
       const room = await this.roomService.getRoom(data.roomId);
       if (room.owner_id !== userId)
         throw new Error('Only room owner can advance questions');
+      const state = await this.getGameState(data.roomId);
+      if (!state || state.status !== 'REVEAL' || (state.revealEndsAt && state.revealEndsAt > Date.now())) {
+        throw new Error('Questions advance automatically after the 5-second reveal');
+      }
       await this.advanceGameState(data.roomId, Number(data.expectedVersion));
     } catch (error) {
       client.emit('game_error', {
@@ -993,6 +1150,15 @@ export class RoomWebSocketGateway
         return;
       }
       const userId = this.extractUserIdFromToken(client);
+      const state = await this.getGameState(data.roomId);
+      if (!state || state.status !== 'QUESTION' || state.questionId !== data.questionId) {
+        throw new Error('Question is no longer accepting answers');
+      }
+      const receivedAt = Date.now();
+      if (state.deadline && receivedAt > state.deadline) {
+        await this.advanceGameState(data.roomId, state.version);
+        throw new Error('Question time has expired');
+      }
       answerKey = `room:${data.roomId}:answered:${userId}:${data.questionId}`;
       answerLockAcquired = await this.redisService.setIfAbsent(
         answerKey,
@@ -1013,22 +1179,46 @@ export class RoomWebSocketGateway
       const answer = data.selectedOptionIds?.length
         ? data.selectedOptionIds
         : data.selectedOptionId || '';
+      const responseTimeMs = Math.max(0, receivedAt - Number(state.questionStartedAt || receivedAt));
       const result = await this.roomService.submitAnswer(
         userId,
         data.roomId,
         data.questionId,
         answer,
-        data.timeSpent || 0,
+        Math.ceil(responseTimeMs / 1000),
       );
+      const durationMs = Math.max(1, Number(state.deadline || receivedAt) - Number(state.questionStartedAt || receivedAt));
+      const speedFactor = Math.max(0.5, Math.min(1, 1 - (responseTimeMs / durationMs) * 0.5));
+      const points = result.isCorrect ? Math.round(Number(result.points || 0) * speedFactor * 100) / 100 : 0;
+      const answeredAt = new Date(receivedAt).toISOString();
+      const durableAnswer = {
+        userId,
+        questionId: data.questionId,
+        selectedOptionIds: Array.isArray(answer) ? answer : answer ? [answer] : [],
+        isCorrect: result.isCorrect,
+        points,
+        responseTimeMs,
+        answeredAt,
+      };
       await this.redisService.set(
         answerKey,
         {
           questionId: data.questionId,
           commandId: data.commandId,
           ...result,
+          points,
+          responseTimeMs,
+          answeredAt,
+          selectedOptionIds: Array.isArray(answer) ? answer : answer ? [answer] : [],
+          textAnswer: typeof answer === 'string' ? answer : undefined,
         } satisfies StoredRoomAnswer,
         21600,
       );
+      if (typeof (this.roomService as any).persistRealtimeAnswer === 'function') {
+        void (this.roomService as any).persistRealtimeAnswer(data.roomId, durableAnswer).catch((persistError: unknown) => {
+          this.logger.warn(`Realtime answer persistence deferred for room ${data.roomId}: ${persistError instanceof Error ? persistError.message : String(persistError)}`);
+        });
+      }
       const username = this.extractUsernameFromToken(client) || 'Unknown';
       const scoreKey = `room:${data.roomId}:scores`;
       const leaderboard =
@@ -1037,23 +1227,41 @@ export class RoomWebSocketGateway
       const updateData = {
         userId,
         username,
-        score: Number(previous?.score || 0) + result.points,
+        score: Number(previous?.score || 0) + points,
         correctAnswers:
           Number(previous?.correctAnswers || 0) + (result.isCorrect ? 1 : 0),
         timestamp: new Date().toISOString(),
+        totalTimeMs: Number(previous?.totalTimeMs || 0) + responseTimeMs,
       };
       await this.redisService.hashSetJson(scoreKey, userId, updateData, 21600);
-      const updatedLeaderboard =
-        await this.redisService.hashValuesJson(scoreKey);
+      const updatedLeaderboard = this.sortLeaderboard(
+        await this.redisService.hashValuesJson<RoomScoreEntry>(scoreKey),
+      );
       client.emit('answer_result', {
         commandId: data.commandId,
         questionId: data.questionId,
         ...result,
+        points,
+        responseTimeMs,
+        answeredAt,
       });
       this.server.to(`room:${data.roomId}`).emit('score_updated', updateData);
       this.server
         .to(`room:${data.roomId}`)
         .emit('leaderboard_update', updatedLeaderboard);
+      const answeredCount = await this.redisService.incrementWithTtl(
+        `room:${data.roomId}:answered-count:${data.questionId}`,
+        21600,
+      );
+      this.server.to(`room:${data.roomId}`).emit('answer_progress', {
+        roomId: data.roomId,
+        questionId: data.questionId,
+        answeredCount: Number(answeredCount),
+        rosterCount: state.rosterCount || 0,
+      });
+      if (state.rosterCount && Number(answeredCount) >= state.rosterCount) {
+        await this.advanceGameState(data.roomId, state.version);
+      }
     } catch (error) {
       if (answerLockAcquired && answerKey) {
         await this.redisService.del(answerKey);
@@ -1093,13 +1301,18 @@ export class RoomWebSocketGateway
         leaderboard = await this.redisService.hashValuesJson(
           `room:${data.roomId}:scores`,
         );
+        if (!leaderboard?.length && typeof (this.roomService as any).getPersistedFinalLeaderboard === 'function') {
+          leaderboard = await (this.roomService as any).getPersistedFinalLeaderboard(data.roomId);
+        }
       } catch {
         leaderboard = this.roomScores.has(data.roomId)
           ? Array.from(this.roomScores.get(data.roomId)!.values())
-          : [];
+          : (typeof (this.roomService as any).getPersistedFinalLeaderboard === 'function'
+            ? await (this.roomService as any).getPersistedFinalLeaderboard(data.roomId)
+            : []);
       }
 
-      client.emit('leaderboard_update', leaderboard);
+      client.emit('leaderboard_update', this.sortLeaderboard(leaderboard as RoomScoreEntry[]));
     } catch (error) {
       this.logger.error(
         `❌ Failed to get leaderboard for client ${client.id}:`,

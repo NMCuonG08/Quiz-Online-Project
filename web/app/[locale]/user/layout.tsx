@@ -33,6 +33,12 @@ interface NavItem {
   badge?: string;
 }
 
+const MessageCircleIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 11.5a8.38 8.38 0 0 1-9 8.5 8.5 8.5 0 0 1-4-.98L3 20l1.98-4A8.5 8.5 0 1 1 21 11.5Z" />
+  </svg>
+);
+
 const mainNavItems: NavItem[] = [
   {
     href: "/user",
@@ -48,6 +54,16 @@ const mainNavItems: NavItem[] = [
     href: "/user/quizzes",
     icon: <BookOpen size={18} />,
     label: "My Quizzes",
+  },
+  {
+    href: "/user/friends",
+    icon: <Users size={18} />,
+    label: "Friends",
+  },
+  {
+    href: "/user/messages",
+    icon: <MessageCircleIcon size={18} />,
+    label: "Messages",
   },
 ];
 

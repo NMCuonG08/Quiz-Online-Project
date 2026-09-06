@@ -77,7 +77,7 @@ export function ThemeToggle() {
         <Button
           variant="outline"
           size="icon"
-          className="relative h-9 w-9 rounded-md border-2 border-black dark:border-white bg-violet hover:text-accent-foreground transition-colors duration-200"
+          className="relative h-9 w-9 rounded-lg border-border bg-card text-foreground hover:bg-muted hover:text-foreground transition-colors duration-150"
         >
           <Icon className="h-4 w-4 transition-all" />
           <span className="sr-only">Chuyển đổi chế độ sáng tối</span>

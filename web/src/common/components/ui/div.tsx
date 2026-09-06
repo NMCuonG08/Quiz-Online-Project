@@ -60,7 +60,7 @@ const Div = React.forwardRef<HTMLDivElement, DivProps>(
         {/* Shadow Layer - hiệu ứng đổ bóng đẹp */}
         <div
           className={cn(
-            "absolute bg-black dark:bg-white transition-all duration-300  -z-10",
+            "absolute bg-foreground/35 -z-10",
             // Shadow positioning giống button
             variant === "default" && "w-full h-full -bottom-1 -right-1 ",
             variant === "elevated" && "w-full h-full -bottom-1.5 -right-1.5 ",
@@ -82,7 +82,7 @@ const Div = React.forwardRef<HTMLDivElement, DivProps>(
           ref={ref}
           className={cn(
             divVariants({ variant, size, rounded }),
-            "relative z-10 bg-white text-slate-900 dark:bg-black dark:text-white border border-black dark:border-white transition-all duration-300 ",
+            "relative z-10 bg-card text-card-foreground border border-border transition-colors duration-150 ",
             className
           )}
           {...props}

@@ -25,6 +25,7 @@ export const apiRoutes = {
     GET_ALL: "/api/quizzes",
 
     GET_BY_SLUG: (slug: string) => `/api/quizzes/slug/${slug}`,
+    FRIENDS_LEADERBOARD: (id: string) => `/api/quizzes/${id}/leaderboard`,
     GET_BY_ID: (id: string) => `/api/quizzes/id/${id}`,
     CREATE: "/api/quizzes",
     UPDATE_BY_ID: (Id: string) => `/api/quizzes/${Id}`,
@@ -76,7 +77,7 @@ export const apiRoutes = {
     REGISTER: "/api/auth/register",
     FORGOT_PASSWORD: "/api/auth/forgot-password",
     LOGOUT: "/api/auth/logout",
-    PROFILE: "/api/auth/profile",
+    PROFILE: "/api/auth/me",
     REFRESH: "/api/auth/refresh-cookie",
     GOOGLE_URL: "/api/auth/google/url",
     GOOGLE_CALLBACK: "/api/auth/google/callback",
@@ -101,6 +102,8 @@ export const apiRoutes = {
     UPDATE: (id: string) => `/api/user/${id}`,
     ROLES: "/api/user/roles",
     UPDATE_ROLES: (id: string) => `/api/user/${id}/roles`,
+    DASHBOARD: "/api/user/me/dashboard",
+    PUBLIC_PROFILE: (id: string) => `/api/user/${id}/profile`,
   },
   COURSES: {
     BASE: "/api/courses",
@@ -123,6 +126,13 @@ export const apiRoutes = {
     DELETE: (id: string) => `/api/friendships/${id}`,
     FRIENDS: "/api/friendships/friends",
     PENDING: "/api/friendships/requests/pending",
+    SENT: "/api/friendships/requests/sent",
+  },
+  MESSAGING: {
+    CONVERSATIONS: "/api/conversations",
+    MESSAGES: (id: string) => `/api/conversations/${id}/messages`,
+    SEND: (id: string) => `/api/conversations/${id}/messages`,
+    READ: (id: string) => `/api/conversations/${id}/read`,
   },
 };
 

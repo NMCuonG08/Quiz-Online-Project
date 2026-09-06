@@ -45,7 +45,7 @@ export const MOCK_SERVICES: TicketService[] = [
     category: "Hair",
     staffId: "staff-1",
     staffName: "Sarah Johnson",
-    startTime: new Date(Date.now() - 15 * 60 * 1000), // Started 15 mins ago
+    startTime: new Date("2026-09-06T09:45:00.000Z"), // Mock started time
     isArchived: false,
   },
   {
@@ -83,7 +83,7 @@ export const MOCK_SERVICES: TicketService[] = [
     category: "Massage",
     staffId: "staff-2",
     staffName: "Mike Chen",
-    startTime: new Date(Date.now() - 70 * 60 * 1000),
+    startTime: new Date("2026-09-06T08:50:00.000Z"),
     isArchived: false,
   },
   {
@@ -95,7 +95,7 @@ export const MOCK_SERVICES: TicketService[] = [
     category: "Spa",
     staffId: "staff-2",
     staffName: "Mike Chen",
-    startTime: new Date(Date.now() - 20 * 60 * 1000),
+    startTime: new Date("2026-09-06T09:40:00.000Z"),
     isArchived: false,
   },
 
@@ -109,7 +109,7 @@ export const MOCK_SERVICES: TicketService[] = [
     category: "Nails",
     staffId: "staff-3",
     staffName: "Emily Davis",
-    startTime: new Date(Date.now() - 25 * 60 * 1000),
+    startTime: new Date("2026-09-06T09:35:00.000Z"),
     isArchived: false,
   },
   {

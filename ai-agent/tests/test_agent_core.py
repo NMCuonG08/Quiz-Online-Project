@@ -4,7 +4,7 @@ import unittest
 import httpx
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import ANY, AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, call, patch
 from langchain_core.messages import AIMessage
 from zoneinfo import ZoneInfo
 
@@ -76,6 +76,24 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
                 "delete_quiz", {"quiz_id": "quiz-1", "confirmed": False},
                 "Bearer token", "user-1", "creator",
             )
+
+    async def test_friend_request_is_proposed_then_executed_with_idempotency(self):
+        result, surface, _ = await self.core._execute_tool(
+            "send_friend_request", {"friend_id": "user-2"},
+            "Bearer token", "user-1", "learner",
+        )
+        self.assertTrue(result["approval_required"])
+        self.assertEqual(surface.actions[0].kind, "approve")
+        self.core.tools.send_friend_request = AsyncMock(return_value={"id": "friendship-1"})
+
+        events = [event async for event in self.core._approve(
+            surface.actions[0].value, "Bearer token", "user-1", "learner",
+        )]
+
+        self.assertEqual(events[-1]["intent"], "approved_write")
+        self.core.tools.send_friend_request.assert_awaited_once_with(
+            "user-2", "Bearer token", idempotency_key=ANY,
+        )
 
     async def test_create_quiz_approval_keeps_resource_id_and_followup_actions(self):
         self.core.tools.list_categories = AsyncMock(return_value={
@@ -1106,6 +1124,57 @@ class ToolBackendRouteContractTests(unittest.IsolatedAsyncioTestCase):
             "POST", "/api/knowledge/sources/source-1/review",
             body={"status": "QUARANTINED", "rejection_reason": "Thiếu nguồn"},
             authorization="Bearer token",
+        )
+
+    async def test_social_tools_use_authenticated_backend_routes(self):
+        self.tools.call_backend_api = AsyncMock(return_value={"data": [{"id": "friendship-1"}]})
+        await self.tools.search_users("An", "Bearer token", 5)
+        self.tools.call_backend_api.assert_awaited_with(
+            "GET", "/api/user/search", params={"q": "An"}, authorization="Bearer token",
+        )
+        self.tools.call_backend_api.reset_mock()
+        await self.tools.get_friends_leaderboard("quiz-1", "Bearer token", 5)
+        self.tools.call_backend_api.assert_awaited_with(
+            "GET", "/api/quizzes/quiz-1/leaderboard", params={"limit": 5}, authorization="Bearer token",
+        )
+        self.tools.call_backend_api.reset_mock()
+        await self.tools.send_friend_request("user-2", "Bearer token", idempotency_key="idem-1")
+        self.tools.call_backend_api.assert_awaited_with(
+            "POST", "/api/friendships/request", body={"friendId": "user-2"},
+            authorization="Bearer token", idempotency_key="idem-1",
+        )
+        self.tools.call_backend_api.reset_mock()
+        await self.tools.accept_friend_request("friendship-1", "Bearer token", idempotency_key="idem-2")
+        self.tools.call_backend_api.assert_awaited_with(
+            "POST", "/api/friendships/accept/friendship-1", authorization="Bearer token",
+            idempotency_key="idem-2",
+        )
+        self.tools.call_backend_api.reset_mock()
+        await self.tools.remove_friendship("friendship-1", "Bearer token", idempotency_key="idem-2")
+        self.tools.call_backend_api.assert_awaited_with(
+            "DELETE", "/api/friendships/friendship-1", authorization="Bearer token",
+            idempotency_key="idem-2",
+        )
+
+    async def test_friend_request_read_tools_preserve_direction_and_limit(self):
+        self.tools.call_backend_api = AsyncMock(side_effect=[
+            {"data": [{"id": "incoming-1"}]},
+            {"data": [{"id": "outgoing-1"}]},
+        ])
+        requests = await self.tools.get_friend_requests("Bearer token", "all", 5)
+        self.assertEqual(requests["incoming"], [{"id": "incoming-1"}])
+        self.assertEqual(requests["outgoing"], [{"id": "outgoing-1"}])
+        self.tools.call_backend_api.assert_has_awaits([
+            call("GET", "/api/friendships/requests/pending", authorization="Bearer token"),
+            call("GET", "/api/friendships/requests/sent", authorization="Bearer token"),
+        ], any_order=True)
+        self.tools.call_backend_api.reset_mock()
+        self.tools.call_backend_api.side_effect = None
+        self.tools.call_backend_api.return_value = {"data": {"status": "NONE", "friendshipId": None}}
+        status = await self.tools.get_friendship_status("user-2", "Bearer token")
+        self.assertEqual(status["status"], "NONE")
+        self.tools.call_backend_api.assert_awaited_once_with(
+            "GET", "/api/friendships/status/user-2", authorization="Bearer token",
         )
 
     async def test_publish_readiness_rejects_invalid_question_options(self):

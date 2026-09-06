@@ -31,6 +31,27 @@ type CreateQuizWithQuestionsResult = {
 
 @Injectable()
 export class QuizService extends BaseService {
+  async getFriendsLeaderboard(quizId: string, userId: string, limit = 10) {
+    const friendships = await this.prisma.friendship.findMany({
+      where: { status: 'ACCEPTED', OR: [{ userId }, { friendId: userId }] },
+      select: { userId: true, friendId: true },
+    });
+    const friendIds = new Set<string>([userId]);
+    friendships.forEach((friendship) => friendIds.add(friendship.userId === userId ? friendship.friendId : friendship.userId));
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: { quiz_id: quizId, user_id: { in: Array.from(friendIds) }, status: 'COMPLETED' },
+      orderBy: [{ score: 'desc' }, { time_taken: 'asc' }, { completed_at: 'asc' }],
+      select: { id: true, user_id: true, score: true, max_score: true, percentage: true, time_taken: true, completed_at: true,
+        user: { select: { id: true, username: true, full_name: true, avatar: true } } },
+    });
+    const bestByUser = new Map<string, (typeof attempts)[number]>();
+    attempts.forEach((attempt) => { if (!bestByUser.has(attempt.user_id)) bestByUser.set(attempt.user_id, attempt); });
+    return Array.from(bestByUser.values()).slice(0, Math.min(Math.max(limit, 1), 50)).map((attempt, index) => ({
+      rank: index + 1, attemptId: attempt.id, user: attempt.user, score: attempt.score,
+      maxScore: attempt.max_score, percentage: attempt.percentage, timeTaken: attempt.time_taken,
+      completedAt: attempt.completed_at,
+    }));
+  }
   async getQuizzes(
     paginationQuery: QuizPaginationQueryDto,
   ): Promise<PaginatedResponseDto<QuizResponseDto>> {

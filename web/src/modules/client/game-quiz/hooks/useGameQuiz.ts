@@ -13,12 +13,19 @@ interface UseGameQuizProps {
 }
 
 interface AuthoritativeGameState {
-  status: "WAITING" | "QUESTION" | "FINISHED";
+  status: "WAITING" | "QUESTION" | "REVEAL" | "FINISHED";
   questionIndex: number;
   deadline?: number;
   answeredQuestionId?: string;
   playerScore?: number;
   playerCorrectAnswers?: number;
+  answeredOptionIds?: string[];
+  answeredText?: string;
+  questionStartedAt?: number;
+  revealEndsAt?: number;
+  answeredCount?: number;
+  rosterCount?: number;
+  serverTime?: number;
 }
 
 export const useGameQuiz = ({
@@ -45,28 +52,43 @@ export const useGameQuiz = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const deadlineRef = useRef<number | null>(null);
+  const serverOffsetRef = useRef(0);
   const endNotifiedRef = useRef(false);
   const scoredQuestionsRef = useRef(new Set<string>());
 
   const syncGameState = useCallback((snapshot: AuthoritativeGameState) => {
+    if (snapshot.serverTime) {
+      serverOffsetRef.current = Number(snapshot.serverTime) - Date.now();
+    }
     deadlineRef.current = snapshot.deadline || null;
     if (timerRef.current) clearInterval(timerRef.current);
     setState((prev) => ({
       ...prev,
       currentQuestionIndex: Math.max(0, Math.min(snapshot.questionIndex, Math.max(0, questions.length - 1))),
-      isGameStarted: snapshot.status === "QUESTION",
+      isGameStarted: snapshot.status === "QUESTION" || snapshot.status === "REVEAL",
       isGameEnded: snapshot.status === "FINISHED",
-      isAnswered: snapshot.answeredQuestionId
-        ? snapshot.answeredQuestionId === questions[snapshot.questionIndex]?.id
-        : snapshot.questionIndex !== prev.currentQuestionIndex
-          ? false
-          : prev.isAnswered,
+      phase: snapshot.status,
+      isAnswered: snapshot.status !== "QUESTION"
+        ? true
+        : snapshot.answeredQuestionId
+          ? snapshot.answeredQuestionId === questions[snapshot.questionIndex]?.id
+          : snapshot.questionIndex !== prev.currentQuestionIndex
+            ? false
+            : prev.isAnswered,
       score: snapshot.playerScore ?? prev.score,
       correctAnswersCount:
         snapshot.playerCorrectAnswers ?? prev.correctAnswersCount,
-      timeRemaining: snapshot.deadline
-        ? Math.max(0, Math.ceil((snapshot.deadline - Date.now()) / 1000))
+      timeRemaining: snapshot.status === "REVEAL" && snapshot.revealEndsAt
+        ? Math.max(0, Math.ceil((snapshot.revealEndsAt - (Date.now() + serverOffsetRef.current)) / 1000))
+        : snapshot.deadline
+        ? Math.max(0, Math.ceil((snapshot.deadline - (Date.now() + serverOffsetRef.current)) / 1000))
         : 0,
+      selectedAnswers: snapshot.answeredQuestionId && snapshot.answeredOptionIds
+        ? new Map(prev.selectedAnswers).set(
+            snapshot.answeredQuestionId,
+            snapshot.answeredOptionIds.length === 1 ? snapshot.answeredOptionIds[0] : snapshot.answeredOptionIds,
+          )
+        : prev.selectedAnswers,
     }));
   }, [questions]);
 
@@ -91,12 +113,12 @@ export const useGameQuiz = ({
     deadlineRef.current = deadline;
     setState((prev) => ({
       ...prev,
-      timeRemaining: Math.max(0, Math.ceil((deadline - Date.now()) / 1000)),
+      timeRemaining: Math.max(0, Math.ceil((deadline - (Date.now() + serverOffsetRef.current)) / 1000)),
     }));
 
     timerRef.current = setInterval(() => {
       setState((prev) => {
-        const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        const remaining = Math.max(0, Math.ceil((deadline - (Date.now() + serverOffsetRef.current)) / 1000));
         if (remaining <= 0) {
           if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -199,10 +221,10 @@ export const useGameQuiz = ({
 
   // Update timer when question changes
   useEffect(() => {
-    if (state.isGameStarted && !state.isAnswered) {
+    if (state.isGameStarted && !state.isAnswered && state.phase === "QUESTION") {
       startTimerForCurrentQuestion();
     }
-  }, [state.currentQuestionIndex, state.isAnswered, state.isGameStarted, startTimerForCurrentQuestion]);
+  }, [state.currentQuestionIndex, state.isAnswered, state.isGameStarted, state.phase, startTimerForCurrentQuestion]);
 
   useEffect(() => {
     if (state.isGameEnded && !endNotifiedRef.current) {
@@ -225,6 +247,7 @@ export const useGameQuiz = ({
     isAnswered: state.isAnswered,
     isGameStarted: state.isGameStarted,
     isGameEnded: state.isGameEnded,
+    phase: state.phase,
     score: state.score,
     correctAnswersCount: state.correctAnswersCount,
     totalScore: state.totalScore,

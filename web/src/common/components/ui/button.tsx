@@ -5,23 +5,23 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-2 border-gray-900",
+  "flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white dark:border-white",
+          "bg-primary text-primary-foreground border-primary shadow-sm hover:bg-primary/90",
         destructive:
-          "bg-destructive text-destructive-foreground border-destructive active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-black dark:text-white",
+          "bg-destructive text-destructive-foreground border-destructive shadow-sm hover:bg-destructive/90 focus-visible:ring-destructive/20",
         outline:
-          "bg-white text-foreground hover:bg-muted/60 hover:text-foreground active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white dark:border-white dark:hover:bg-white/10",
+          "bg-card text-foreground border-border hover:bg-muted/60 hover:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground border-secondary active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white",
+          "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80",
         ghost:
           "border-none text-foreground hover:bg-muted/50 hover:text-foreground dark:text-white dark:hover:bg-white/10",
         link: "border-none text-primary underline-offset-4 hover:underline dark:text-white",
         shadowBorder:
-          "bg-background text-foreground active:translate-x-0.5 active:translate-y-0.5 dark:bg-black dark:text-white dark:border-white",
+          "bg-card text-foreground border-border shadow-sm hover:bg-muted/60",
       },
       size: {
         default: "h-9 px-6 py-4 has-[>svg]:px-6",
@@ -75,13 +75,13 @@ function Button({
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
       {showShadow && (
         <div
-          className="absolute bg-black dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-active/button:bottom-0 group-active/button:right-0 -z-10"
+          className="absolute bg-foreground/35 rounded-lg w-full h-full -bottom-1 -right-1 -z-10 transition-[transform] duration-150 group-active/button:translate-x-1 group-active/button:translate-y-1"
           style={{ overflow: "visible" }}
         />
       )}
       <div
         className={cn(
-          "absolute inset-0 rounded-md bg-white dark:bg-black -z-[5]",
+          "absolute inset-0 rounded-lg bg-card -z-[5]",
           (variant === "link" || variant === "ghost") && "hidden"
         )}
       />
@@ -89,7 +89,7 @@ function Button({
         data-slot="button"
         className={cn(
           buttonVariants({ variant, size, className: buttonClassName }),
-          "relative z-10 hover:cursor-pointer transition-all duration-200 w-full"
+          "relative z-10 hover:cursor-pointer transition-colors duration-150 w-full"
         )}
         {...props}
       />

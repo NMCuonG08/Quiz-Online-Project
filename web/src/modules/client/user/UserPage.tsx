@@ -4,6 +4,7 @@ import React from "react";
 import HistoryQuizes from "./components/HistoryQuizes";
 import FriendsCarousel from "./components/FriendsCarousel";
 import { useAppSelector } from "@/hooks/useRedux";
+import DashboardOverview from "./components/DashboardOverview";
 
 const UserPage = () => {
   const { user } = useAppSelector((state) => state.auth);
@@ -20,6 +21,8 @@ const UserPage = () => {
           Your Quiz Journey
         </h1>
       </div>
+
+      <DashboardOverview />
 
       {/* All quiz attempts (both in-progress and completed) */}
       <HistoryQuizes />

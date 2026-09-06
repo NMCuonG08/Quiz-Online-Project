@@ -48,7 +48,7 @@ const QuizCard: React.FC<Props> = ({ quiz, onRefresh }) => {
             {/* Thumbnail */}
             <div className="relative h-40 w-full bg-gray-100 dark:bg-dark-2">
                 <Image
-                    src={quiz.thumbnail_url || "/logo.jpg"}
+                    src={quiz.thumbnail_url || "/logo.png"}
                     alt={quiz.title}
                     fill
                     className="object-cover"

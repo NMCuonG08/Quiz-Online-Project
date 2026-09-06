@@ -30,6 +30,7 @@ import { AiChatHistoryModule } from './modules/ai-chat-history/ai-chat-history.m
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AiIdempotencyInterceptor } from './common/interceptors/ai-idempotency.interceptor';
+import { MessagingModule } from './modules/messaging/messaging.module';
 
 @Module({
   imports: [
@@ -193,6 +194,7 @@ import { AiIdempotencyInterceptor } from './common/interceptors/ai-idempotency.i
     ReportsModule,
     KnowledgeModule,
     AiChatHistoryModule,
+    MessagingModule,
   ],
   controllers: [AppController],
   providers: [

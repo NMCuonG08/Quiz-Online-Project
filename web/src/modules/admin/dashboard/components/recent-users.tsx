@@ -81,7 +81,7 @@ export function RecentUsers({
                                 <TableCell className="max-w-[200px] truncate">{user.email}</TableCell>
 
                                 <TableCell className="!text-right">
-                                    {new Date(user.created_at).toLocaleDateString()}
+                                    {new Date(user.created_at).toISOString().slice(0, 10)}
                                 </TableCell>
                             </TableRow>
                         ))

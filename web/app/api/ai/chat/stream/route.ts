@@ -7,16 +7,24 @@ const agentUrl = (process.env.AI_AGENT_INTERNAL_URL || "http://localhost:8000").
 
 export async function POST(request: NextRequest) {
   const authorization = request.headers.get("authorization");
-  const upstream = await fetch(`${agentUrl}/chat/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-      ...(authorization ? { Authorization: authorization } : {}),
-    },
-    body: await request.text(),
-    cache: "no-store",
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${agentUrl}/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      body: await request.text(),
+      cache: "no-store",
+    });
+  } catch {
+    return Response.json(
+      { error: { message: "AI Agent đang tạm thời chưa sẵn sàng.", code: "AI_AGENT_UNAVAILABLE" } },
+      { status: 503 },
+    );
+  }
 
   if (!upstream.body) {
     return new Response("AI Agent did not return a response body", { status: 502 });

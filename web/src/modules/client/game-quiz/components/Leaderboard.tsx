@@ -9,6 +9,7 @@ export interface LeaderboardEntry {
   username: string;
   score: number;
   correctAnswers: number;
+  totalTimeMs?: number;
   isMe?: boolean;
 }
 
@@ -22,10 +23,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   title = "Arena Leaderboard",
 }) => {
   // Sort entries by score descending
-  const sortedEntries = [...entries].sort((a, b) => b.score - a.score);
+  const sortedEntries = [...entries].sort((a, b) =>
+    b.score - a.score || b.correctAnswers - a.correctAnswers || (a.totalTimeMs || 0) - (b.totalTimeMs || 0) || a.userId.localeCompare(b.userId),
+  );
 
   return (
-    <div className="w-full max-w-2xl mx-auto bg-card/50 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
+    <div className="w-full max-w-2xl mx-auto bg-card/70 backdrop-blur-md border border-border/50 rounded-3xl shadow-xl overflow-hidden animate-in fade-in duration-300">
       {/* Header */}
       <div className="bg-primary/10 px-8 py-6 border-b border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-3">

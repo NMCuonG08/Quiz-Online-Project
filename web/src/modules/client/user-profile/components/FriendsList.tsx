@@ -1,16 +1,19 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { FriendshipService, FriendUser, FriendshipRequest } from "../services/friendship.service";
+import { FriendshipService, FriendUser, FriendshipRequest, FriendListItem } from "../services/friendship.service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/common/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/common/components/ui/avatar";
 import { Button } from "@/common/components/ui/button";
 import { Input } from "@/common/components/ui/input";
 import { showSuccess, showError } from "@/lib/Notification";
 import { UserMinus, Check, X, Users, Search, UserPlus } from "lucide-react";
+import { useLocalizedRouter } from "@/common/hooks/useLocalizedRouter";
 
 export const FriendsList = () => {
-    const [friends, setFriends] = useState<FriendUser[]>([]);
+    const router = useLocalizedRouter();
+    const [friends, setFriends] = useState<FriendListItem[]>([]);
     const [requests, setRequests] = useState<FriendshipRequest[]>([]);
+    const [sentRequests, setSentRequests] = useState<FriendshipRequest[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<FriendUser[]>([]);
     const [searching, setSearching] = useState(false);
@@ -19,12 +22,14 @@ export const FriendsList = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [friendsRes, requestsRes] = await Promise.all([
+            const [friendsRes, requestsRes, sentRes] = await Promise.all([
                 FriendshipService.getFriends(),
-                FriendshipService.getPendingRequests()
+                FriendshipService.getPendingRequests(),
+                FriendshipService.getSentRequests(),
             ]);
             if (friendsRes.data) setFriends(friendsRes.data);
             if (requestsRes.data) setRequests(requestsRes.data);
+            if (sentRes.data) setSentRequests(sentRes.data);
         } catch (error) {
             console.error("Lỗi khi tải danh sách bạn bè", error);
         } finally {
@@ -114,21 +119,37 @@ export const FriendsList = () => {
                                         <AvatarFallback className="text-xl">{user.username?.charAt(0).toUpperCase()}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="font-semibold text-sm">{user.full_name || user.username}</p>
+                                        <button className="font-semibold text-sm hover:underline" onClick={() => router.push(`/users/${user.id}`)}>{user.full_name || user.username}</button>
                                         <p className="text-xs text-muted-foreground">@{user.username}</p>
                                     </div>
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-full text-primary border-primary hover:bg-primary/10"
+                                        disabled={user.relationshipStatus !== "NONE"}
                                         onClick={() => handleSendRequest(user.id)}
                                     >
-                                        <UserPlus className="w-4 h-4 mr-2" /> Kết bạn
+                                        <UserPlus className="w-4 h-4 mr-2" />
+                                        {user.relationshipStatus === "FRIENDS" ? "Đã là bạn" :
+                                         user.relationshipStatus === "OUTGOING_PENDING" ? "Đã gửi" :
+                                         user.relationshipStatus === "INCOMING_PENDING" ? "Có lời mời" : "Kết bạn"}
                                     </Button>
                                 </div>
                             ))}
                         </div>
                     )}
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-xl flex items-center gap-2"><UserPlus className="w-5 h-5 text-primary" /> Lời mời đã gửi ({sentRequests.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {sentRequests.length === 0 ? <p className="text-sm text-muted-foreground">Bạn chưa gửi lời mời nào.</p> :
+                      <div className="space-y-2">{sentRequests.map((req) => <div key={req.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                        <div><p className="text-sm font-medium">{req.friend?.full_name || req.friend?.username}</p><p className="text-xs text-muted-foreground">@{req.friend?.username}</p></div>
+                        <Button size="sm" variant="outline" onClick={() => handleRejectOrRemove(req.id)}>Thu hồi</Button>
+                      </div>)}</div>}
                 </CardContent>
             </Card>
             <Card>
@@ -180,14 +201,14 @@ export const FriendsList = () => {
                         <p className="text-sm text-muted-foreground">Bạn chưa có người bạn nào.</p>
                     ) : (
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {friends.map((friend) => (
-                                <div key={friend.id} className="flex flex-col items-center gap-3 p-4 border rounded-xl text-center bg-card shadow-sm hover:shadow-md transition-shadow">
+                            {friends.map(({ friend, friendshipId }) => (
+                                <div key={friendshipId} className="flex flex-col items-center gap-3 p-4 border rounded-xl text-center bg-card shadow-sm hover:shadow-md transition-shadow">
                                     <Avatar className="w-16 h-16">
                                         <AvatarImage src={friend.avatar} />
                                         <AvatarFallback className="text-xl">{friend.username?.charAt(0).toUpperCase()}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="font-semibold text-sm">{friend.full_name || friend.username}</p>
+                                        <button className="font-semibold text-sm hover:underline" onClick={() => router.push(`/users/${friend.id}`)}>{friend.full_name || friend.username}</button>
                                         <p className="text-xs text-muted-foreground">@{friend.username}</p>
                                     </div>
                                     <Button
@@ -196,7 +217,7 @@ export const FriendsList = () => {
                                         className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                                         // Notice: We don't have the friendship ID here simply fetched in getFriends. A real implementation would return { friend, friendshipId }
                                         // So we might need a workaround or adapt the backend to return friendshipId too.
-                                        onClick={() => showError("Tính năng demo: Trong thực tế cần gọi removeFriend với friendshipId hiện tại.")}
+                                        onClick={() => handleRejectOrRemove(friendshipId, true)}
                                     >
                                         <UserMinus className="w-4 h-4 mr-2" /> Hủy kết bạn
                                     </Button>

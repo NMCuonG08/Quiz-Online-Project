@@ -60,7 +60,7 @@ export interface RoomData {
 
 export interface RoomGameStatePayload {
   roomId: string;
-  status: "WAITING" | "QUESTION" | "FINISHED";
+  status: "WAITING" | "QUESTION" | "REVEAL" | "FINISHED";
   questionIndex: number;
   questionId?: string;
   deadline?: number;
@@ -69,12 +69,29 @@ export interface RoomGameStatePayload {
   playerScore?: number;
   playerCorrectAnswers?: number;
   answeredQuestionId?: string;
+  answeredOptionIds?: string[];
+  answeredText?: string;
+  questionStartedAt?: number;
+  revealEndsAt?: number;
+  answeredCount?: number;
+  rosterCount?: number;
+  questionResults?: QuestionResultPayload[];
+}
+
+export interface QuestionResultPayload {
+  userId: string;
+  username: string;
+  isCorrect: boolean;
+  points: number;
+  responseTimeMs: number | null;
+  answeredAt?: string;
 }
 
 export interface ClientEventMap {
   on_user_delete: [string];
   on_asset_delete: [string];
   on_notification: [ServerNotification];
+  direct_message: [{ conversationId: string; message: MessagePayload }];
   // Room events from backend
   room_joined: [RoomJoinedPayload];
   room_left: [RoomLeftPayload];
@@ -89,13 +106,26 @@ export interface ClientEventMap {
   participant_left: [string];
   participants_list: [{ roomId: string; participants: Participant[]; revision?: number }];
   room_updated: [RoomData];
-  score_updated: [{ userId: string; username: string; score: number; correctAnswers: number; timestamp: string }];
-  leaderboard_update: [Array<{ userId: string; username: string; score: number; correctAnswers: number; timestamp: string }>];
+  score_updated: [{ userId: string; username: string; score: number; correctAnswers: number; totalTimeMs?: number; timestamp: string }];
+  leaderboard_update: [Array<{ userId: string; username: string; score: number; correctAnswers: number; totalTimeMs?: number; timestamp: string }>];
   answer_result: [{ commandId: string; questionId: string; isCorrect?: boolean; correctAnswer?: string; points?: number; duplicate?: boolean }];
   answer_error: [{ commandId?: string; error: string }];
   score_update_rejected: [{ error: string }];
   game_state: [RoomGameStatePayload];
+  question_reveal: [{ roomId: string; questionId?: string; questionResults: QuestionResultPayload[]; revealEndsAt: number; version: number }];
+  answer_progress: [{ roomId: string; questionId: string; answeredCount: number; rosterCount: number }];
   game_error: [{ error: string }];
+  room_invitation_result: [{ invited_count: number; skipped_count: number }];
+}
+
+export interface MessagePayload {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  type: string;
+  created_at: string;
+  sender?: { id: string; username?: string | null; full_name?: string | null; avatar?: string | null };
 }
 
 export interface ServerEventMap {

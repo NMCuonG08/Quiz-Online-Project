@@ -26,10 +26,10 @@ export default function RootLayout({ children }: PropsWithChildren) {
     <Providers>
       <NextTopLoader color="#5750F1" showSpinner={false} />
 
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar />
 
-        <div className="flex-1 min-w-0 bg-gray-2 dark:bg-[#020D1A]">
+        <div className="flex-1 min-w-0 bg-background">
           <Header />
 
           <main className="isolate mx-auto w-full max-w-screen-2xl p-4 md:p-6 2xl:p-10">

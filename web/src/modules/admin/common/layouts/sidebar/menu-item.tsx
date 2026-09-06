@@ -4,13 +4,13 @@ import { Link } from "@/common/i18n/navigation";
 import { useSidebarContext } from "./sidebar-context";
 
 const menuItemBaseStyles = cva(
-  "rounded-lg px-3.5 font-medium text-dark-4 transition-all duration-200 dark:text-white",
+  "rounded-lg px-3.5 font-medium text-muted-foreground transition-colors duration-150",
   {
     variants: {
       isActive: {
-        true: "bg-violet-light text-primary hover:bg-violet dark:bg-[#FFFFFF1A] dark:text-white",
+        true: "bg-primary/10 text-primary shadow-sm hover:bg-primary/15",
         false:
-          "hover:bg-gray-100 hover:text-dark hover:dark:bg-[#FFFFFF1A] hover:dark:text-white",
+          "hover:bg-muted hover:text-foreground",
       },
     },
     defaultVariants: {

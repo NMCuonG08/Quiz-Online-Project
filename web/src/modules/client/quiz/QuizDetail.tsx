@@ -47,6 +47,7 @@ import {
   BreadcrumbSeparator,
 } from "@/common/components/ui/breadcrumb";
 import { Link } from "@/common/i18n/navigation";
+import FriendsLeaderboard from "./components/FriendsLeaderboard";
 
 interface QuizDetailProps {
   slug: string;
@@ -528,6 +529,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Quiz Stats Card */}
+            {data?.id && <FriendsLeaderboard quizId={data.id} />}
             <Card className="bg-[#FFF5F5]">
               <CardHeader>
                 <CardTitle className="font-semibold">
@@ -560,7 +562,7 @@ const QuizDetail: React.FC<QuizDetailProps> = ({ slug }) => {
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{t("createdDate")}</span>
                       <span className="font-medium">
-                        {new Date(data.published_at).toLocaleDateString()}
+                        {new Date(data.published_at).toLocaleDateString("en-US", { timeZone: "UTC" })}
                       </span>
                     </div>
                   )}

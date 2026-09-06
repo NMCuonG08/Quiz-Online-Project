@@ -31,7 +31,7 @@ const QuizSection = () => {
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex-1 min-w-0 sm:min-w-fit">
                 <LocalizedLink href="/category">
-                  <Button className="w-full px-6 py-6 bg-yellow dark:bg-gray-dark text-base lg:text-lg text-black dark:text-white">
+                  <Button className="w-full px-6 py-6 text-base lg:text-lg">
                     {t("startQuiz")}
                   </Button>
                 </LocalizedLink>
@@ -40,7 +40,7 @@ const QuizSection = () => {
                 <LocalizedLink href="/category">
                   <Button
                     variant="outline"
-                    className="w-full px-6 py-6 bg-gray dark:bg-gray-dark text-base lg:text-lg"
+                    className="w-full px-6 py-6 bg-secondary text-base lg:text-lg"
                   >
                     {t("viewQuizList")}
                   </Button>

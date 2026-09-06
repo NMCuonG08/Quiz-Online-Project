@@ -56,10 +56,10 @@ const QuizMeta: React.FC<QuizMetaProps> = ({
         <div>Câu hỏi: {questionsCount}</div>
         <div>Lượt làm: {attemptsCount}</div>
         {publishedAt && (
-          <div>Public: {new Date(publishedAt).toLocaleDateString()}</div>
+          <div>Public: {new Date(publishedAt).toLocaleDateString("en-US", { timeZone: "UTC" })}</div>
         )}
         {updatedAt && (
-          <div>Update: {new Date(updatedAt).toLocaleDateString()}</div>
+          <div>Update: {new Date(updatedAt).toLocaleDateString("en-US", { timeZone: "UTC" })}</div>
         )}
       </div>
     </div>

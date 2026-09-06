@@ -50,18 +50,32 @@ export class UserController {
   }
 
   @Get('profile')
-  // @UseGuards(AuthGuard)
-  // @Authenticated({ permission: Permission.ActivityRead })
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
   getProfile(@Auth() auth: AuthDto) {
     return auth.user;
   }
 
   @Get('search')
-  // @UseGuards(AuthGuard)
-  // @Authenticated()
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
   @ApiQuery({ name: 'q', required: true, description: 'Search query' })
   searchUsers(@Query('q') query: string, @Auth() auth: AuthDto) {
     return this.userService.searchUsers(query, auth.user?.id || '');
+  }
+
+  @Get('me/dashboard')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
+  getDashboard(@Auth() auth: AuthDto) {
+    return this.userService.getDashboard(auth.user.id);
+  }
+
+  @Get(':id/profile')
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: false })
+  getPublicProfile(@Param('id') id: string, @Auth() auth: AuthDto) {
+    return this.userService.getPublicProfile(id, auth.user.id);
   }
 
   @Get(':id')

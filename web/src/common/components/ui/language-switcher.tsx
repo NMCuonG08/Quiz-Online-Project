@@ -23,16 +23,16 @@ export function LanguageSwitcher() {
   return (
     <Select value={locale} onValueChange={onValueChange}>
       <div className="relative inline-block group">
-        <SelectTrigger className="h-9 w-[120px] relative z-10">
+        <SelectTrigger className="h-9 w-[120px] relative z-10 rounded-lg border-border bg-card text-foreground shadow-sm">
           <SelectValue aria-label="Language selector" />
         </SelectTrigger>
         <div
-          className="absolute bg-black/80 dark:bg-white rounded-md w-full h-full -bottom-1 -right-1 transition-all duration-200 group-hover:-bottom-1 group-hover:-right-1 group-active:bottom-0 group-active:right-0 -z-10"
+          className="hidden"
           style={{ overflow: "visible" }}
         />
       </div>
 
-      <SelectContent className="shadow-lg shadow-black/5 dark:shadow-black/20 border-2 light:border-black dark:border-white">
+      <SelectContent className="rounded-lg border-border bg-popover shadow-lg shadow-black/10">
         <SelectItem value="en">English</SelectItem>
         <SelectItem value="vi">Tiếng Việt</SelectItem>
       </SelectContent>

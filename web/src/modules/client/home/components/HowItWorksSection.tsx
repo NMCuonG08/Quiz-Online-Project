@@ -23,7 +23,7 @@ const HowItWorksSection = () => {
           height="24"
           viewBox="0 0 24 24"
           fill="none"
-          className="text-white"
+          className="text-primary"
         >
           <path
             d="M12 2L2 7L12 12L22 7L12 2Z"
@@ -61,7 +61,7 @@ const HowItWorksSection = () => {
           height="24"
           viewBox="0 0 24 24"
           fill="none"
-          className="text-white"
+          className="text-primary"
         >
           <path
             d="M21 16V8C20.9996 7.64927 20.9071 7.30481 20.7315 7.00116C20.556 6.69751 20.3037 6.44536 20 6.27L13 2.27C12.696 2.09446 12.3511 2.00205 12 2.00205C11.6489 2.00205 11.304 2.09446 11 2.27L4 6.27C3.69626 6.44536 3.44398 6.69751 3.26846 7.00116C3.09294 7.30481 3.00036 7.64927 3 8V16C3.00036 16.3507 3.09294 16.6952 3.26846 16.9988C3.44398 17.3025 3.69626 17.5546 4 17.73L11 21.73C11.304 21.9055 11.6489 21.9979 12 21.9979C12.3511 21.9979 12.696 21.9055 13 21.73L20 17.73C20.3037 17.5546 20.556 17.3025 20.7315 16.9988C20.9071 16.6952 20.9996 16.3507 21 16Z"
@@ -99,7 +99,7 @@ const HowItWorksSection = () => {
           height="24"
           viewBox="0 0 24 24"
           fill="none"
-          className="text-white"
+          className="text-primary"
         >
           <path
             d="M21 16V8C20.9996 7.64927 20.9071 7.30481 20.7315 7.00116C20.556 6.69751 20.3037 6.44536 20 6.27L13 2.27C12.696 2.09446 12.3511 2.00205 12 2.00205C11.6489 2.00205 11.304 2.09446 11 2.27L4 6.27C3.69626 6.44536 3.44398 6.69751 3.26846 7.00116C3.09294 7.30481 3.00036 7.64927 3 8V16C3.00036 16.3507 3.09294 16.6952 3.26846 16.9988C3.44398 17.3025 3.69626 17.5546 4 17.73L11 21.73C11.304 21.9055 11.6489 21.9979 12 21.9979C12.3511 21.9979 12.696 21.9055 13 21.73L20 17.73C20.3037 17.5546 20.556 17.3025 20.7315 16.9988C20.9071 16.6952 20.9996 16.3507 21 16Z"
@@ -146,12 +146,12 @@ const HowItWorksSection = () => {
           {steps.map((step, index) => (
             <Card
               key={step.id}
-              className="relative bg-[#c953d2] dark:bg-gray-dark text-black dark:text-white border-gray-500 h-full flex flex-col"
+              className="relative bg-card text-foreground border-border shadow-sm h-full flex flex-col"
             >
               <CardHeader className="relative flex-shrink-0">
                 {/* Step Number */}
                 {step.stepNumber && (
-                  <div className="text-sm text-white/80 mb-2">
+                  <div className="text-sm text-muted-foreground mb-2">
                     {step.stepNumber}
                   </div>
                 )}
@@ -162,14 +162,14 @@ const HowItWorksSection = () => {
                 </div>
 
                 {/* Title */}
-                <CardTitle className="text-2xl font-bold text-white">
+                <CardTitle className="text-2xl font-bold text-foreground">
                   {step.title}
                 </CardTitle>
               </CardHeader>
 
               <CardContent className="flex flex-col flex-grow space-y-6">
                 {/* Description */}
-                <p className="text-sm text-white/80 leading-relaxed flex-grow">
+                <p className="text-sm text-muted-foreground leading-relaxed flex-grow">
                   {step.description}
                 </p>
 
@@ -179,14 +179,14 @@ const HowItWorksSection = () => {
                     <Button
                       variant="shadowBorder"
                       size="lg"
-                      className="bg-yellow text-gray-dark border-black hover:bg-yellow font-bold"
+                      className="font-semibold"
                     >
                       {step.buttonText}
                     </Button>
                   )}
                   <Link
                     href="#"
-                    className="text-sm text-white hover:text-white/80 transition-colors"
+                    className="text-sm text-primary hover:text-primary/80 transition-colors"
                   >
                     {step.linkText}
                   </Link>

@@ -23,8 +23,7 @@
 
 /* Active state */
 .nav-link.active {
-    color: #FDD239;
-    /* Tailwind yellow-500 */
+    color: hsl(var(--primary));
 }
 
 .nav-link.active::after {

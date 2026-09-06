@@ -12,4 +12,5 @@ export class AuthApi extends BaseApi {
   async getMe(token: string) {
     return this.agent.get('/api/auth/me').set('Authorization', `Bearer ${token}`);
   }
+
 }

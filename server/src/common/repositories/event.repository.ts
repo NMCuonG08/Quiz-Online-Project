@@ -123,6 +123,7 @@ export interface ClientEventMap {
   on_user_delete: [string];
   on_asset_delete: [string];
   notification: [RealtimeNotification];
+  direct_message: [{ conversationId: string; message: unknown }];
   participants_list: [
     {
       roomId: string;

@@ -10,6 +10,7 @@ export interface GameQuizState {
   isAnswered: boolean;
   isGameStarted: boolean;
   isGameEnded: boolean;
+  phase?: "WAITING" | "QUESTION" | "REVEAL" | "FINISHED";
   score: number;
   correctAnswersCount: number;
   totalScore: number;

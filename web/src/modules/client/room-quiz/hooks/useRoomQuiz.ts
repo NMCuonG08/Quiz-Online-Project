@@ -23,6 +23,7 @@ import {
   type JoinRoomPayload,
   type ChatMessage,
   type Participant,
+  RoomQuizService,
 } from "../services/room-quiz.service";
 import type {
   RoomJoinedPayload,
@@ -56,7 +57,6 @@ export function useRoomQuiz() {
     (roomId: string) => {
       currentRoomIdRef.current = roomId; // Store current roomId
       // Join room via WebSocket
-      console.log("Joining room via WebSocket:", roomId);
       if (!wsManager.isConnected() && !wsManager.getIsConnecting()) {
         wsManager.scheduleReconnect(0);
       }
@@ -134,50 +134,25 @@ export function useRoomQuiz() {
 
   const getParticipants = useCallback(
     (roomId: string) => {
-      console.log("🔍 getParticipants called with roomId:", roomId);
-      console.log("🔌 WebSocket connected:", wsManager.isConnected());
 
       // Request participants via WebSocket
       if (wsManager.isConnected()) {
-        console.log("📡 Sending get_participants via WebSocket");
         wsManager.send("get_participants", { roomId });
         return;
       }
 
-      console.log("⚠️ WebSocket not connected, using one API fallback");
-      const action = dispatch(fetchParticipants(roomId));
-      action.then((res: any) => {
-        try {
-          console.log("🧾 API fetchParticipants result:", res);
-          const payload = res?.payload as any;
-          if (payload) {
-            console.log(
-              "📥 API participants payload keys:",
-              Object.keys(payload)
-            );
-            const apiParticipants = (payload as any).participants ?? payload;
-            console.log(
-              "📊 API participants length:",
-              Array.isArray(apiParticipants) ? apiParticipants.length : "n/a"
-            );
-          }
-        } catch (e) {
-          console.log("⚠️ Unable to inspect API payload:", e);
-        }
-      });
-      return action;
+      return dispatch(fetchParticipants(roomId));
     },
     [dispatch]
   );
 
   const inviteFriendsAction = useCallback(
-    (roomId: string, friendIds: string[]) => {
-      // Send via WebSocket for real-time
-      if (wsManager.isConnected()) {
-        wsManager.send("invite_friends", { roomId, friendIds });
+    async (roomId: string, friendIds: string[]) => {
+      try {
+        await RoomQuizService.inviteFriends(roomId, friendIds);
+      } catch {
+        // Realtime delivery remains best effort; HTTP errors are surfaced by the room UI.
       }
-      // Also send via API for persistence
-      // TODO: Add inviteFriends API call
     },
     []
   );
@@ -206,29 +181,24 @@ export function useRoomQuiz() {
     if (wsBoundRef.current) return;
     wsBoundRef.current = true;
     const handleNewMessage = (message: ChatMessage) => {
-      console.log("📨 New message received:", message);
       addMessageAction(message);
     };
 
     const handleMessagesList = (messages: ChatMessage[]) => {
-      console.log("📨 Messages list received:", messages);
       dispatch(setMessages(messages));
     };
 
     const handleParticipantJoined = (participant: Participant) => {
-      console.log("👤 Participant joined:", participant);
       dispatch(addParticipant(participant));
     };
 
     const handleParticipantLeft = (participantId: string) => {
-      console.log("👤 Participant left:", participantId);
       dispatch(removeParticipant(participantId));
     };
 
     const handleParticipantsList = (
       data: { participants: Participant[]; roomId: string } & any
     ) => {
-      console.log("👤 Participants list event payload:", data);
 
       // Check if this event is for the current room
       const eventRoomId = data?.roomId;
@@ -236,33 +206,24 @@ export function useRoomQuiz() {
         currentRoomIdRef.current &&
         eventRoomId !== currentRoomIdRef.current
       ) {
-        console.log(
-          `⚠️ Ignoring participants_list for room ${eventRoomId}, current room is ${currentRoomIdRef.current}`
-        );
         return;
       }
 
-      const list = (data && (data as any).participants) || [];
-      console.log("📊 Total participants (WS):", list.length);
       dispatch(setParticipants(data));
     };
 
     const handleRoomUpdate = (roomData: RoomData) => {
-      console.log("🏠 Room updated:", roomData);
       // TODO: Update room data
     };
 
     const handleRoomJoined = (data: RoomJoinedPayload) => {
-      console.log("✅ Room joined successfully:", data);
       const joinedRoomId = (data as any)?.room_id || (data as any)?.roomId;
       if (joinedRoomId) {
-        console.log("🔄 Fetching messages after join for:", joinedRoomId);
         getChatMessages(joinedRoomId);
       }
     };
 
     const handleRoomLeft = (data: RoomLeftPayload) => {
-      console.log("👋 Room left successfully:", data);
       // TODO: Clear room data or show message
     };
 
@@ -277,16 +238,12 @@ export function useRoomQuiz() {
     };
 
     const handleUserJoined = (data: UserRoomPayload) => {
-      console.log("👤 User joined room:", data);
 
       // Chỉ xử lý nếu đúng phòng hiện tại
       if (
         currentRoomIdRef.current &&
         data.roomId !== currentRoomIdRef.current
       ) {
-        console.log(
-          `⚠️ Ignoring user_joined for room ${data.roomId}, current room is ${currentRoomIdRef.current}`
-        );
         return;
       }
 
@@ -295,16 +252,12 @@ export function useRoomQuiz() {
     };
 
     const handleUserLeft = (data: UserRoomPayload) => {
-      console.log("👋 User left room:", data);
 
       // Check if this event is for the current room
       if (
         currentRoomIdRef.current &&
         data.roomId !== currentRoomIdRef.current
       ) {
-        console.log(
-          `⚠️ Ignoring user_left for room ${data.roomId}, current room is ${currentRoomIdRef.current}`
-        );
         return;
       }
 
@@ -318,8 +271,6 @@ export function useRoomQuiz() {
     };
 
     // Listen for WebSocket events
-    console.log("🔌 Setting up WebSocket listeners...");
-    console.log("🔌 WebSocket connected:", wsManager.isConnected());
 
     wsManager.on("room_message", handleNewMessage);
     wsManager.on("messages_list", handleMessagesList);

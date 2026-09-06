@@ -86,7 +86,7 @@ const NavBarMobile = () => {
           <nav className="flex flex-col gap-3">
             <Link
               href="/"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/") ? "active" : "hover:text-yellow-500"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/") ? "active" : "hover:text-primary"
                 }`}
               onClick={() => setOpen(false)}
             >
@@ -94,7 +94,7 @@ const NavBarMobile = () => {
             </Link>
             <Link
               href="/category"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/category") ? "active" : "hover:text-yellow-500"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/category") ? "active" : "hover:text-primary"
                 }`}
               onClick={() => setOpen(false)}
             >
@@ -102,7 +102,7 @@ const NavBarMobile = () => {
             </Link>
             <Link
               href="/courses"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/courses") ? "active" : "hover:text-yellow-500"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/courses") ? "active" : "hover:text-primary"
                 }`}
               onClick={() => setOpen(false)}
             >
@@ -110,7 +110,7 @@ const NavBarMobile = () => {
             </Link>
             <Link
               href="/community"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/community") ? "active" : "hover:text-yellow-500"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/community") ? "active" : "hover:text-primary"
                 }`}
               onClick={() => setOpen(false)}
             >
@@ -118,7 +118,7 @@ const NavBarMobile = () => {
             </Link>
             <Link
               href="/about"
-              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/about") ? "active" : "hover:text-yellow-500"
+              className={`nav-link rounded-md px-3 py-2 text-base text-foreground transition-colors ${isActive("/about") ? "active" : "hover:text-primary"
                 }`}
               onClick={() => setOpen(false)}
             >
@@ -197,7 +197,7 @@ const NavBarMobile = () => {
               </DropdownMenu>
             ) : (
               <LocalizedLink href="/auth/login">
-                <Button className="inline-flex bg-yellow dark:bg-gray-dark items-center px-4 py-2 text-sm font-medium text-primary-foreground transition-colors">
+                <Button className="inline-flex items-center px-4 py-2 text-sm font-medium">
                   {tAuth("signIn")}
                 </Button>
               </LocalizedLink>

@@ -40,29 +40,36 @@ export class AuthController {
     private readonly configService: ConfigService,
   ) {}
 
+  private getRefreshCookieOptions(req: Request) {
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const protocol = Array.isArray(forwardedProto)
+      ? forwardedProto[0]
+      : forwardedProto || req.protocol;
+    const secure = protocol === 'https';
+    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
+    return {
+      httpOnly: true,
+      secure,
+      sameSite: secure ? ('none' as const) : ('lax' as const),
+      domain,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    };
+  }
+
   @Post('google')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with Google OAuth code' })
   @ApiResponse({ status: 200, description: 'Google login successful' })
   async loginWithGoogle(
     @Body('code') code: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result: AuthLoginResult =
       await this.authService.loginWithGoogle(code);
 
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
-    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
-
-    res.cookie('__refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      domain,
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('__refreshToken', result.refreshToken, this.getRefreshCookieOptions(req));
 
     return { user: result.user, accessToken: result.accessToken };
   }
@@ -73,23 +80,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Google OAuth callback (compat)' })
   async loginWithGoogleCallback(
     @Body('code') code: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result: AuthLoginResult =
       await this.authService.loginWithGoogle(code);
 
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
-    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
-
-    res.cookie('__refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      domain,
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('__refreshToken', result.refreshToken, this.getRefreshCookieOptions(req));
 
     return { user: result.user, accessToken: result.accessToken };
   }
@@ -122,23 +119,12 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(
     @Body() loginDto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result: AuthLoginResult = await this.authService.login(loginDto);
 
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
-    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
-
-    // Only set refresh token in cookie
-    res.cookie('__refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      domain,
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    res.cookie('__refreshToken', result.refreshToken, this.getRefreshCookieOptions(req));
 
     return { user: result.user, accessToken: result.accessToken };
   }
@@ -169,8 +155,13 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 409, description: 'Email or username already exists' })
-  async signup(@Body() signupDto: SignupDto) {
+  async signup(
+    @Body() signupDto: SignupDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result: AuthLoginResult = await this.authService.signup(signupDto);
+    res.cookie('__refreshToken', result.refreshToken, this.getRefreshCookieOptions(req));
     return { user: result.user, accessToken: result.accessToken };
   }
 
@@ -184,22 +175,12 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(
     @Auth() auth: AuthDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.logout(auth.user.id);
 
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
-    const domain = this.configService.get<string>('COOKIE_DOMAIN') || undefined;
-
-    // Clear refresh token cookies on client
-    res.clearCookie('__refreshToken', {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      domain,
-      path: '/',
-    });
+    res.clearCookie('__refreshToken', this.getRefreshCookieOptions(req));
 
     return result;
   }

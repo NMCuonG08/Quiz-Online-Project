@@ -22,16 +22,16 @@ const LevelUpSection = () => {
           {/* Right side - Content */}
           <div className="order-1 lg:order-2 space-y-8">
             {/* Icon */}
-            <div className="w-16 h-16 bg-black dark:bg-white rounded-full flex items-center justify-center">
-              <Compass className="w-8 h-8 text-white dark:text-black" />
+            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-sm">
+              <Compass className="w-8 h-8 text-primary-foreground" />
             </div>
 
             {/* Heading */}
             <div className="space-y-4">
-              <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white leading-tight">
+              <h2 className="text-4xl sm:text-5xl font-bold text-foreground leading-tight">
                 Level up your learning journey
               </h2>
-              <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed max-w-lg">
+              <p className="text-lg text-muted-foreground leading-relaxed max-w-lg">
                 Earn experience points, unlock achievements, and track your
                 progress through an engaging gamification system
               </p>
@@ -42,12 +42,12 @@ const LevelUpSection = () => {
               <Button
                 variant="outline"
                 size="lg"
-                className="border-2 border-gray-900 dark:border-white text-gray-900 dark:text-white hover:bg-gray-900 dark:hover:bg-white hover:text-white dark:hover:text-black transition-all duration-300 px-8 py-3 rounded-lg"
+                className="px-8 py-3"
               >
                 Discover
               </Button>
               <div className="flex-1" />
-              <button className="text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-300 font-medium text-lg underline underline-offset-4 hover:no-underline transition-all duration-300 ml-0 sm:ml-auto">
+              <button className="text-primary hover:text-primary/80 font-medium text-lg underline underline-offset-4 hover:no-underline transition-colors ml-0 sm:ml-auto">
                 Rewards &gt;
               </button>
             </div>

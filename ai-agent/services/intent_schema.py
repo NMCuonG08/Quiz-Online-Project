@@ -42,6 +42,14 @@ InteractionIntent = Literal[
     "knowledge_review",
     "account_identity",
     "account_permissions",
+    "friend_search",
+    "friend_list",
+    "friend_requests",
+    "friend_relationship",
+    "friend_request_send",
+    "friend_request_accept",
+    "friend_remove",
+    "friends_leaderboard",
     "admin_dashboard",
     "admin_audit",
     "temporal",
@@ -53,7 +61,7 @@ InteractionIntent = Literal[
 MissingField = Literal[
     "title", "topic", "query", "category", "category_id", "difficulty",
     "difficulty_level", "time_limit", "quiz_type", "quiz_id", "quiz_slug",
-    "question_id", "source_id", "session_id", "confirmation",
+    "question_id", "source_id", "session_id", "user_id", "friendship_id", "confirmation",
 ]
 
 IntentRisk = Literal["none", "read", "write", "destructive", "admin"]
@@ -67,12 +75,12 @@ ReferenceMode = Literal["standalone", "previous_turn", "pending_workflow", "expl
 SelectionStrategy = Literal["none", "exact", "best_match", "only_option", "first_available", "user_choice"]
 IntentResource = Literal[
     "conversation", "quiz", "attempt", "question", "category", "knowledge",
-    "account", "admin", "media", "time", "system",
+    "account", "friendship", "leaderboard", "admin", "media", "time", "system",
 ]
 IntentOperation = Literal[
     "respond", "help", "search", "recommend", "detail", "list", "create",
     "update", "delete", "publish", "unpublish", "start", "resume", "result",
-    "history", "submit_review", "review", "inspect", "abstain",
+    "history", "submit_review", "review", "inspect", "accept", "abstain",
 ]
 
 
@@ -87,6 +95,8 @@ class IntentEntities(BaseModel):
     category_id: Optional[str] = Field(default=None, max_length=128)
     source_id: Optional[str] = Field(default=None, max_length=128)
     session_id: Optional[str] = Field(default=None, max_length=128)
+    user_id: Optional[str] = Field(default=None, max_length=128)
+    friendship_id: Optional[str] = Field(default=None, max_length=128)
     title: Optional[str] = Field(default=None, max_length=300)
     category: Optional[str] = Field(default=None, max_length=300)
     question_count: Optional[int] = Field(default=None, ge=1, le=100, description="Exact number of questions requested")
@@ -125,6 +135,7 @@ READ_ONLY_INTENTS: frozenset[str] = frozenset({
     "quiz_detail", "quiz_resume", "quiz_result", "quiz_history", "quiz_owned", "quiz_attempts", "quiz_in_progress", "question_list",
     "category_list", "category_recommend", "knowledge_search", "knowledge_list", "account_identity",
     "account_permissions", "admin_dashboard", "admin_audit", "image_search", "temporal",
+    "friend_search", "friend_list", "friend_requests", "friend_relationship", "friends_leaderboard",
     "auth_required", "no_evidence", "unsupported",
 })
 
@@ -134,6 +145,7 @@ STRONG_PLANNER_INTENTS: frozenset[str] = frozenset({
     "question_duplicate", "question_reorder", "category_create", "category_update",
     "category_delete", "knowledge_import", "knowledge_submit_review",
     "knowledge_review", "admin_dashboard", "admin_audit",
+    "friend_request_send", "friend_request_accept", "friend_remove",
 })
 
 GENERAL_INTENTS: frozenset[str] = frozenset({"conversation_general", "capability_help"})
@@ -173,6 +185,14 @@ INTENT_ALLOWED_TOOLS: dict[str, frozenset[str]] = {
     "knowledge_review": frozenset({"list_knowledge_sources", "review_knowledge", "render_ui"}),
     "account_identity": frozenset({"get_current_user", "render_ui"}),
     "account_permissions": frozenset({"get_current_user", "get_my_permissions", "render_ui"}),
+    "friend_search": frozenset({"search_users", "get_friendship_status", "send_friend_request", "render_ui"}),
+    "friend_list": frozenset({"get_friends", "render_ui"}),
+    "friend_requests": frozenset({"get_friend_requests", "accept_friend_request", "remove_friendship", "render_ui"}),
+    "friend_relationship": frozenset({"get_friendship_status", "render_ui"}),
+    "friend_request_send": frozenset({"search_users", "get_friendship_status", "send_friend_request", "render_ui"}),
+    "friend_request_accept": frozenset({"get_friend_requests", "accept_friend_request", "render_ui"}),
+    "friend_remove": frozenset({"get_friends", "get_friend_requests", "remove_friendship", "render_ui"}),
+    "friends_leaderboard": frozenset({"get_quiz", "get_friends_leaderboard", "render_ui"}),
     "admin_dashboard": frozenset({"get_admin_dashboard_stats", "render_ui"}),
     "admin_audit": frozenset({"list_audit_events", "render_ui"}),
     "temporal": frozenset({"get_current_time"}),
@@ -209,6 +229,10 @@ INTENT_DOMAINS: dict[str, frozenset[str]] = {
     }),
     "media": frozenset({"image_search"}),
     "account": frozenset({"account_identity", "account_permissions"}),
+    "social": frozenset({
+        "friend_search", "friend_list", "friend_requests", "friend_relationship",
+        "friend_request_send", "friend_request_accept", "friend_remove", "friends_leaderboard",
+    }),
     "admin": frozenset({"admin_dashboard", "admin_audit"}),
     "system": frozenset({"temporal", "auth_required", "no_evidence", "unsupported"}),
 }
@@ -250,6 +274,14 @@ INTENT_METADATA: dict[str, dict[str, Any]] = {
     "knowledge_review": {"resource": "knowledge", "operation": "review", "scopes": {"admin"}, "example": "Duyệt nguồn kiến thức"},
     "account_identity": {"resource": "account", "operation": "detail", "scopes": {"learner", "creator", "admin"}, "example": "Tài khoản hiện tại là ai?"},
     "account_permissions": {"resource": "account", "operation": "inspect", "scopes": {"learner", "creator", "admin"}, "example": "Tôi có quyền gì?"},
+    "friend_search": {"resource": "friendship", "operation": "search", "scopes": {"learner", "creator", "admin"}, "example": "Tìm bạn tên An"},
+    "friend_list": {"resource": "friendship", "operation": "list", "scopes": {"learner", "creator", "admin"}, "example": "Danh sách bạn bè của tôi"},
+    "friend_requests": {"resource": "friendship", "operation": "list", "scopes": {"learner", "creator", "admin"}, "example": "Tôi có lời mời kết bạn nào?"},
+    "friend_relationship": {"resource": "friendship", "operation": "detail", "scopes": {"learner", "creator", "admin"}, "example": "Tôi đã kết bạn với người này chưa?"},
+    "friend_request_send": {"resource": "friendship", "operation": "create", "scopes": {"learner", "creator", "admin"}, "example": "Gửi lời mời kết bạn cho An"},
+    "friend_request_accept": {"resource": "friendship", "operation": "accept", "scopes": {"learner", "creator", "admin"}, "example": "Chấp nhận lời mời kết bạn này"},
+    "friend_remove": {"resource": "friendship", "operation": "delete", "scopes": {"learner", "creator", "admin"}, "example": "Xác nhận hủy kết bạn"},
+    "friends_leaderboard": {"resource": "leaderboard", "operation": "list", "scopes": {"learner", "creator", "admin"}, "example": "Xem bảng xếp hạng bạn bè của quiz này"},
     "admin_dashboard": {"resource": "admin", "operation": "inspect", "scopes": {"admin"}, "example": "Xem dashboard quản trị"},
     "admin_audit": {"resource": "admin", "operation": "list", "scopes": {"admin"}, "example": "Xem audit event"},
     "temporal": {"resource": "time", "operation": "detail", "scopes": {"learner", "creator", "admin"}, "example": "Bây giờ là mấy giờ?"},

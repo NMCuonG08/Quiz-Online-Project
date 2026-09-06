@@ -18,7 +18,7 @@ function Card({ className, disableHover, tightShadow, ...props }: CardProps) {
       {/* Shadow Layer - hiệu ứng đổ bóng đẹp, chỉ hiển thị ở phần dư */}
       <div
         className={cn(
-          "absolute bg-black/80 dark:bg-white rounded-xl w-full h-full transition-all duration-300 -z-10",
+          "absolute bg-foreground/35 rounded-xl w-full h-full -z-10",
           shadowOffset,
           shadowHover
         )}
@@ -28,7 +28,7 @@ function Card({ className, disableHover, tightShadow, ...props }: CardProps) {
       <div
         data-slot="card"
         className={cn(
-          "bg-white dark:bg-gray-dark border-black dark:border-white p-4 text-card-foreground flex flex-col gap-6 rounded-xl border py-6 relative z-10 transition-all duration-300",
+          "bg-card border-border p-4 text-card-foreground flex flex-col gap-6 rounded-xl border py-6 relative z-10 transition-colors duration-150",
           contentHover,
           className
         )}

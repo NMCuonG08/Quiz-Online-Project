@@ -5,7 +5,10 @@ import { useAppDispatch, useAppSelector } from "@/hooks/useRedux";
 import {
   restoreAuth,
   getUserProfile,
+  tokenRefreshed,
+  forceLogout,
 } from "@/modules/auth/common/slices/authSlice";
+import { wsManager } from "@/lib/websocket";
 
 /**
  * Component to restore auth state from localStorage on app startup
@@ -18,6 +21,25 @@ export default function AuthRestorer({
 }) {
   const dispatch = useAppDispatch();
   const { token, isAuthenticated, user } = useAppSelector((state) => state.auth);
+
+  useEffect(() => {
+    const handleTokenRefreshed = (event: Event) => {
+      const nextToken = (event as CustomEvent<{ token?: string }>).detail?.token;
+      if (!nextToken) return;
+      dispatch(tokenRefreshed(nextToken));
+      void wsManager.connect(nextToken);
+    };
+    window.addEventListener("auth-token-refreshed", handleTokenRefreshed);
+    return () => window.removeEventListener("auth-token-refreshed", handleTokenRefreshed);
+  }, [dispatch]);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      dispatch(forceLogout());
+    };
+    window.addEventListener("auth-session-expired", handleSessionExpired);
+    return () => window.removeEventListener("auth-session-expired", handleSessionExpired);
+  }, [dispatch]);
 
   useEffect(() => {
     // Restore the access token first. The profile effect below then restores

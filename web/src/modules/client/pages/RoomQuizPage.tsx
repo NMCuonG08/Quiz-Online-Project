@@ -62,13 +62,11 @@ const RoomQuizPage = () => {
     messagesLoading,
     messagesError,
     sendMessageLoading,
-    getChatMessages,
     sendMessage,
     // Participants
     participants,
     participantsLoading,
     participantsError,
-    getParticipants,
     inviteFriends,
     leaveRoom,
   } = useRoomQuiz();
@@ -89,21 +87,9 @@ const RoomQuizPage = () => {
   }, [
     roomId,
     getRoomById,
-    getChatMessages,
-    getParticipants,
     leaveRoom,
     clearData,
   ]);
-
-  // Ensure websocket room join even when data is cached or after reconnect
-  useEffect(() => {
-    if (!roomId) return;
-    if (!isConnected) return;
-    console.log("Ensuring WebSocket join for room:", roomId);
-    getRoomById(roomId);
-    getParticipants(roomId);
-    getChatMessages(roomId);
-  }, [roomId, isConnected, getRoomById, getParticipants, getChatMessages]);
 
   const handleRetry = () => {
     if (roomId) {
@@ -160,7 +146,7 @@ const RoomQuizPage = () => {
         || snapshot.version < gameVersionRef.current
       ) return;
       gameVersionRef.current = snapshot.version;
-      if (snapshot.status === "QUESTION" || snapshot.status === "FINISHED") {
+      if (snapshot.status === "QUESTION" || snapshot.status === "REVEAL" || snapshot.status === "FINISHED") {
         const ready = await ensureGameQuestions();
         if (active && ready) setIsGameStarted(true);
       } else if (active) {

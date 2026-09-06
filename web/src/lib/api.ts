@@ -1,7 +1,6 @@
 import { AuthenticationService } from "@/modules/auth/common/services/auth.service";
 import { detectLocaleFromPath, withLocalePrefix } from "@/lib/locale";
 import axios, { AxiosError, AxiosHeaders, AxiosRequestConfig, AxiosResponse } from "axios";
-import { Subject, filter, take } from "rxjs";
 // Note: AuthenticationService will be dynamically imported to avoid circular dependencies
 // Enhanced error interface with comprehensive error information
 export interface StandardError extends Error {
@@ -136,8 +135,26 @@ const apiClient = axios.create({
 let isLoggingOut = false;
 
 // Refresh token logic with RxJS
-let isRefreshing = false;
-let refreshTokenSubject = new Subject<string | null>();
+let refreshPromise: Promise<string | null> | null = null;
+
+const publishTokenRefresh = (token: string): void => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("auth-token-refreshed", { detail: { token } }));
+};
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const result = await AuthenticationService.refreshToken();
+    if ("error" in result || !result.token) return null;
+    setAccessToken(result.token);
+    publishTokenRefresh(result.token);
+    return result.token;
+  })().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+};
 
 // Removed unused store access helpers
 
@@ -271,7 +288,8 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Removed startTokenRefresh as we'll handle it in the interceptor using RxJS
+// Refresh is coordinated by the shared promise above so concurrent 401s reuse
+// one cookie refresh request.
 
 // Enhanced response interceptor with comprehensive error handling
 apiClient.interceptors.response.use(
@@ -297,6 +315,14 @@ apiClient.interceptors.response.use(
 
       // Check if the error is from the refresh token endpoint itself
       const isRefreshURL = originalConfig.url?.includes("/auth/refresh");
+      const isAuthEndpoint = originalConfig.url?.includes("/auth/login")
+        || originalConfig.url?.includes("/auth/register")
+        || originalConfig.url?.includes("/auth/google")
+        || originalConfig.url?.includes("/auth/forgot-password");
+
+      if (isAuthEndpoint) {
+        return Promise.reject(error);
+      }
 
       if (isRefreshURL) {
         console.warn(
@@ -325,90 +351,35 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      if (!isRefreshing) {
-        isRefreshing = true;
-        console.log("🔄 Attempting token refresh...");
-
-        try {
-          type RefreshResult =
-            | { token?: string; user?: unknown }
-            | { error: { message: string; code: string } };
-
-          const result: RefreshResult =
-            await AuthenticationService.refreshToken();
-
-          if ("error" in result || !result.token) {
-            console.warn("⚠️ Token refresh failed - Auto logout");
-            isRefreshing = false;
-            refreshTokenSubject.next(null);
-
-            if (!isLoggingOut) {
-              isLoggingOut = true;
-              await performLogout();
-              setTimeout(() => {
-                isLoggingOut = false;
-              }, 1000);
-            }
-            return Promise.reject(error);
-          }
-
-          const newToken = result.token;
-          setAccessToken(newToken);
-          isRefreshing = false;
-          refreshTokenSubject.next(newToken);
-
-          // Retry the original request
-          console.log("✅ Token refreshed successfully - Retrying request");
-          originalConfig._retry = true;
-          if (originalConfig.headers) {
-            originalConfig.headers.Authorization = `Bearer ${newToken}`;
-          }
-          return apiClient(originalConfig);
-        } catch (refreshError) {
-          console.error("❌ Token refresh error - Auto logout:", refreshError);
-          isRefreshing = false;
-          refreshTokenSubject.next(null);
-
+      try {
+        const newToken = await refreshAccessToken();
+        if (!newToken) {
           if (!isLoggingOut) {
             isLoggingOut = true;
             await performLogout();
-            setTimeout(() => {
-              isLoggingOut = false;
-            }, 1000);
+            setTimeout(() => { isLoggingOut = false; }, 1000);
           }
-          return Promise.reject(refreshError);
+          return Promise.reject(error);
         }
-      } else {
-        // Wait for the token refresh to complete
-        console.log("⏳ Waiting for ongoing token refresh...");
-        return new Promise((resolve, reject) => {
-          refreshTokenSubject.pipe(take(1)).subscribe((token) => {
-            if (token) {
-              originalConfig._retry = true;
-              if (originalConfig.headers) {
-                originalConfig.headers.Authorization = `Bearer ${token}`;
-              }
-              resolve(apiClient(originalConfig));
-            } else {
-              reject(error);
-            }
-          });
-        });
+
+        originalConfig._retry = true;
+        originalConfig.headers = originalConfig.headers || new AxiosHeaders();
+        originalConfig.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient(originalConfig);
+      } catch (refreshError) {
+        if (!isLoggingOut) {
+          isLoggingOut = true;
+          await performLogout();
+          setTimeout(() => { isLoggingOut = false; }, 1000);
+        }
+        return Promise.reject(refreshError);
       }
     }
 
-    // Handle 403 Forbidden - invalid token or access denied, auto logout
+    // A valid user can receive 403 for a single protected capability. Logging
+    // out here creates a redirect loop on dashboards that load mixed-permission
+    // widgets. Only 401 is allowed to refresh/expire the whole session.
     if (error.response?.status === 403) {
-      console.warn(
-        "🔒 403 Forbidden - Auto logout due to invalid token or access denied"
-      );
-      if (!isLoggingOut) {
-        isLoggingOut = true;
-        await performLogout();
-        setTimeout(() => {
-          isLoggingOut = false;
-        }, 1000);
-      }
       return Promise.reject(error);
     }
 
@@ -424,6 +395,7 @@ export const clearAuthData = (): void => {
 
 export const setAuthToken = (token: string): void => {
   setAccessToken(token);
+  publishTokenRefresh(token);
 };
 
 export { apiClient };

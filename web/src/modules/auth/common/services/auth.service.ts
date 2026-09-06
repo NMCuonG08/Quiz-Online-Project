@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api";
 import { apiRoutes } from "@/lib/apiRoutes";
 import { LoginFormData, RegisterFormData } from "../schema/auth";
+import axios from "axios";
 
 export class AuthenticationService {
   static async forgotPassword(email: string) {
@@ -117,15 +118,16 @@ export class AuthenticationService {
     }
   }
 
-  // Refresh token method - DISABLED
+  // Refresh through a bare Axios client so a 401 from this endpoint cannot
+  // recursively enter the normal 401 interceptor.
   static async refreshToken(): Promise<
     | { token?: string; user?: unknown }
     | { error: { message: string; code: string } }
   > {
     try {
       // Expect backend to read refresh token from HttpOnly cookie
-      const refreshResponse = await apiClient.post(
-        apiRoutes.AUTH.REFRESH,
+      const refreshResponse = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333"}${apiRoutes.AUTH.REFRESH}`,
         {},
         {
           headers: {

@@ -4,6 +4,7 @@
 import { cn } from "@/lib/utils";
 import { Link, usePathname } from "@/common/i18n/navigation";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { NAV_DATA } from "./data";
 import { ArrowLeftIcon, ChevronUp } from "./icons";
 import { MenuItem } from "./menu-item";
@@ -54,7 +55,7 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "max-w-[290px] overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-linear dark:border-gray-800  dark:bg-[#122031]",
+          "max-w-[290px] overflow-hidden border-r border-border bg-card transition-[width] duration-200 ease-linear",
           isMobile ? "fixed bottom-0 top-0 z-50" : "sticky top-0 h-screen",
           isOpen ? "w-full" : "w-0"
         )}
@@ -67,9 +68,10 @@ export function Sidebar() {
             <Link
               href={"/"}
               onClick={() => isMobile && toggleSidebar()}
-              className="px-0 py-2.5 min-[850px]:py-0"
+              className="flex items-center gap-2 px-0 py-2.5 min-[850px]:py-0"
             >
-              {/* <Logo /> */}
+              <Image src="/logo.png" alt="CourseCo" width={34} height={34} className="size-8 object-contain" />
+              <span className="text-base font-bold tracking-tight text-foreground">CourseCo Admin</span>
             </Link>
 
             {isMobile && (
@@ -88,7 +90,7 @@ export function Sidebar() {
           <div className="custom-scrollbar mt-6 flex-1 overflow-y-auto pr-3 min-[850px]:mt-10">
             {NAV_DATA.map((section) => (
               <div key={section.label} className="mb-6">
-                <h2 className="mb-5 text-sm font-medium text-dark-4 dark:text-white">
+                <h2 className="mb-5 text-sm font-medium text-muted-foreground">
                   {section.label}
                 </h2>
 

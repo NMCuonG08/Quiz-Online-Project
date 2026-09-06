@@ -124,6 +124,52 @@ TOOLS = [
         {},
     ),
     function_tool(
+        "search_users",
+        "Search real user profiles by name or username for the signed-in user. Each result includes the current friendship status when available.",
+        {"query": NON_EMPTY_STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 20}},
+        ["query"],
+    ),
+    function_tool(
+        "get_friends",
+        "List the signed-in user's accepted friends, including the friendship id needed for later removal.",
+        {"limit": {"type": "integer", "minimum": 1, "maximum": 100}},
+    ),
+    function_tool(
+        "get_friend_requests",
+        "List incoming, outgoing, or both pending friend requests for the signed-in user.",
+        {"direction": {"type": "string", "enum": ["incoming", "outgoing", "all"]}, "limit": {"type": "integer", "minimum": 1, "maximum": 100}},
+    ),
+    function_tool(
+        "get_friendship_status",
+        "Get the signed-in user's relationship status with one user id. Use this to confirm whether a request can be sent or accepted.",
+        {"user_id": NON_EMPTY_STRING},
+        ["user_id"],
+    ),
+    function_tool(
+        "get_friends_leaderboard",
+        "Show the signed-in user and their friends' best completed attempts for one quiz, ordered by score then fastest time.",
+        {"quiz_id": NON_EMPTY_STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 50}},
+        ["quiz_id"],
+    ),
+    function_tool(
+        "send_friend_request",
+        "Send a friend request to one user. Requires the user's approval before it is sent.",
+        {"friend_id": NON_EMPTY_STRING},
+        ["friend_id"],
+    ),
+    function_tool(
+        "accept_friend_request",
+        "Accept an incoming friend request. Requires the user's approval before it is accepted.",
+        {"friendship_id": NON_EMPTY_STRING},
+        ["friendship_id"],
+    ),
+    function_tool(
+        "remove_friendship",
+        "Cancel an outgoing request, reject an incoming request, or remove an accepted friendship. Only call after explicit confirmation in the current message.",
+        {"friendship_id": NON_EMPTY_STRING, "confirmed": BOOLEAN},
+        ["friendship_id", "confirmed"],
+    ),
+    function_tool(
         "search_quizzes",
         "Search real quizzes in the application database by title or description. Returns items and pagination.",
         {"query": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 20}},

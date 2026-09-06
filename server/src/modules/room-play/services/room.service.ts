@@ -15,6 +15,24 @@ import type { $Enums } from '@prisma/client';
 
 @Injectable()
 export class RoomService extends BaseService {
+  async inviteFriends(userId: string, roomId: string, friendIds: string[]) {
+    if (!this.isValidUUID(roomId) || !friendIds?.length) throw new BadRequestException('A room and at least one friend are required');
+    const room = await this.roomRepository.findUnique({ id: roomId });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.owner_id !== userId) throw new ForbiddenException('Only the room owner can invite friends');
+    if (room.status !== 'OPEN') throw new BadRequestException('This room is no longer accepting invitations');
+    const uniqueIds = [...new Set(friendIds)].filter((id) => id !== userId).slice(0, 20);
+    const friendships = await this.prisma.friendship.findMany({ where: { status: 'ACCEPTED', OR: [{ userId, friendId: { in: uniqueIds } }, { friendId: userId, userId: { in: uniqueIds } }] }, select: { userId: true, friendId: true } });
+    const acceptedIds = new Set(friendships.map((friendship) => friendship.userId === userId ? friendship.friendId : friendship.userId));
+    const participants = await this.prisma.roomParticipant.findMany({ where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE'] } }, select: { user_id: true } }).catch(() => []);
+    const participantIds = new Set(participants.map((participant) => participant.user_id));
+    const invitedIds = uniqueIds.filter((id) => acceptedIds.has(id) && !participantIds.has(id));
+    await Promise.all(invitedIds.map(async (friendId) => {
+      await this.prisma.notification.create({ data: { user_id: friendId, type: 'QUIZ_INVITE', title: 'Lời mời tham gia quiz', message: 'Bạn được mời tham gia một phòng quiz.', data: { kind: 'ROOM_INVITE', roomId, inviterId: userId } } });
+      await this.eventRepository.emit('Notification', { userId: friendId, title: 'Lời mời tham gia quiz', message: 'Bạn được mời tham gia một phòng quiz.', type: 'info', actionUrl: `/room/${roomId}` });
+    }));
+    return { invited_count: invitedIds.length, skipped_count: uniqueIds.length - invitedIds.length };
+  }
   async createRoom(userId: string, dto: CreateRoomDto): Promise<QuizRoom> {
     const roomCode =
       dto.room_code || this.cryptoRepository.randomBytesAsText(6);
@@ -309,6 +327,19 @@ export class RoomService extends BaseService {
     return { room_id: roomId, participants, live_sockets };
   }
 
+  async getGameRoster(roomId: string): Promise<Array<{ userId: string; username: string }>> {
+    const rows = await this.prisma.roomParticipant.findMany({
+      where: { room_id: roomId, status: { in: ['JOINED', 'ACTIVE', 'DISCONNECTED', 'FINISHED'] } },
+      orderBy: { joined_at: 'asc' },
+    });
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: rows.map((row) => row.user_id) } },
+      select: { id: true, username: true, full_name: true, email: true },
+    });
+    const names = new Map(users.map((user) => [user.id, user.full_name || user.username || user.email]));
+    return rows.map((row) => ({ userId: row.user_id, username: names.get(row.user_id) || row.user_id.slice(0, 8) }));
+  }
+
   async joinRoomViaWebSocket(
     userId: string,
     roomId: string,
@@ -505,7 +536,7 @@ export class RoomService extends BaseService {
     roomId: string,
     questionId: string,
     answer: string | string[],
-    timeSpent: number, // reserved for server-side time bonus rules
+    timeSpent: number, // server-calculated elapsed seconds; gateway applies speed weighting
   ): Promise<{ isCorrect: boolean; correctAnswer: string; points: number }> {
     void timeSpent;
     // Verify room and participant
@@ -605,6 +636,23 @@ export class RoomService extends BaseService {
     });
   }
 
+  async getPersistedFinalLeaderboard(roomId: string): Promise<unknown[]> {
+    const room = await this.prisma.quizRoom.findUnique({ where: { id: roomId }, select: { settings: true } });
+    if (!room || !room.settings || typeof room.settings !== 'object' || Array.isArray(room.settings)) return [];
+    const leaderboard = (room.settings as Record<string, unknown>).finalLeaderboard;
+    return Array.isArray(leaderboard) ? leaderboard : [];
+  }
+
+  async getPersistedRealtimeAnswers(roomId: string, questionId: string): Promise<Record<string, unknown>[]> {
+    const room = await this.prisma.quizRoom.findUnique({ where: { id: roomId }, select: { settings: true } });
+    if (!room || !room.settings || typeof room.settings !== 'object' || Array.isArray(room.settings)) return [];
+    const answers = (room.settings as Record<string, unknown>).gameAnswers;
+    if (!Array.isArray(answers)) return [];
+    return answers.filter((answer): answer is Record<string, unknown> =>
+      Boolean(answer && typeof answer === 'object' && (answer as Record<string, unknown>).questionId === questionId),
+    );
+  }
+
   async persistGameSnapshot(
     roomId: string,
     snapshot: Record<string, unknown>,
@@ -628,5 +676,31 @@ export class RoomService extends BaseService {
         } as Prisma.InputJsonValue,
       },
     });
+  }
+
+  async persistRealtimeAnswer(
+    roomId: string,
+    answer: Record<string, unknown>,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const room = await tx.quizRoom.findUnique({ where: { id: roomId } });
+      if (!room) throw new NotFoundException('Room not found');
+      const settings =
+        room.settings && typeof room.settings === 'object' && !Array.isArray(room.settings)
+          ? (room.settings as Record<string, unknown>)
+          : {};
+      const current = Array.isArray(settings.gameAnswers) ? settings.gameAnswers : [];
+      const key = `${String(answer.userId)}:${String(answer.questionId)}`;
+      const next = current.filter((item) => {
+        if (!item || typeof item !== 'object') return true;
+        const value = item as Record<string, unknown>;
+        return `${String(value.userId)}:${String(value.questionId)}` !== key;
+      });
+      next.push(answer);
+      await tx.quizRoom.update({
+        where: { id: roomId },
+        data: { settings: { ...settings, gameAnswers: next } as Prisma.InputJsonValue },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }

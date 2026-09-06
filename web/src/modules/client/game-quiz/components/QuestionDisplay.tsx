@@ -63,7 +63,7 @@ export const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
         userAnswer={mappedUserAnswer}
         onAnswerSelect={handleSelect}
         readOnly={isAnswered}
-        showCorrectAnswers={isAnswered}
+      showCorrectAnswers={false}
       />
     </div>
   );

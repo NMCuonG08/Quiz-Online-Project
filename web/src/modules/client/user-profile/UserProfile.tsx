@@ -1,10 +1,15 @@
+"use client";
+
 import React from "react";
+import { useSearchParams } from "next/navigation";
 import Profile from "./components/Profile";
 import { FriendsList } from "./components/FriendsList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/common/components/ui/tabs";
 import { User, Users } from "lucide-react";
 
-const UserProfile = () => {
+const UserProfile = ({ defaultTab }: { defaultTab?: "profile" | "friends" } = {}) => {
+  const searchParams = useSearchParams();
+  const tab = defaultTab || (searchParams.get("tab") === "friends" ? "friends" : "profile");
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="mb-6">
@@ -12,7 +17,7 @@ const UserProfile = () => {
         <p className="text-muted-foreground">Quản lý tài khoản, thông tin cơ bản và kết nối bạn bè.</p>
       </div>
 
-      <Tabs defaultValue="profile" className="w-full">
+      <Tabs defaultValue={tab} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" /> Thông tin chung

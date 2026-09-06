@@ -365,7 +365,10 @@ export class AuthService extends BaseService {
   }: ValidateRequest): Promise<AuthDto> {
     const authDto = await this.validate({ headers, queryParams });
     const { adminRoute, sharedLinkRoute, uri } = metadata;
-    const requestedPermission = metadata.permission ?? Permission.All;
+    // `@Authenticated()` means authentication-only. Endpoints that require a
+    // capability must opt in with an explicit permission; defaulting to `all`
+    // incorrectly rejects every normal user on community/friendship routes.
+    const requestedPermission = metadata.permission ?? false;
 
     if (adminRoute && (!authDto.user || !authDto.user.isAdmin)) {
       this.logger.warn(`Denied access to admin only route: ${uri}`);

@@ -24,6 +24,7 @@ class WebSocketManager {
   >();
   private pendingEmits: Array<{ event: string; args: unknown[] }> = [];
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private socketRefreshPromise: Promise<string | null> | null = null;
 
   private getRoomIdFromArgs(args: unknown[]): string | null {
     const payload = args[0] as { roomId?: unknown } | undefined;
@@ -132,6 +133,10 @@ class WebSocketManager {
           });
 
           socket.on("connect_error", (error) => {
+            if (error.message === "Unauthorized" && this.tokenSubject$.value) {
+              void this.refreshSocketToken();
+              return;
+            }
             console.error("🚨 WebSocket connection error:", error.message);
             this.statusSubject$.next('error');
             this.emit("error", error);
@@ -176,25 +181,58 @@ class WebSocketManager {
   private handlePostConnect() {
     if (!this.socket) return;
 
-    // Flush pending emits
-    if (this.pendingEmits.length) {
-      console.log(`🚀 Flushing ${this.pendingEmits.length} pending emits`);
-      const toSend = [...this.pendingEmits];
-      this.pendingEmits = [];
-      toSend.forEach(({ event, args }) => {
-        this.socket!.emit(event, ...args);
-      });
-    }
-
     // Rejoin rooms
     if (this.joinedRooms.size > 0) {
       console.log(`🏠 Rejoining ${this.joinedRooms.size} rooms`);
       this.joinedRooms.forEach((roomId) => {
         this.socket!.emit("join_room", { roomId });
-        this.socket!.emit("get_participants", { roomId });
-        this.socket!.emit("get_messages", { roomId });
       });
     }
+
+    // Join handlers are asynchronous on the server. Replay commands only after
+    // room membership has had a chance to be restored, otherwise an answer
+    // queued during a network drop could be rejected as "not a participant".
+    const flushPending = () => {
+      if (!this.socket || !this.pendingEmits.length) return;
+      console.log(`🚀 Flushing ${this.pendingEmits.length} pending emits`);
+      const toSend = [...this.pendingEmits];
+      this.pendingEmits = [];
+      toSend.forEach(({ event, args }) => this.socket!.emit(event, ...args));
+    };
+    if (this.joinedRooms.size > 0) window.setTimeout(flushPending, 150);
+    else flushPending();
+  }
+
+  private async refreshSocketToken(): Promise<string | null> {
+    if (this.socketRefreshPromise) return this.socketRefreshPromise;
+    this.socketRefreshPromise = (async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3333"}/api/auth/refresh-cookie`,
+          { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: "{}" },
+        );
+        if (!response.ok) {
+          if (typeof window !== "undefined") window.dispatchEvent(new Event("auth-session-expired"));
+          return null;
+        }
+        const payload = await response.json() as { accessToken?: string; token?: string; data?: { accessToken?: string; token?: string } };
+        const token = payload.data?.accessToken || payload.data?.token || payload.accessToken || payload.token;
+        if (!token) {
+          if (typeof window !== "undefined") window.dispatchEvent(new Event("auth-session-expired"));
+          return null;
+        }
+        localStorage.setItem("auth_token", token);
+        window.dispatchEvent(new CustomEvent("auth-token-refreshed", { detail: { token } }));
+        await this.reconnectWithNewToken(token);
+        return token;
+      } catch {
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("auth-session-expired"));
+        return null;
+      } finally {
+        this.socketRefreshPromise = null;
+      }
+    })();
+    return this.socketRefreshPromise;
   }
 
   private registerEventListeners(socket: Socket) {
@@ -203,7 +241,8 @@ class WebSocketManager {
     
     // Internal helper to setup common listeners
     const setupCommonListeners = (s: Socket) => {
-      s.on("notification", (data) => this.emit("notification", data));
+          s.on("notification", (data) => this.emit("notification", data));
+          s.on("direct_message", (data) => this.emit("direct_message", data));
       s.on("room_message", (msg) => this.emit("room_message", msg));
       s.on("messages_list", (list) => this.emit("messages_list", list));
       s.on("room_joined", (p) => this.emit("room_joined", p));
@@ -227,6 +266,8 @@ class WebSocketManager {
       s.on("answer_error", (payload) => this.emit("answer_error", payload));
       s.on("score_update_rejected", (payload) => this.emit("score_update_rejected", payload));
       s.on("game_state", (payload) => this.emit("game_state", payload));
+      s.on("question_reveal", (payload) => this.emit("question_reveal", payload));
+      s.on("answer_progress", (payload) => this.emit("answer_progress", payload));
       s.on("game_error", (payload) => this.emit("game_error", payload));
     };
 

@@ -135,7 +135,7 @@ const ListQuizTable = () => {
                     <TableCell className="min-w-[80px] xl:pl-7.5">
                       <div className="flex-shrink-0">
                         <Image
-                          src={item.thumbnail_url || "/logo.jpg"}
+                          src={item.thumbnail_url || "/logo.png"}
                           alt={item.title}
                           width={60}
                           height={60}

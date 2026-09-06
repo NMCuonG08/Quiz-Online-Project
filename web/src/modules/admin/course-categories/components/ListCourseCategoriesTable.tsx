@@ -129,7 +129,7 @@ const ListCourseCategoriesTable = () => {
 
                                     <TableCell className="min-w-[155px]">
                                         <Image
-                                            src={item.icon_url || "/logo.jpg"}
+                                            src={item.icon_url || "/logo.png"}
                                             alt={item.name}
                                             width={50}
                                             height={50}

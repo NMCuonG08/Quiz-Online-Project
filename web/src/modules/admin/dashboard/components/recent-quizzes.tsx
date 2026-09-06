@@ -78,7 +78,7 @@ export function RecentQuizzes({
                                 <TableCell>{quiz.creator.full_name || quiz.creator.username}</TableCell>
 
                                 <TableCell className="!text-right">
-                                    {new Date(quiz.created_at).toLocaleDateString()}
+                                    {new Date(quiz.created_at).toISOString().slice(0, 10)}
                                 </TableCell>
                             </TableRow>
                         ))

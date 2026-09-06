@@ -175,6 +175,14 @@ export class RoomController {
     return this.roomService.joinRoom(auth.user.id, id, dto);
   }
 
+  @ApiOperation({ summary: 'Invite accepted friends to an open room' })
+  @UseGuards(AuthGuard)
+  @Authenticated({ permission: Permission.ActivityRead })
+  @Post(':id/invite')
+  inviteFriends(@Auth() auth: AuthDto, @Param('id') id: string, @Body() body: { friend_ids: string[] }) {
+    return this.roomService.inviteFriends(auth.user.id, id, body.friend_ids);
+  }
+
   @ApiOperation({ summary: 'List participants of a room' })
   @UseGuards(AuthGuard)
   @Authenticated({ permission: Permission.ActivityRead })

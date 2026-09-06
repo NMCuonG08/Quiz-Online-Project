@@ -41,7 +41,7 @@ const OffersSection = () => {
       variant="elevated"
       size="xl"
       rounded="xl"
-      className=" py-16 px-4 sm:px-8 lg:px-12 bg-[#FFF5F5] dark:bg-gray-dark  w-full"
+      className="py-16 px-4 sm:px-8 lg:px-12 bg-muted/50 w-full"
     >
       <div className="max-w-7xl mx-auto">
         {/* Header with title and SVG stars */}
@@ -92,7 +92,7 @@ const OffersSection = () => {
               key={offer.id}
               className={`relative overflow-hidden h-full flex flex-col ${offer.featured
                 ? "shadow-lg bg-card"
-                : "bg-card/80 backdrop-blur-sm hover:bg-card transition-all duration-300"
+                : "bg-card/90 hover:bg-card transition-colors duration-200"
                 }`}
               style={{
                 backgroundImage: `url(${offer.image})`,
@@ -101,6 +101,7 @@ const OffersSection = () => {
                 backgroundRepeat: "no-repeat",
               }}
             >
+              <div className="absolute inset-0 bg-card/80" />
               {/* Background pattern for featured card */}
               {offer.featured && (
                 <div className="absolute inset-0 opacity-20">
@@ -132,7 +133,7 @@ const OffersSection = () => {
 
                   {/* Title */}
                   <CardTitle
-                    className={`text-lg dark:text-black font-bold ${offer.featured ? "text-foreground" : "text-foreground"
+                    className={`text-lg font-bold ${offer.featured ? "text-foreground" : "text-foreground"
                       }`}
                   >
                     {offer.title}
@@ -141,7 +142,7 @@ const OffersSection = () => {
 
                 {/* Description */}
                 <CardDescription
-                  className={`text-sm leading-relaxed dark:text-black flex-grow ${offer.featured
+                  className={`text-sm leading-relaxed flex-grow ${offer.featured
                     ? "text-muted-foreground"
                     : "text-muted-foreground"
                     }`}

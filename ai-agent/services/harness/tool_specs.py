@@ -44,6 +44,7 @@ _WRITE_TOOLS = frozenset({
     "update_question", "delete_question", "duplicate_question", "reorder_questions",
     "create_category", "update_category", "delete_category", "import_knowledge_url",
     "submit_knowledge_review", "review_knowledge",
+    "send_friend_request", "accept_friend_request", "remove_friendship",
 })
 _ADMIN_ONLY_TOOLS = frozenset({
     "create_category", "update_category", "delete_category", "review_knowledge",
@@ -68,6 +69,10 @@ _CAPABILITY_BY_TOOL = {
     "review_knowledge": "knowledge", "render_ui": "presentation",
     "plan_interaction": "planning", "get_my_quizzes": "authoring",
     "list_questions": "authoring", "get_quiz_build_status": "authoring",
+    "search_users": "social", "get_friends": "social", "get_friend_requests": "social",
+    "get_friendship_status": "social", "get_friends_leaderboard": "social",
+    "send_friend_request": "social", "accept_friend_request": "social",
+    "remove_friendship": "social",
 }
 
 

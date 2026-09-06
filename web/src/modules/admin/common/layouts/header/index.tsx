@@ -18,7 +18,7 @@ export function Header() {
   const locale = useLocale();
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-stroke  dark:bg-[#122031] bg-white px-4 py-5 shadow-1 dark:border-stroke-dark dark:bg-[#122031] md:px-5 2xl:px-10">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 py-5 shadow-sm md:px-5 2xl:px-10">
       <button
         onClick={toggleSidebar}
         className="rounded-lg border px-1.5 py-1 dark:border-stroke-dark dark:bg-[#020D1A] hover:dark:bg-[#FFFFFF1A] lg:hidden"
@@ -43,7 +43,7 @@ export function Header() {
       )}
 
       <div className="max-xl:hidden">
-        <h1 className="mb-0.5 text-heading-5 font-bold text-dark dark:text-white">
+        <h1 className="mb-0.5 text-heading-5 font-bold text-foreground">
           {tNav("dashboard")}
         </h1>
         <p className="font-medium">{tCommon("adminSubtitle")}</p>
@@ -54,7 +54,7 @@ export function Header() {
           <input
             type="search"
             placeholder={tCommon("search")}
-            className="flex w-full items-center gap-3.5 rounded-full border bg-gray-2 py-3 pl-[53px] pr-5 outline-none transition-colors focus-visible:border-primary dark:border-dark-3 dark:bg-[#122031] dark:hover:border-dark-4 dark:hover:bg-[#122031]  dark:hover:text-dark-6 dark:focus-visible:border-primary"
+            className="flex w-full items-center gap-3.5 rounded-full border border-border bg-muted py-3 pl-[53px] pr-5 text-foreground outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
           />
 
           <SearchIcon className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 max-[1015px]:size-5" />

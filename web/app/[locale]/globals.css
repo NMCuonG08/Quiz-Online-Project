@@ -13,76 +13,76 @@
 
 
 :root {
-  --radius: 0.625rem;
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  --radius: 0.75rem;
+  --background: 220 33% 97%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 239 72% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 22% 93%;
+  --secondary-foreground: 222 47% 15%;
+  --muted: 220 22% 94%;
+  --muted-foreground: 215 16% 42%;
+  --accent: 188 86% 38%;
+  --accent-foreground: 0 0% 100%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
+  --border: 220 18% 88%;
+  --input: 220 18% 86%;
+  --ring: 239 72% 58%;
   --chart-1: 12 76% 61%;
   --chart-2: 173 58% 39%;
   --chart-3: 197 37% 24%;
   --chart-4: 43 74% 66%;
   --chart-5: 27 87% 67%;
-  --sidebar: 0 0% 98%;
-  --sidebar-foreground: 222.2 84% 4.9%;
-  --sidebar-primary: 222.2 47.4% 11.2%;
-  --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 210 40% 96%;
-  --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-  --sidebar-border: 214.3 31.8% 91.4%;
-  --sidebar-ring: 222.2 84% 4.9%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-primary: 239 72% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 22% 94%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-border: 220 18% 88%;
+  --sidebar-ring: 239 72% 58%;
 }
 
 .dark {
   /* Override tokens for dark mode so bg-gray auto-switches */
   --color-gray: #122031;
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  --background: 222 47% 8%;
+  --foreground: 220 20% 96%;
+  --card: 222 38% 13%;
+  --card-foreground: 220 20% 96%;
+  --popover: 222 38% 13%;
+  --popover-foreground: 220 20% 96%;
+  --primary: 239 84% 68%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 222 28% 19%;
+  --secondary-foreground: 220 20% 96%;
+  --muted: 222 28% 18%;
+  --muted-foreground: 217 15% 70%;
+  --accent: 188 86% 52%;
+  --accent-foreground: 222 47% 11%;
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
+  --border: 222 23% 25%;
+  --input: 222 23% 27%;
+  --ring: 239 84% 68%;
   --chart-1: 220 70% 50%;
   --chart-2: 160 60% 45%;
   --chart-3: 30 80% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
-  --sidebar: 222.2 84% 4.9%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 210 40% 98%;
-  --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-  --sidebar-accent: 217.2 32.6% 17.5%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 217.2 32.6% 17.5%;
-  --sidebar-ring: 212.7 26.8% 83.9%;
+  --sidebar: 222 47% 8%;
+  --sidebar-foreground: 220 20% 96%;
+  --sidebar-primary: 239 84% 68%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 222 28% 18%;
+  --sidebar-accent-foreground: 220 20% 96%;
+  --sidebar-border: 222 23% 25%;
+  --sidebar-ring: 239 84% 68%;
 }
 
 @layer base {
@@ -94,9 +94,8 @@
     @apply bg-background text-foreground transition-colors duration-300;
   }
 
-  /* Smooth transitions for theme switching */
-  * {
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  body {
+    transition: background-color 160ms ease-out, color 160ms ease-out;
   }
 
   /* Dark mode specific improvements */
