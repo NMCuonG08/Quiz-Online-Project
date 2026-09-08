@@ -6,14 +6,17 @@ import {
   Param,
   Body,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FriendshipService } from '../services/friendship.service';
 import { SendFriendRequestDto } from '../dtos/friendship.dto';
 import { AuthGuard, Authenticated, Auth } from '@/common/guards/auth.guard';
 import { AuthDto } from '@/modules/auth/dto';
+import { AiIdempotencyInterceptor } from '@/common/interceptors/ai-idempotency.interceptor';
 
 @Controller('/api/friendships')
 @UseGuards(AuthGuard)
+@UseInterceptors(AiIdempotencyInterceptor)
 export class FriendshipController {
   constructor(private readonly friendshipService: FriendshipService) {}
 

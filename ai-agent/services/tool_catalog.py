@@ -228,8 +228,8 @@ TOOLS = [
     function_tool(
         "delete_category",
         "Admin only: delete a quiz category. Requires confirmation.",
-        {"category_id": STRING},
-        ["category_id"],
+        {"category_id": STRING, "confirmed": BOOLEAN},
+        ["category_id", "confirmed"],
     ),
     function_tool(
         "create_quiz",

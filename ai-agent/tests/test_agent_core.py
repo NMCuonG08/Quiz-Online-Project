@@ -77,6 +77,18 @@ class ApprovalContractTests(unittest.IsolatedAsyncioTestCase):
                 "Bearer token", "user-1", "creator",
             )
 
+    async def test_approval_survives_rotated_access_token(self):
+        _, surface, _ = await self.core._execute_tool(
+            "send_friend_request", {"friend_id": "user-2"},
+            "Bearer token-old", "user-1", "learner",
+        )
+        self.core.tools.send_friend_request = AsyncMock(return_value={"id": "friendship-1"})
+        events = [event async for event in self.core._approve(
+            surface.actions[0].value, "Bearer token-new", "user-1", "learner",
+        )]
+        self.assertEqual(events[-1]["intent"], "approved_write")
+        self.core.tools.send_friend_request.assert_awaited_once()
+
     async def test_friend_request_is_proposed_then_executed_with_idempotency(self):
         result, surface, _ = await self.core._execute_tool(
             "send_friend_request", {"friend_id": "user-2"},
@@ -644,6 +656,8 @@ class LangGraphContractTests(unittest.TestCase):
             })
         with self.assertRaisesRegex(ValueError, "KNOWLEDGE_REJECTION_REASON_REQUIRED"):
             core._validate_tool_semantics("review_knowledge", {"status": "QUARANTINED"})
+        self.assertFalse(core._has_explicit_confirmation("Tôi không đồng ý xóa"))
+        self.assertFalse(core._has_explicit_confirmation("Do not confirm deletion"))
 
     def test_catalog_validation_rejects_out_of_range_values(self):
         core = AIAgentCore({})

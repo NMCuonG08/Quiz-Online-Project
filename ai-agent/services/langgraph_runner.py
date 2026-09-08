@@ -51,6 +51,7 @@ KnowledgeReviewStatus = Literal["PUBLISHED", "QUARANTINED"]
 Limit10 = Annotated[int, Field(ge=1, le=10)]
 Limit20 = Annotated[int, Field(ge=1, le=20)]
 Limit50 = Annotated[int, Field(ge=1, le=50)]
+Limit100 = Annotated[int, Field(ge=1, le=100)]
 Limit200 = Annotated[int, Field(ge=1, le=200)]
 PositiveNumber = Annotated[float, Field(ge=1)]
 NonNegativeNumber = Annotated[float, Field(ge=0)]
@@ -785,6 +786,44 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Fo
                 return await dispatch("get_my_permissions", {})
             tools.append(get_my_permissions)
 
+        if include("search_users"):
+            @tool
+            async def search_users(query: Annotated[str, Field(min_length=1)], limit: Limit20 = 10) -> str:
+                """Search users by name or username for the signed-in user."""
+                return await dispatch("search_users", {"query": query, "limit": limit})
+            tools.append(search_users)
+
+        if include("get_friends"):
+            @tool
+            async def get_friends(limit: Limit100 = 50) -> str:
+                """List accepted friends for the signed-in user."""
+                return await dispatch("get_friends", {"limit": limit})
+            tools.append(get_friends)
+
+        if include("get_friend_requests"):
+            @tool
+            async def get_friend_requests(
+                direction: Literal["incoming", "outgoing", "all"] = "all",
+                limit: Limit100 = 50,
+            ) -> str:
+                """List incoming and/or outgoing pending friend requests."""
+                return await dispatch("get_friend_requests", {"direction": direction, "limit": limit})
+            tools.append(get_friend_requests)
+
+        if include("get_friendship_status"):
+            @tool
+            async def get_friendship_status(user_id: Annotated[str, Field(min_length=1)]) -> str:
+                """Get the relationship status with one user id."""
+                return await dispatch("get_friendship_status", {"user_id": user_id})
+            tools.append(get_friendship_status)
+
+        if include("get_friends_leaderboard"):
+            @tool
+            async def get_friends_leaderboard(quiz_id: Annotated[str, Field(min_length=1)], limit: Limit50 = 10) -> str:
+                """Show friends ordered by quiz score and time."""
+                return await dispatch("get_friends_leaderboard", {"quiz_id": quiz_id, "limit": limit})
+            tools.append(get_friends_leaderboard)
+
         if include("search_quizzes"):
             @tool
             async def search_quizzes(query: str, limit: Limit20 = 10) -> str:
@@ -851,9 +890,9 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Fo
 
         if include("delete_category"):
             @tool
-            async def delete_category(category_id: str) -> str:
+            async def delete_category(category_id: str, confirmed: bool) -> str:
                 """Admin only: propose deleting a category; execution requires Accept."""
-                return await dispatch("delete_category", {"category_id": category_id})
+                return await dispatch("delete_category", {"category_id": category_id, "confirmed": confirmed})
             tools.append(delete_category)
 
         if include("get_my_quizzes"):
@@ -1132,6 +1171,27 @@ Return plan_interaction exactly once. Extract entities and secondary intents. Fo
                     "rejection_reason": rejection_reason,
                 })
             tools.append(review_knowledge)
+
+        if include("send_friend_request"):
+            @tool
+            async def send_friend_request(friend_id: Annotated[str, Field(min_length=1)]) -> str:
+                """Propose sending a friend request; execution requires Accept."""
+                return await dispatch("send_friend_request", {"friend_id": friend_id})
+            tools.append(send_friend_request)
+
+        if include("accept_friend_request"):
+            @tool
+            async def accept_friend_request(friendship_id: Annotated[str, Field(min_length=1)]) -> str:
+                """Propose accepting a friend request; execution requires Accept."""
+                return await dispatch("accept_friend_request", {"friendship_id": friendship_id})
+            tools.append(accept_friend_request)
+
+        if include("remove_friendship"):
+            @tool
+            async def remove_friendship(friendship_id: Annotated[str, Field(min_length=1)], confirmed: bool) -> str:
+                """Propose removing a friendship after explicit confirmation."""
+                return await dispatch("remove_friendship", {"friendship_id": friendship_id, "confirmed": confirmed})
+            tools.append(remove_friendship)
 
         if include("render_ui"):
             @tool

@@ -43,7 +43,11 @@ class AgentStateStore:
 
     @staticmethod
     def authorization_fingerprint(authorization: Optional[str]) -> str:
-        return hashlib.sha256((authorization or "").encode("utf-8")).hexdigest()
+        # Access tokens rotate during a normal refresh. Approval records are
+        # already bound to user_id and scope, so keep the credential scheme
+        # stable and let the backend verify the refreshed token at execution.
+        scheme = (authorization or "").split(None, 1)[0].lower()
+        return hashlib.sha256(scheme.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _subject_key(user_id: str, session_id: str) -> str:

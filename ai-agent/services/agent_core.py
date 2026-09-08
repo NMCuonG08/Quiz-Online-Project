@@ -2979,6 +2979,7 @@ class AIAgentCore:
             "quiz_delete": "quiz",
             "question_delete": "câu hỏi",
             "category_delete": "category",
+            "friend_remove": "quan hệ bạn bè",
         }
         intent = str(plan.get("intent") or "")
         resource = destructive_intents.get(intent)
@@ -3000,6 +3001,11 @@ class AIAgentCore:
     @staticmethod
     def _has_explicit_confirmation(user_input: str) -> bool:
         normalized = AIAgentCore._enum_key(user_input)
+        if any(marker in normalized for marker in (
+            "KHONG_DONG_Y", "KHONG_XAC_NHAN", "KHONG_CAN_XAC_NHAN",
+            "DO_NOT_CONFIRM", "DONT_CONFIRM", "NO_CONFIRM",
+        )):
+            return False
         return any(marker in normalized for marker in (
             "XAC_NHAN", "DONG_Y", "TOI_CHAC", "CONFIRM", "YES_XOA", "OK_XOA",
         ))
@@ -3545,6 +3551,7 @@ class AIAgentCore:
     ) -> AsyncIterator[Dict[str, Any]]:
         """OpenAI Chat Completions adapter for compatible providers."""
         allowed_tools = self._scope_tools(scope)
+        locale = str((context or {}).get("locale") or "vi")
         persisted_history = await self.state_store.get_chat_messages(user_id, session_id)
         if persisted_history:
             state.chat_messages = persisted_history
@@ -4681,7 +4688,7 @@ class AIAgentCore:
                 item["image_alt"] = item["label"]
             items.append(item)
 
-        destructive = name.startswith("delete_")
+        destructive = name in DESTRUCTIVE_TOOLS
         description = (
             "Thao tác này sẽ xóa dữ liệu và không thể hoàn tác. Hãy kiểm tra kỹ trước khi tiếp tục."
             if destructive else
@@ -4862,6 +4869,14 @@ class AIAgentCore:
             "update_category": "Đang cập nhật category",
             "delete_category": "Đang xóa category",
             "get_quiz_history": "Đang đọc lịch sử làm bài",
+            "search_users": "Đang tìm người dùng",
+            "get_friends": "Đang đọc danh sách bạn bè",
+            "get_friend_requests": "Đang đọc lời mời kết bạn",
+            "get_friendship_status": "Đang kiểm tra quan hệ bạn bè",
+            "get_friends_leaderboard": "Đang đọc bảng xếp hạng bạn bè",
+            "send_friend_request": "Đang gửi lời mời kết bạn",
+            "accept_friend_request": "Đang chấp nhận lời mời kết bạn",
+            "remove_friendship": "Đang xóa quan hệ bạn bè",
             "render_ui": "Đang chuẩn bị giao diện",
         }
         return labels.get(name, f"Đang chạy {name}")

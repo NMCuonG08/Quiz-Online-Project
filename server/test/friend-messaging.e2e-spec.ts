@@ -43,8 +43,14 @@ describe('Friend messaging (e2e)', () => {
     const second = await createUser('second');
     const friendship = await request(app.getHttpServer()).post('/api/friendships/request')
       .set('Authorization', `Bearer ${first.token}`).send({ friendId: second.id }).expect(201);
+    const acceptRequest = request(app.getHttpServer()).post(`/api/friendships/accept/${friendship.body.id}`)
+      .set('Authorization', `Bearer ${second.token}`)
+      .set('Idempotency-Key', `friend-accept-${stamp}`);
+    await acceptRequest.expect(201);
     await request(app.getHttpServer()).post(`/api/friendships/accept/${friendship.body.id}`)
-      .set('Authorization', `Bearer ${second.token}`).expect(201);
+      .set('Authorization', `Bearer ${second.token}`)
+      .set('Idempotency-Key', `friend-accept-${stamp}`)
+      .expect(201);
 
     const conversation = await request(app.getHttpServer()).post('/api/conversations')
       .set('Authorization', `Bearer ${first.token}`).send({ otherUserId: second.id }).expect(201);

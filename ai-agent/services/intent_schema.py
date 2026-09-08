@@ -132,7 +132,7 @@ class InteractionPlan(BaseModel):
 
 READ_ONLY_INTENTS: frozenset[str] = frozenset({
     "conversation_general", "capability_help", "quiz_search", "quiz_recommend",
-    "quiz_detail", "quiz_resume", "quiz_result", "quiz_history", "quiz_owned", "quiz_attempts", "quiz_in_progress", "question_list",
+    "quiz_detail", "quiz_result", "quiz_history", "quiz_owned", "quiz_attempts", "quiz_in_progress", "question_list",
     "category_list", "category_recommend", "knowledge_search", "knowledge_list", "account_identity",
     "account_permissions", "admin_dashboard", "admin_audit", "image_search", "temporal",
     "friend_search", "friend_list", "friend_requests", "friend_relationship", "friends_leaderboard",
@@ -141,7 +141,7 @@ READ_ONLY_INTENTS: frozenset[str] = frozenset({
 
 STRONG_PLANNER_INTENTS: frozenset[str] = frozenset({
     "quiz_create", "quiz_update", "quiz_delete", "quiz_publish", "quiz_unpublish",
-    "quiz_start", "question_create", "question_update", "question_delete",
+    "quiz_start", "quiz_resume", "question_create", "question_update", "question_delete",
     "question_duplicate", "question_reorder", "category_create", "category_update",
     "category_delete", "knowledge_import", "knowledge_submit_review",
     "knowledge_review", "admin_dashboard", "admin_audit",
@@ -185,9 +185,9 @@ INTENT_ALLOWED_TOOLS: dict[str, frozenset[str]] = {
     "knowledge_review": frozenset({"list_knowledge_sources", "review_knowledge", "render_ui"}),
     "account_identity": frozenset({"get_current_user", "render_ui"}),
     "account_permissions": frozenset({"get_current_user", "get_my_permissions", "render_ui"}),
-    "friend_search": frozenset({"search_users", "get_friendship_status", "send_friend_request", "render_ui"}),
+    "friend_search": frozenset({"search_users", "get_friendship_status", "render_ui"}),
     "friend_list": frozenset({"get_friends", "render_ui"}),
-    "friend_requests": frozenset({"get_friend_requests", "accept_friend_request", "remove_friendship", "render_ui"}),
+    "friend_requests": frozenset({"get_friend_requests", "render_ui"}),
     "friend_relationship": frozenset({"get_friendship_status", "render_ui"}),
     "friend_request_send": frozenset({"search_users", "get_friendship_status", "send_friend_request", "render_ui"}),
     "friend_request_accept": frozenset({"get_friend_requests", "accept_friend_request", "render_ui"}),
